@@ -58,6 +58,20 @@ export default function ThemesPage() {
     return vals.reduce((a, b) => a + b, 0) / vals.length;
   };
 
+  // Hottest themes (highest average change%) float to the top. Themes with
+  // no price data yet (still loading, or no matched codes) sink to the
+  // bottom instead of breaking the sort.
+  const sortedThemes = useMemo(() => {
+    return [...filteredThemes].sort((a, b) => {
+      const ca = themeAvgChange(a.stocks);
+      const cb = themeAvgChange(b.stocks);
+      if (ca === null && cb === null) return 0;
+      if (ca === null) return 1;
+      if (cb === null) return -1;
+      return cb - ca;
+    });
+  }, [filteredThemes, priceMap]);
+
   return (
     <div>
       <Header />
@@ -75,9 +89,9 @@ export default function ThemesPage() {
 
         <div className="theme-layout">
           <aside>
-            <h2 className="section-title">전체 테마 ({filteredThemes.length})</h2>
+            <h2 className="section-title">전체 테마 ({sortedThemes.length}) · 🔥 등락률 높은 순</h2>
             <div className="theme-list">
-              {filteredThemes.map((t) => (
+              {sortedThemes.map((t) => (
                 <button
                   key={t.theme}
                   onClick={() => setSelected(t.theme)}
