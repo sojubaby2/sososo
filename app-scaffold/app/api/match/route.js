@@ -27,6 +27,21 @@ function buildCompanyList() {
   return Array.from(seen.values()).join("\n");
 }
 
+// Safety net: extract just the balanced [...] portion even if Claude adds
+// stray text after it despite instructions, instead of letting JSON.parse
+// fail outright on trailing content.
+function extractJsonArray(prefilledText) {
+  let depth = 0;
+  for (let i = 0; i < prefilledText.length; i++) {
+    if (prefilledText[i] === "[") depth++;
+    else if (prefilledText[i] === "]") {
+      depth--;
+      if (depth === 0) return prefilledText.slice(0, i + 1);
+    }
+  }
+  return prefilledText;
+}
+
 const SYSTEM_PROMPT = `너는 한국 주식 뉴스와 종목을 연결하는 분석가야.
 
 아래 [종목 목록]에 있는 종목 중에서만 골라야 해. 목록에 없는 종목이나 코드를 절대 지어내면 안 돼.
@@ -38,9 +53,13 @@ const SYSTEM_PROMPT = `너는 한국 주식 뉴스와 종목을 연결하는 분
 
 진짜 관련된 종목이 없으면 반드시 빈 배열 []을 반환해. 어떻게든 연결을 만들어내려고 하지 마 — 이게 가장 중요한 규칙이야.
 
+중요한 제약 조건 (반드시 지켜):
+- 너한테는 뉴스 제목과 요약만 주어져. 본문 전체는 주어지지 않고, 앞으로도 주어지지 않아. 정보가 부족하다고 본문을 요청하거나 "정확한 판단이 어렵다"는 식으로 되묻지 마. 주어진 정보만으로 최선의 판단을 내려. 정말 판단이 안 서면 그냥 빈 배열 []을 반환해.
+- 응답에는 오직 JSON 배열만 포함해야 해. 설명, 사과, 질문, 코드블록 표시(\`\`\`), 그 어떤 추가 텍스트도 앞뒤로 단 한 글자도 붙이면 안 돼. 이걸 어기면 시스템이 응답을 파싱하지 못해 완전히 실패해.
+
 각 매치에는 reason에 왜 관련되는지 한국어로 한 문장, 20단어 이내로 설명해.
 
-응답은 반드시 아래 JSON 배열 형식이어야 하고, 그 외의 텍스트(설명, 인사말, 코드블록 표시 등)는 절대 포함하지 마:
+응답은 반드시 아래 JSON 배열 형식이어야 해:
 [{"code":"005930","name":"삼성전자","market":"코스피","confidence":"confirmed","reason":"..."}]`;
 
 export async function GET(request) {
@@ -93,7 +112,7 @@ export async function GET(request) {
     }
 
     const continuation = data?.content?.find((c) => c.type === "text")?.text || "]";
-    const fullJson = "[" + continuation;
+    const fullJson = extractJsonArray("[" + continuation);
 
     let matches;
     try {
