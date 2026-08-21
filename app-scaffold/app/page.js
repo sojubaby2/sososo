@@ -27,6 +27,7 @@ function toCardShape(item) {
     source: `자동 수집 · ${item.keyword}`,
     headline: item.title,
     summary: item.summary,
+    link: item.link,
     confidence: hasLegitimate ? "confirmed" : "rumor",
     reason: reason || "관련 근거 정보 없음",
     stocks: item.matches.map((m) => ({ name: m.name, code: m.code, market: m.market })),

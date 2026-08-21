@@ -1,4 +1,4 @@
-import { Clock, ShieldAlert, ShieldCheck } from "lucide-react";
+import { Clock, ShieldAlert, ShieldCheck, ExternalLink } from "lucide-react";
 import StockChip from "./StockChip";
 
 export default function NewsCard({ n }) {
@@ -13,6 +13,12 @@ export default function NewsCard({ n }) {
       </div>
       <h3 className="news-title">{n.headline}</h3>
       <p className="news-summary">{n.summary}</p>
+      {n.link && (
+        <a href={n.link} target="_blank" rel="noopener noreferrer" className="news-link">
+          <ExternalLink size={12} />
+          원문 기사 전체 보기
+        </a>
+      )}
       <div className={`reason-box ${isRumor ? "rumor" : "confirmed"}`}>
         {isRumor ? <ShieldAlert size={14} style={{ marginTop: 2, flexShrink: 0 }} /> : <ShieldCheck size={14} style={{ marginTop: 2, flexShrink: 0 }} />}
         <span>
