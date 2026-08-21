@@ -8,15 +8,17 @@ import Header from "../components/Header";
 import NewsCard from "../components/NewsCard";
 
 // Turns a saved /api/poll feed item into the shape NewsCard expects.
-// A single article can have a mix of confirmed/rumor matches — the whole
-// card is marked "confirmed" if at least one match is business-grounded,
-// so the strongest, most trustworthy signal wins the badge.
+// Matches can now be tiered three ways: "confirmed" (directly named),
+// "theme" (pulled in via a matched investment theme), or "rumor". Both
+// confirmed and theme-tier are legitimate, non-fabricated connections, so
+// either one is enough to earn the card's green "관련주" styling — only
+// pure rumor-only cards get the dashed/amber treatment.
 function toCardShape(item) {
-  const hasConfirmed = item.matches.some((m) => m.confidence === "confirmed");
+  const hasLegitimate = item.matches.some((m) => m.confidence === "confirmed" || m.confidence === "theme");
   const reason = item.matches
     .map((m) => m.reason)
     .filter(Boolean)
-    .slice(0, 2)
+    .slice(0, 3)
     .join(" / ");
 
   return {
@@ -25,7 +27,7 @@ function toCardShape(item) {
     source: `자동 수집 · ${item.keyword}`,
     headline: item.title,
     summary: item.summary,
-    confidence: hasConfirmed ? "confirmed" : "rumor",
+    confidence: hasLegitimate ? "confirmed" : "rumor",
     reason: reason || "관련 근거 정보 없음",
     stocks: item.matches.map((m) => ({ name: m.name, code: m.code, market: m.market })),
   };
