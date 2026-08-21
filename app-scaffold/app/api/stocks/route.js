@@ -11,19 +11,44 @@
 // Do NOT run it through encodeURIComponent again or it will be double-encoded
 // and the API will reject it.
 
-function defaultBasDt() {
-  // Data publishes next business day afternoon, so step back a few calendar
-  // days to land on a date that's safely already published, then walk back
-  // further if it lands on a weekend.
-  const d = new Date();
-  d.setDate(d.getDate() - 3);
-  const day = d.getDay(); // 0 = Sun, 6 = Sat
-  if (day === 0) d.setDate(d.getDate() - 2);
-  if (day === 6) d.setDate(d.getDate() - 1);
+function toBasDt(d) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
   return `${y}${m}${dd}`;
+}
+
+// Walks backward one calendar day at a time from `from`, skipping
+// weekends, yielding each candidate business-day date string.
+function* businessDaysBackFrom(from) {
+  const d = new Date(from);
+  while (true) {
+    d.setDate(d.getDate() - 1);
+    const day = d.getDay(); // 0 = Sun, 6 = Sat
+    if (day !== 0 && day !== 6) yield toBasDt(d);
+  }
+}
+
+async function fetchStockPage(serviceKey, basDt, numOfRows, pageNo) {
+  const qs = new URLSearchParams({ numOfRows, pageNo, resultType: "json", basDt });
+  const url = `https://apis.data.go.kr/1160100/service/GetStockSecuritiesInfoService/getStockPriceInfo?serviceKey=${serviceKey}&${qs.toString()}`;
+  const res = await fetch(url, { next: { revalidate: 600 } });
+  return res.json();
+}
+
+// Tries the most recent business day first; if that day's data hasn't been
+// published yet (empty result), automatically steps back one more business
+// day, up to a few attempts, so the site always shows the freshest data
+// that's actually available rather than a fixed, possibly-stale offset.
+async function fetchLatestAvailable(serviceKey, numOfRows, pageNo, maxAttempts = 5) {
+  const gen = businessDaysBackFrom(new Date());
+  for (let i = 0; i < maxAttempts; i++) {
+    const basDt = gen.next().value;
+    const data = await fetchStockPage(serviceKey, basDt, numOfRows, pageNo);
+    const count = data?.response?.body?.totalCount ?? 0;
+    if (count > 0) return { data, basDt };
+  }
+  return { data: null, basDt: null };
 }
 
 export async function GET(request) {
@@ -36,21 +61,28 @@ export async function GET(request) {
   }
 
   const { searchParams } = new URL(request.url);
-  const basDt = searchParams.get("basDt") || defaultBasDt();
+  const explicitBasDt = searchParams.get("basDt");
   const code = searchParams.get("code"); // optional: look up one stock (likeSrtnCd)
   const numOfRows = searchParams.get("numOfRows") || "50";
   const pageNo = searchParams.get("pageNo") || "1";
 
-  const qs = new URLSearchParams({ numOfRows, pageNo, resultType: "json", basDt });
-  if (code) qs.set("likeSrtnCd", code);
-
-  // serviceKey is appended raw (already URL-encoded by data.go.kr) — see note above.
-  const url = `https://apis.data.go.kr/1160100/service/GetStockSecuritiesInfoService/getStockPriceInfo?serviceKey=${serviceKey}&${qs.toString()}`;
-
   try {
-    const res = await fetch(url, { next: { revalidate: 600 } }); // cache 10 min
-    const data = await res.json();
-    return Response.json(data);
+    if (explicitBasDt) {
+      // Caller pinned a specific date — just fetch that one, no fallback.
+      const qs = new URLSearchParams({ numOfRows, pageNo, resultType: "json", basDt: explicitBasDt });
+      if (code) qs.set("likeSrtnCd", code);
+      const url = `https://apis.data.go.kr/1160100/service/GetStockSecuritiesInfoService/getStockPriceInfo?serviceKey=${serviceKey}&${qs.toString()}`;
+      const res = await fetch(url, { next: { revalidate: 600 } });
+      const data = await res.json();
+      return Response.json(data);
+    }
+
+    // No date given — auto-pick the freshest business day that actually has data.
+    const { data, basDt } = await fetchLatestAvailable(serviceKey, numOfRows, pageNo);
+    if (!data) {
+      return Response.json({ error: "최근 며칠간 시세 데이터를 찾지 못했습니다." }, { status: 502 });
+    }
+    return Response.json({ ...data, resolvedBasDt: basDt });
   } catch (err) {
     return Response.json({ error: "KRX API 호출 실패", detail: String(err) }, { status: 502 });
   }
