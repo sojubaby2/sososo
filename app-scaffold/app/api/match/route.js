@@ -62,15 +62,49 @@ const SYSTEM_PROMPT = `너는 한국 주식 뉴스와 종목을 연결하는 분
 응답은 반드시 아래 JSON 배열 형식이어야 해:
 [{"code":"005930","name":"삼성전자","market":"코스피","confidence":"confirmed","reason":"..."}]`;
 
-export async function GET(request) {
+export async function matchStocks(title, summary = "") {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    return Response.json(
-      { error: "ANTHROPIC_API_KEY 환경변수가 설정되지 않았습니다." },
-      { status: 500 }
-    );
+    throw new Error("ANTHROPIC_API_KEY 환경변수가 설정되지 않았습니다.");
   }
 
+  const companyList = buildCompanyList();
+  const userMessage = `[종목 목록]\n${companyList}\n\n---\n뉴스 제목: ${title}\n뉴스 요약: ${summary}`;
+
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 1024,
+      system: SYSTEM_PROMPT,
+      messages: [
+        { role: "user", content: userMessage },
+        { role: "assistant", content: "[" },
+      ],
+    }),
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error("Claude API 오류: " + JSON.stringify(data));
+  }
+
+  const continuation = data?.content?.find((c) => c.type === "text")?.text || "]";
+  const fullJson = extractJsonArray("[" + continuation);
+
+  try {
+    return JSON.parse(fullJson);
+  } catch {
+    throw new Error("Claude 응답 파싱 실패: " + fullJson);
+  }
+}
+
+export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const title = searchParams.get("title");
   const summary = searchParams.get("summary") || "";
@@ -81,48 +115,10 @@ export async function GET(request) {
     );
   }
 
-  const companyList = buildCompanyList();
-  const userMessage = `[종목 목록]\n${companyList}\n\n---\n뉴스 제목: ${title}\n뉴스 요약: ${summary}`;
-
   try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
-      },
-      // The assistant turn is prefilled with "[" so Claude continues
-      // directly into a JSON array instead of adding preamble text —
-      // makes the response reliably parseable.
-      body: JSON.stringify({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 1024,
-        system: SYSTEM_PROMPT,
-        messages: [
-          { role: "user", content: userMessage },
-          { role: "assistant", content: "[" },
-        ],
-      }),
-    });
-
-    const data = await res.json();
-    if (!res.ok) {
-      return Response.json({ error: "Claude API 오류", detail: data }, { status: res.status });
-    }
-
-    const continuation = data?.content?.find((c) => c.type === "text")?.text || "]";
-    const fullJson = extractJsonArray("[" + continuation);
-
-    let matches;
-    try {
-      matches = JSON.parse(fullJson);
-    } catch {
-      return Response.json({ error: "Claude 응답 파싱 실패", raw: fullJson }, { status: 502 });
-    }
-
+    const matches = await matchStocks(title, summary);
     return Response.json({ title, matches });
   } catch (err) {
-    return Response.json({ error: "Claude API 호출 실패", detail: String(err) }, { status: 502 });
+    return Response.json({ error: String(err.message || err) }, { status: 502 });
   }
 }

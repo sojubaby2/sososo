@@ -26,51 +26,50 @@ function stripHtml(str = "") {
     .replace(/&#39;/g, "'");
 }
 
-export async function GET(request) {
+export async function fetchNaverNews(query, { display = "20", sort = "date" } = {}) {
   const clientId = process.env.NAVER_CLIENT_ID;
   const clientSecret = process.env.NAVER_CLIENT_SECRET;
   if (!clientId || !clientSecret) {
-    return Response.json(
-      { error: "NAVER_CLIENT_ID / NAVER_CLIENT_SECRET 환경변수가 설정되지 않았습니다." },
-      { status: 500 }
-    );
+    throw new Error("NAVER_CLIENT_ID / NAVER_CLIENT_SECRET 환경변수가 설정되지 않았습니다.");
   }
 
+  const qs = new URLSearchParams({ query, display: String(display), sort, format: "json" });
+  const url = `https://naverapihub.apigw.ntruss.com/search/v1/news?${qs.toString()}`;
+
+  const res = await fetch(url, {
+    headers: {
+      "X-NCP-APIGW-API-KEY-ID": clientId,
+      "X-NCP-APIGW-API-KEY": clientSecret,
+    },
+    cache: "no-store",
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error("네이버 뉴스 API 오류: " + JSON.stringify(data));
+  }
+
+  return (data.items || []).map((it) => ({
+    title: stripHtml(it.title),
+    summary: stripHtml(it.description),
+    link: it.originallink || it.link,
+    naverLink: it.link,
+    pubDate: it.pubDate,
+  }));
+}
+
+export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const query = searchParams.get("query");
   if (!query) {
     return Response.json({ error: "query 파라미터가 필요합니다. 예: /api/news?query=반도체" }, { status: 400 });
   }
-  const display = searchParams.get("display") || "20"; // 1~100
-  const sort = searchParams.get("sort") || "date"; // date=최신순, sim=정확도
-
-  const qs = new URLSearchParams({ query, display, sort, format: "json" });
-  const url = `https://naverapihub.apigw.ntruss.com/search/v1/news?${qs.toString()}`;
+  const display = searchParams.get("display") || "20";
+  const sort = searchParams.get("sort") || "date";
 
   try {
-    const res = await fetch(url, {
-      headers: {
-        "X-NCP-APIGW-API-KEY-ID": clientId,
-        "X-NCP-APIGW-API-KEY": clientSecret,
-      },
-      cache: "no-store", // this endpoint is itself the polling target — always fetch fresh
-    });
-    const data = await res.json();
-
-    if (!res.ok) {
-      return Response.json({ error: "네이버 뉴스 API 오류", detail: data }, { status: res.status });
-    }
-
-    const items = (data.items || []).map((it) => ({
-      title: stripHtml(it.title),
-      summary: stripHtml(it.description),
-      link: it.originallink || it.link,
-      naverLink: it.link,
-      pubDate: it.pubDate, // e.g. "Fri, 21 Aug 2026 09:14:00 +0900"
-    }));
-
-    return Response.json({ query, total: data.total, items });
+    const items = await fetchNaverNews(query, { display, sort });
+    return Response.json({ query, total: items.length, items });
   } catch (err) {
-    return Response.json({ error: "네이버 뉴스 API 호출 실패", detail: String(err) }, { status: 502 });
+    return Response.json({ error: String(err.message || err) }, { status: 502 });
   }
 }

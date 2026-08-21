@@ -1,17 +1,59 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { SlidersHorizontal, Newspaper } from "lucide-react";
+export const dynamic = "force-dynamic";
+
+import { useEffect, useMemo, useState } from "react";
+import { SlidersHorizontal, Newspaper, Loader2 } from "lucide-react";
 import Header from "../components/Header";
 import NewsCard from "../components/NewsCard";
-import SAMPLE_NEWS from "../lib/sampleNews";
+
+// Turns a saved /api/poll feed item into the shape NewsCard expects.
+// A single article can have a mix of confirmed/rumor matches — the whole
+// card is marked "confirmed" if at least one match is business-grounded,
+// so the strongest, most trustworthy signal wins the badge.
+function toCardShape(item) {
+  const hasConfirmed = item.matches.some((m) => m.confidence === "confirmed");
+  const reason = item.matches
+    .map((m) => m.reason)
+    .filter(Boolean)
+    .slice(0, 2)
+    .join(" / ");
+
+  return {
+    id: item.id,
+    time: item.pubDate || "",
+    source: `자동 수집 · ${item.keyword}`,
+    headline: item.title,
+    summary: item.summary,
+    confidence: hasConfirmed ? "confirmed" : "rumor",
+    reason: reason || "관련 근거 정보 없음",
+    stocks: item.matches.map((m) => ({ name: m.name, code: m.code, market: m.market })),
+  };
+}
 
 export default function HomePage() {
+  const [rawItems, setRawItems] = useState([]);
+  const [loadState, setLoadState] = useState("loading"); // loading | ready | error
   const [filter, setFilter] = useState("all");
-  const items = useMemo(
-    () => (filter === "confirmed" ? SAMPLE_NEWS.filter((n) => n.confidence === "confirmed") : SAMPLE_NEWS),
-    [filter]
-  );
+
+  useEffect(() => {
+    fetch("/api/feed")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.error) {
+          setLoadState("error");
+          return;
+        }
+        setRawItems(data.items || []);
+        setLoadState("ready");
+      })
+      .catch(() => setLoadState("error"));
+  }, []);
+
+  const items = useMemo(() => {
+    const mapped = rawItems.map(toCardShape);
+    return filter === "confirmed" ? mapped.filter((n) => n.confidence === "confirmed") : mapped;
+  }, [rawItems, filter]);
 
   return (
     <div>
@@ -26,6 +68,25 @@ export default function HomePage() {
           </div>
         </div>
 
+        {loadState === "loading" && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--ink-muted)", fontSize: 14, padding: "24px 0" }}>
+            <Loader2 size={16} />
+            불러오는 중...
+          </div>
+        )}
+
+        {loadState === "error" && (
+          <p style={{ fontSize: 13, color: "var(--amber-tint-ink)", background: "var(--amber-tint)", padding: "8px 12px", borderRadius: 8 }}>
+            피드를 불러오지 못했습니다. Redis(Upstash) 환경변수 설정을 확인해주세요.
+          </p>
+        )}
+
+        {loadState === "ready" && items.length === 0 && (
+          <p style={{ fontSize: 14, color: "var(--ink-muted)", padding: "24px 0" }}>
+            아직 자동 수집된 뉴스가 없어요. /api/poll 을 한 번 호출해보시거나, 1분 스케줄러가 연결되면 여기 자동으로 쌓이기 시작해요.
+          </p>
+        )}
+
         <div className="news-list">
           {items.map((n) => <NewsCard key={n.id} n={n} />)}
         </div>
@@ -35,8 +96,7 @@ export default function HomePage() {
         <Newspaper size={14} style={{ marginTop: 2, flexShrink: 0 }} />
         <span>
           "관련주"는 사업내용상 근거가 확인된 연결이며, "시장 추정 · 검증되지 않은 연관"은 실적과 무관한 풍문·인맥 기반
-          정보를 있는 그대로 전달하는 것으로 투자 추천이 아닙니다. 이 뉴스 목록은 샘플입니다 — 실제 뉴스 수집·매칭
-          파이프라인은 다음 단계에서 연결합니다.
+          정보를 있는 그대로 전달하는 것으로 투자 추천이 아닙니다.
         </span>
       </footer>
     </div>

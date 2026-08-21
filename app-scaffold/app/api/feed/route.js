@@ -1,0 +1,29 @@
+// GET /api/feed
+//
+// Serves whatever /api/poll has saved to Redis so far. The homepage calls
+// this to render the real, automatically-collected news feed.
+
+import { getRedis } from "../../../lib/redis";
+
+export async function GET() {
+  const redis = getRedis();
+  if (!redis) {
+    return Response.json(
+      { error: "Redis(Upstash) 환경변수가 아직 설정되지 않았습니다." },
+      { status: 500 }
+    );
+  }
+
+  const raw = await redis.lrange("feed", 0, 49);
+  const items = raw
+    .map((r) => {
+      try {
+        return typeof r === "string" ? JSON.parse(r) : r; // SDK may already parse JSON values
+      } catch {
+        return null;
+      }
+    })
+    .filter(Boolean);
+
+  return Response.json({ items });
+}
