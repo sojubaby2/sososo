@@ -1,154 +1,76 @@
-"use client";
+// GET /api/news?query=반도체&display=20&sort=date
+//
+// Proxies the News Search endpoint on NAVER API HUB (naverapihub.apigw.ntruss.com).
+//
+// IMPORTANT: NAVER migrated its Search APIs off the old developers.naver.com
+// "Application" system onto NAVER Cloud Platform's "NAVER API HUB" in June
+// 2026. The endpoint domain AND the auth header names both changed:
+//   - old: openapi.naver.com/v1/search/news.json
+//          headers: X-Naver-Client-Id / X-Naver-Client-Secret
+//   - new: naverapihub.apigw.ntruss.com/search/v1/news
+//          headers: X-NCP-APIGW-API-KEY-ID / X-NCP-APIGW-API-KEY
+// Free quota is unchanged: 25,000 calls/day.
+//
+// Runs server-side only so the Client ID/Secret never reach the browser.
+// sort=date (최신순) is the default here on purpose: for a "속보" feed we
+// care about "what's newest", not "what's most relevant" (sort=sim).
 
-import { useEffect, useMemo, useState } from "react";
-import { Search, ShieldAlert, TrendingUp, TrendingDown, Minus } from "lucide-react";
-import Header from "../../components/Header";
-import { getThemesGrouped, isPoliticalTheme } from "../../lib/themeData";
-
-const THEMES = getThemesGrouped(); // [{ theme, stocks: [{theme,name,code,market}] }, ...]
-
-function ChangeTag({ value }) {
-  if (typeof value !== "number") return <span className="flat mono">—</span>;
-  const isUp = value > 0, isDown = value < 0;
-  const cls = isUp ? "up" : isDown ? "down" : "flat";
-  const Icon = isUp ? TrendingUp : isDown ? TrendingDown : Minus;
-  return (
-    <span className={`mono ${cls}`} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontWeight: 600 }}>
-      <Icon size={14} strokeWidth={2.5} />
-      {isUp ? "+" : ""}
-      {value.toFixed(1)}%
-    </span>
-  );
+function stripHtml(str = "") {
+  return str
+    .replace(/<b>/g, "")
+    .replace(/<\/b>/g, "")
+    .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&#39;/g, "'");
 }
 
-export default function ThemesPage() {
-  const [query, setQuery] = useState("");
-  const [selected, setSelected] = useState(THEMES[0]?.theme ?? "");
-  const [priceMap, setPriceMap] = useState({}); // code -> { price, change }
-  const [loadState, setLoadState] = useState("loading"); // loading | ready | error
+export async function GET(request) {
+  const clientId = process.env.NAVER_CLIENT_ID;
+  const clientSecret = process.env.NAVER_CLIENT_SECRET;
+  if (!clientId || !clientSecret) {
+    return Response.json(
+      { error: "NAVER_CLIENT_ID / NAVER_CLIENT_SECRET 환경변수가 설정되지 않았습니다." },
+      { status: 500 }
+    );
+  }
 
-  useEffect(() => {
-    fetch("/api/stocks?numOfRows=3000&pageNo=1")
-      .then((r) => r.json())
-      .then((data) => {
-        const items = data?.response?.body?.items?.item ?? [];
-        const map = {};
-        for (const it of items) {
-          map[it.srtnCd] = {
-            price: Number(it.clpr),
-            change: Number(it.fltRt),
-          };
-        }
-        setPriceMap(map);
-        setLoadState(items.length ? "ready" : "error");
-      })
-      .catch(() => setLoadState("error"));
-  }, []);
+  const { searchParams } = new URL(request.url);
+  const query = searchParams.get("query");
+  if (!query) {
+    return Response.json({ error: "query 파라미터가 필요합니다. 예: /api/news?query=반도체" }, { status: 400 });
+  }
+  const display = searchParams.get("display") || "20"; // 1~100
+  const sort = searchParams.get("sort") || "date"; // date=최신순, sim=정확도
 
-  const filteredThemes = useMemo(
-    () => THEMES.filter((t) => t.theme.toLowerCase().includes(query.toLowerCase())),
-    [query]
-  );
+  const qs = new URLSearchParams({ query, display, sort, format: "json" });
+  const url = `https://naverapihub.apigw.ntruss.com/search/v1/news?${qs.toString()}`;
 
-  const selectedGroup = THEMES.find((t) => t.theme === selected) ?? THEMES[0];
-
-  const themeAvgChange = (stocks) => {
-    const vals = stocks.map((s) => priceMap[s.code]?.change).filter((v) => typeof v === "number");
-    if (!vals.length) return null;
-    return vals.reduce((a, b) => a + b, 0) / vals.length;
-  };
-
-  // Hottest themes (highest average change%) float to the top. Themes with
-  // no price data yet (still loading, or no matched codes) sink to the
-  // bottom instead of breaking the sort.
-  const sortedThemes = useMemo(() => {
-    return [...filteredThemes].sort((a, b) => {
-      const ca = themeAvgChange(a.stocks);
-      const cb = themeAvgChange(b.stocks);
-      if (ca === null && cb === null) return 0;
-      if (ca === null) return 1;
-      if (cb === null) return -1;
-      return cb - ca;
+  try {
+    const res = await fetch(url, {
+      headers: {
+        "X-NCP-APIGW-API-KEY-ID": clientId,
+        "X-NCP-APIGW-API-KEY": clientSecret,
+      },
+      cache: "no-store", // this endpoint is itself the polling target — always fetch fresh
     });
-  }, [filteredThemes, priceMap]);
+    const data = await res.json();
 
-  return (
-    <div>
-      <Header />
-      <main className="container-wide" style={{ paddingTop: 32, paddingBottom: 32 }}>
-        <div className="search-box">
-          <Search size={16} />
-          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="테마 검색 (예: 반도체, 위고비, 호르무즈)" />
-        </div>
+    if (!res.ok) {
+      return Response.json({ error: "네이버 뉴스 API 오류", detail: data }, { status: res.status });
+    }
 
-        {loadState === "error" && (
-          <p style={{ fontSize: 13, color: "var(--amber-tint-ink)", background: "var(--amber-tint)", padding: "8px 12px", borderRadius: 8, marginBottom: 16 }}>
-            실시간 시세를 불러오지 못했습니다. KRX_SERVICE_KEY 환경변수 설정을 확인해주세요. (테마·종목 목록은 정상 표시됩니다)
-          </p>
-        )}
+    const items = (data.items || []).map((it) => ({
+      title: stripHtml(it.title),
+      summary: stripHtml(it.description),
+      link: it.originallink || it.link,
+      naverLink: it.link,
+      pubDate: it.pubDate, // e.g. "Fri, 21 Aug 2026 09:14:00 +0900"
+    }));
 
-        <div className="theme-layout">
-          <aside>
-            <h2 className="section-title">전체 테마 ({sortedThemes.length}) · 🔥 등락률 높은 순</h2>
-            <div className="theme-list">
-              {sortedThemes.map((t) => (
-                <button
-                  key={t.theme}
-                  onClick={() => setSelected(t.theme)}
-                  className={`theme-item ${selected === t.theme ? "active" : ""}`}
-                >
-                  <span className="theme-item-name">
-                    {isPoliticalTheme(t.theme) && <ShieldAlert size={14} style={{ color: "var(--amber)" }} />}
-                    {t.theme}
-                  </span>
-                  <ChangeTag value={themeAvgChange(t.stocks)} />
-                </button>
-              ))}
-            </div>
-          </aside>
-
-          <section>
-            {selectedGroup && (
-              <>
-                <div className="theme-heading">
-                  <h2>{selectedGroup.theme}</h2>
-                  {isPoliticalTheme(selectedGroup.theme) && (
-                    <span className="political-tag">
-                      <ShieldAlert size={12} />정치테마주 — 사업 실적과 무관한 인맥 기반 편입, 투자 주의
-                    </span>
-                  )}
-                </div>
-
-                <table className="stock-table">
-                  <thead>
-                    <tr>
-                      <th>종목명</th>
-                      <th>코드</th>
-                      <th>시장</th>
-                      <th>현재가</th>
-                      <th>등락률</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {selectedGroup.stocks.map((s) => {
-                      const p = priceMap[s.code];
-                      return (
-                        <tr key={s.code}>
-                          <td style={{ fontWeight: 500 }}>{s.name}</td>
-                          <td className="mono" style={{ color: "var(--ink-muted)" }}>{s.code}</td>
-                          <td><span className="market-tag">{s.market}</span></td>
-                          <td className="mono">{p ? `${p.price.toLocaleString("ko-KR")}원` : loadState === "loading" ? "불러오는 중..." : "—"}</td>
-                          <td><ChangeTag value={p?.change} /></td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </>
-            )}
-          </section>
-        </div>
-      </main>
-    </div>
-  );
+    return Response.json({ query, total: data.total, items });
+  } catch (err) {
+    return Response.json({ error: "네이버 뉴스 API 호출 실패", detail: String(err) }, { status: 502 });
+  }
 }
