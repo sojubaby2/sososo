@@ -1,4 +1,5 @@
 import "./globals.css";
+import SiteFooterNav from "../components/SiteFooterNav";
 
 export const metadata = {
   title: "테마보드",
@@ -14,7 +15,10 @@ export default function RootLayout({ children }) {
           rel="stylesheet"
         />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        <SiteFooterNav />
+      </body>
     </html>
   );
 }
