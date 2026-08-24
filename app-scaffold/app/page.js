@@ -24,7 +24,7 @@ function toCardShape(item) {
   return {
     id: item.id,
     time: item.pubDate || "",
-    source: `자동 수집 · ${item.keyword}`,
+    source: item.keyword,
     headline: item.title,
     summary: item.summary,
     link: item.link,
