@@ -139,6 +139,65 @@ const SYSTEM_PROMPT = `너는 한국 주식 뉴스와 종목/테마를 연결하
 응답은 반드시 아래 JSON 객체 형식이어야 해:
 {"matches":[{"code":"005930","name":"삼성전자","market":"코스피","confidence":"confirmed","reason":"..."}],"themes":["반도체"]}`;
 
+const FILTER_SYSTEM_PROMPT = `너는 한국 주식시장 뉴스 큐레이터야. 주어진 뉴스 제목·요약이 "주가에 실질적 영향을 줄 수 있는 구체적 재료(촉매) 뉴스"인지 판단해.
+
+**포함해야 할 것** (예시 — 이런 성격의 뉴스):
+- 대기업의 중소기업 인수·투자
+- 신약 임상시험(FDA 등) 결과, 기술수출 계약
+- 대통령·정부 고위 인사의 특정 산업 관련 정책·관세 발언
+- 빅테크 리더(예: 젠슨황)의 산업에 영향력 있는 발언
+- 해킹, 개인정보 유출 등 보안 사고
+- 감염병 확산 등 공중보건 이슈
+- 대규모 공급계약·수주·기술수출
+- 반도체 등 핵심 부품 공급망 리스크
+- 대규모 투자유치·IPO·자금조달
+- 시장 예상과 크게 다른 실적이고 그 구체적 이유가 설명된 경우
+- 해외 대규모 공장 투자·진출
+- 신기술 인증 등 사업적으로 유의미한 이벤트
+- 횡령·대규모 소송·심각한 경영 위기 등으로 인한 주가 급변동
+
+**제외해야 할 것** (예시 — 이런 건 걸러내):
+- 부고, 인사동정 등 개인 신상 소식
+- 경품·이벤트·프로모션 홍보성 뉴스
+- 연예인이 등장하거나 주요 소재인 뉴스 (그 연예인이 투자·주식 얘기를 하더라도)
+- "OO기업 주가 X원 X% 상승/하락" 식으로 숫자만 있고 구체적 이유(재료)가 없는 기계적 시세 리포트
+- 일반적 시황 칼럼, 기고, 사설, 거시경제 논평
+- 특정 종목과 무관한 일반 서비스 홍보(예: 은행의 시니어 돌봄서비스 출시 등)
+- 경영상 심각한 문제 없이 발생한 소소한 주가 등락
+
+애매하면 포함시키지 말고 제외하는 쪽으로 판단해.
+
+응답은 반드시 아래 형식의 JSON 객체 하나만, 다른 텍스트 없이:
+{"include":true}`;
+
+async function isMarketMovingHeadline(title, summary) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) throw new Error("ANTHROPIC_API_KEY 환경변수가 설정되지 않았습니다.");
+
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+    body: JSON.stringify({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 32,
+      system: FILTER_SYSTEM_PROMPT,
+      messages: [
+        { role: "user", content: `뉴스 제목: ${title}\n뉴스 요약: ${summary}` },
+        { role: "assistant", content: "{" },
+      ],
+    }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error("Claude API(필터) 오류: " + JSON.stringify(data));
+  const continuation = data?.content?.find((c) => c.type === "text")?.text || "\"include\":false}";
+  try {
+    const parsed = JSON.parse(extractJsonObject("{" + continuation));
+    return parsed.include === true;
+  } catch {
+    return false; // if we can't parse it, don't spend more money on the full match — skip.
+  }
+}
+
 async function matchStocks(title, summary) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY 환경변수가 설정되지 않았습니다.");
@@ -175,11 +234,32 @@ async function matchStocks(title, summary) {
 }
 
 function articleKey(article) {
-  // The article link is a stable unique id. base64 keeps it safe as a Redis key.
-  return "seen:" + Buffer.from(article.link).toString("base64url").slice(0, 120);
+  // Dedup by TITLE, not link. Wire-service content (obituaries, routine
+  // price-report briefs, etc.) often gets republished under a brand-new
+  // URL every time even though the headline is identical — keying on the
+  // link let those slip through dedup and get expensively re-matched on
+  // every single poll. Title collisions are the much rarer, safer trade-off.
+  const normalized = article.title.trim().toLowerCase().replace(/\s+/g, "");
+  return "seen:" + Buffer.from(normalized).toString("base64url").slice(0, 120);
 }
 
-export async function GET() {
+export async function GET(request) {
+  // Protect this endpoint — every call costs real money (Claude + Naver API
+  // usage), so only requests carrying the correct secret get through.
+  // Accepts it two ways: ?secret=... (easy to paste in a browser URL for
+  // manual testing) or an "Authorization: Bearer ..." header (what the
+  // cron-job.org scheduler will send).
+  const cronSecret = process.env.CRON_SECRET;
+  if (cronSecret) {
+    const { searchParams } = new URL(request.url);
+    const provided =
+      searchParams.get("secret") ||
+      request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
+    if (provided !== cronSecret) {
+      return Response.json({ error: "인증되지 않은 요청입니다." }, { status: 401 });
+    }
+  }
+
   const redis = getRedis();
   if (!redis) {
     return Response.json(
@@ -205,6 +285,20 @@ export async function GET() {
       const alreadySeen = await redis.get(key);
       if (alreadySeen) {
         log.push({ keyword, title: article.title, skipped: "이미 처리됨" });
+        continue;
+      }
+
+      let passesFilter = false;
+      try {
+        passesFilter = await isMarketMovingHeadline(article.title, article.summary);
+      } catch (err) {
+        log.push({ keyword, title: article.title, error: "필터링 실패: " + String(err.message || err) });
+        continue; // don't mark as seen on failure — retry next poll
+      }
+
+      if (!passesFilter) {
+        await redis.set(key, "1", { ex: SEEN_TTL_SECONDS });
+        log.push({ keyword, title: article.title, published: false, reason: "재료성 부족으로 필터링됨" });
         continue;
       }
 
