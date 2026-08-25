@@ -1,34 +1,43 @@
 // GET /api/poll
 //
-// This is the endpoint the external scheduler (cron-job.org) will hit once
-// a minute. For each watched keyword:
+// This is the endpoint the external scheduler (cron-job.org) hits once a
+// minute. For each watched keyword:
 //   1. Fetch latest articles from Naver News Search (sort=date)
-//   2. Skip any article we've already processed (dedup via Redis)
-//   3. For brand-new articles, ask Claude for (a) directly-related stocks
-//      and (b) related investment themes — then pull in each theme's other
-//      tracked stocks ourselves, so a "매설로봇" article surfaces both the
-//      cable basket AND the robot basket, not just the one company named.
-//   4. Mark the article as seen (so step 2 skips it next time, regardless
-//      of whether it ended up published)
-//   5. If it matched at least one stock, save it to the published feed
-//
-// Kept as a single self-contained file (rather than importing from
-// app/api/news and app/api/match) so this piece works independently even
-// if those routes change later.
-//
-// WATCHED_KEYWORDS starts small on purpose — broad category terms instead
-// of one-per-stock, to stay well within both the Naver 25,000/day quota
-// and a reasonable Claude API budget. Expand this list once you've seen
-// real volume and cost from the Anthropic console.
+//   2. Skip already-processed articles (dedup via Redis, keyed on title)
+//   3. Cheaply pre-filter out low-value articles (obituaries, event promos,
+//      celebrity news, mechanical price-only reports, etc.) before spending
+//      money on the expensive full match step
+//   4. For articles that pass, ask Claude for:
+//      - directly-named stocks (now pickable from the FULL KOSPI/KOSDAQ
+//        universe, not just our curated ~750-stock theme database — so a
+//        company outside our theme DB can still show up if it's actually
+//        named in the article)
+//      - a single PRIMARY theme (the article's real core focus — e.g.
+//        "원자재(리튬)" for a lithium-supply story, not the broader
+//        "2차전지" it's adjacent to) and up to 2 SECONDARY themes
+//   5. Expand primary theme first, then secondary themes, using our
+//      curated theme→stock groupings (this is the one thing the curated DB
+//      is still needed for — the full KRX list has no theme structure)
+//   6. Sort everything by today's price change% (today's strongest movers
+//      first) — this naturally pushes sluggish mega-caps like 삼성전자·
+//      SK하이닉스 down the list without needing a hardcoded blacklist,
+//      since they rarely move as much % as smaller reactive names on the
+//      same news. (True multi-day momentum/"대장주" ranking would need an
+//      accumulated price-history database — not built yet, this is a
+//      same-day proxy for it.)
+//   7. Cap at 9 stocks total
+//   8. Save to the published feed
 
 import { getRedis } from "../../../lib/redis";
 import rawThemeData from "../../../lib/themeData.json";
 
 const WATCHED_KEYWORDS = ["증권"];
-const ARTICLES_PER_KEYWORD = 10;
+const ARTICLES_PER_KEYWORD = 5;
 const SEEN_TTL_SECONDS = 60 * 60 * 24 * 7; // remember an article for 7 days
 const FEED_MAX_LENGTH = 100;
-const MAX_STOCKS_PER_THEME = 6;
+const MAX_STOCKS_PER_PRIMARY_THEME = 6;
+const MAX_STOCKS_PER_SECONDARY_THEME = 3;
+const MAX_TOTAL_MATCHES = 9;
 
 function stripHtml(str = "") {
   return str
@@ -63,12 +72,66 @@ async function fetchNaverNews(query) {
   }));
 }
 
-function buildCompanyList() {
-  const seen = new Map();
-  for (const row of rawThemeData) {
-    if (!seen.has(row.code)) seen.set(row.code, `${row.code}|${row.name}|${row.market}`);
+// ---------------------------------------------------------------------------
+// Full KOSPI/KOSDAQ universe, fetched fresh once per poll cycle (not per
+// article). Same "try the most recent business day, walk back if that
+// day's data isn't published yet" logic as app/api/stocks/route.js —
+// duplicated here (rather than imported) so this file stays self-contained.
+// ---------------------------------------------------------------------------
+function toBasDt(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${y}${m}${dd}`;
+}
+
+function* businessDaysBackFrom(from) {
+  const d = new Date(from);
+  while (true) {
+    d.setDate(d.getDate() - 1);
+    const day = d.getDay();
+    if (day !== 0 && day !== 6) yield toBasDt(d);
   }
-  return Array.from(seen.values()).join("\n");
+}
+
+async function fetchStockPage(serviceKey, basDt, numOfRows, pageNo) {
+  const qs = new URLSearchParams({ numOfRows, pageNo, resultType: "json", basDt });
+  const url = `https://apis.data.go.kr/1160100/service/GetStockSecuritiesInfoService/getStockPriceInfo?serviceKey=${serviceKey}&${qs.toString()}`;
+  const res = await fetch(url, { cache: "no-store" });
+  return res.json();
+}
+
+// Returns { items: [{srtnCd,itmsNm,mrktCtg,clpr,fltRt,...}], basDt } or null.
+async function fetchAllStocksToday() {
+  const serviceKey = process.env.KRX_SERVICE_KEY;
+  if (!serviceKey) return null;
+  const gen = businessDaysBackFrom(new Date());
+  for (let i = 0; i < 5; i++) {
+    const basDt = gen.next().value;
+    const data = await fetchStockPage(serviceKey, basDt, "3000", "1");
+    const items = data?.response?.body?.items?.item ?? [];
+    if (items.length > 0) return { items, basDt };
+  }
+  return null;
+}
+
+function marketLabel(mrktCtg) {
+  if (mrktCtg === "KOSPI") return "코스피";
+  if (mrktCtg === "KOSDAQ") return "코스닥";
+  return mrktCtg || "";
+}
+
+// Builds the full-universe "code|name|market" list Claude picks direct
+// matches from, plus a code -> {price, change} lookup used for sorting.
+function buildUniverseFromKrx(krxItems) {
+  const lines = [];
+  const priceMap = new Map();
+  for (const it of krxItems) {
+    if (!it.srtnCd || !it.itmsNm) continue;
+    lines.push(`${it.srtnCd}|${it.itmsNm}|${marketLabel(it.mrktCtg)}`);
+    priceMap.set(it.srtnCd, { price: Number(it.clpr), change: Number(it.fltRt) });
+  }
+  return { companyList: lines.join("\n"), priceMap };
 }
 
 function buildThemeList() {
@@ -79,7 +142,9 @@ function normalizeThemeName(s) {
   return (s || "").replace(/\s+/g, "");
 }
 
-function expandThemeMatches(themeNames, existingCodes) {
+// tier: "primary" | "secondary" — controls both the per-theme stock cap and
+// the reason text, so the frontend/ordering can tell them apart.
+function expandThemeMatches(themeNames, tier, cap, existingCodes) {
   const added = [];
   for (const themeName of themeNames || []) {
     const target = normalizeThemeName(themeName);
@@ -87,13 +152,14 @@ function expandThemeMatches(themeNames, existingCodes) {
     for (const row of rawThemeData) {
       if (normalizeThemeName(row.theme) !== target) continue;
       if (existingCodes.has(row.code)) continue;
-      if (count >= MAX_STOCKS_PER_THEME) break;
+      if (count >= cap) break;
       added.push({
         code: row.code,
         name: row.name,
         market: row.market,
         confidence: "theme",
-        reason: `'${row.theme}' 테마 동반 종목`,
+        tier,
+        reason: `'${row.theme}' 테마 동반 종목${tier === "primary" ? " (핵심 테마)" : ""}`,
       });
       existingCodes.add(row.code);
       count++;
@@ -117,27 +183,34 @@ function extractJsonObject(prefilledText) {
 const SYSTEM_PROMPT = `너는 한국 주식 뉴스와 종목/테마를 연결하는 분석가야.
 
 너한테는 두 가지 목록이 주어져:
-1. [테마 목록]: 우리가 추적하는 투자 테마 이름들
-2. [종목 목록]: 코드|이름|시장 형식의 개별 종목들
+1. [전체 상장 종목]: 코스피·코스닥에 상장된 전체 종목 (코드|이름|시장 형식)
+2. [테마 목록]: 우리가 관리하는 투자 테마 이름들
 
-뉴스 기사 하나가 주어지면, 두 가지를 판단해:
+뉴스 기사 하나가 주어지면, 세 가지를 판단해:
 
-**A. 직접 관련 종목 (matches)**: [종목 목록]에 있는 종목 중, 이 기사와 실제로 관련 있는 종목을 찾아 분류해. 목록에 없는 종목·코드는 절대 지어내면 안 돼.
-- "confirmed" (사업근거 확인): 그 회사명·제품명이 기사에 직접 언급되거나, 정부 정책·규제·계약·사고 등이 그 회사의 실제 사업 영역(매출이 발생하는 사업)에 직접 영향을 미치는 경우.
-- "rumor" (시장 추정): 구체적으로 존재하는 연결고리(예: 특정 인물과의 동창·지연 관계, 커뮤니티/SNS에 도는 특정 소문)가 있는 경우에만 사용해. "업종이 비슷해서 관련 있을 것 같다", "AI 관련 기업으로 추정된다" 같은 막연한 추측은 "rumor"가 아니야 — 그런 경우엔 matches에 아예 넣지 말고, 대신 아래 [B. 관련 테마]에서 해당 업종 테마를 골라서 처리해. 왜 관련되는지 한 문장으로 명확히 설명 못 하겠으면 애초에 넣지 마.
+**A. 직접 관련 종목 (matches)**: [전체 상장 종목] 중에서, 이 기사와 실제로 관련 있는 종목을 찾아. 목록에 없는 종목·코드는 절대 지어내면 안 돼.
 
-**B. 관련 테마 (themes)**: [테마 목록]에 있는 테마 이름 중, 이 기사 내용과 명확히 관련된 테마가 있으면 골라. 테마 이름은 목록에 있는 것과 정확히 똑같이 적어야 해(하나도 안 틀리게). 예를 들어 해저케이블 시공 확대 기사라면 "해저케이블(전선)"을, 매설로봇 관련 내용이 함께 있으면 "로봇"도 같이 골라 — 기사 하나에 관련 테마가 여러 개일 수 있어. 명확히 관련된 테마가 없으면 빈 배열로 둬. 억지로 테마를 끼워 맞추지 마.
+[전체 상장 종목]에는 [테마 목록]에서 다루는 회사들보다 훨씬 많은 회사가 들어있어. 테마 목록에 없는 회사라도 절대 무시하지 마 — 네가 원래 알고 있는 배경지식(그 회사가 실제로 어떤 사업을 하는지, 무슨 제품을 만드는지)을 적극적으로 활용해서 [전체 상장 종목] 전체를 대상으로 판단해. 익숙한 대기업이 아니거나 우리가 미리 분류해두지 않은 회사라는 이유로 후보에서 제외하지 마 — 실제로 관련 있다면 반드시 포함시켜.
 
-진짜 관련된 게 없으면 matches와 themes 둘 다 빈 배열([])로 반환해.
+- "confirmed" (사업근거 확인): 그 회사명·제품명이 기사에 직접 언급되거나, 정부 정책·규제·계약·사고 등이 그 회사의 실제 사업 영역에 직접 영향을 미치는 경우.
+- "rumor" (시장 추정): 구체적으로 존재하는 연결고리(특정 인물과의 동창·지연 관계, 커뮤니티에 도는 특정 소문)가 있을 때만. 막연한 업종 추측은 여기 넣지 말고 아예 빼.
+
+**B. 핵심 테마 (primary_theme)**: [테마 목록] 중, 이 기사의 "가장 좁고 정확한 핵심 초점" 딱 하나만 골라. 예를 들어 전기차 배터리에 쓰이는 리튬 공급 얘기라면 "2차전지"가 아니라 "원자재(리튬)"을 골라야 해 — 기사가 진짜 말하고 있는 게 뭔지가 기준이야. 명확한 핵심이 없으면 null.
+
+**C. 부가 테마 (secondary_themes)**: 핵심만큼은 아니지만 함께 언급되거나 부차적으로 관련된 테마들. 최대 2개까지만, 배열로. 없으면 빈 배열.
+
+우선순위 판단 예시: "리튬 공급 부족으로 배터리 업체 비상"이라는 기사라면 → primary_theme: "원자재(리튬)", secondary_themes: ["2차전지"]. 자동차 완성차 얘기가 기사에 없다면 자동차 테마는 넣지 마.
+
+진짜 관련된 게 없으면 matches는 빈 배열, primary_theme은 null, secondary_themes는 빈 배열.
 
 중요한 제약 조건 (반드시 지켜):
-- 너한테는 뉴스 제목과 요약만 주어져. 본문 전체는 주어지지 않고, 앞으로도 주어지지 않아. 정보가 부족하다고 본문을 요청하거나 되묻지 마. 주어진 정보만으로 최선의 판단을 내려.
-- 응답에는 오직 아래 형식의 JSON 객체만 포함해야 해. 설명, 사과, 질문, 코드블록 표시(\`\`\`), 그 어떤 추가 텍스트도 앞뒤로 단 한 글자도 붙이면 안 돼. 이걸 어기면 시스템이 응답을 파싱하지 못해 완전히 실패해.
+- 너한테는 뉴스 제목과 요약만 주어져. 본문을 요청하거나 되묻지 마. 주어진 정보만으로 최선의 판단을 내려.
+- 응답에는 오직 아래 형식의 JSON 객체만 포함해야 해. 설명, 사과, 코드블록 표시 등 그 어떤 추가 텍스트도 붙이면 안 돼.
 
-각 매치에는 reason에 왜 관련되는지 한국어로 한 문장, 20단어 이내로 설명해.
+각 matches 항목의 reason은 한국어 한 문장, 20단어 이내.
 
 응답은 반드시 아래 JSON 객체 형식이어야 해:
-{"matches":[{"code":"005930","name":"삼성전자","market":"코스피","confidence":"confirmed","reason":"..."}],"themes":["반도체"]}`;
+{"matches":[{"code":"005930","name":"삼성전자","market":"코스피","confidence":"confirmed","reason":"..."}],"primary_theme":"반도체","secondary_themes":[]}`;
 
 const FILTER_SYSTEM_PROMPT = `너는 한국 주식시장 뉴스 큐레이터야. 주어진 뉴스 제목·요약이 "주가에 실질적 영향을 줄 수 있는 구체적 재료(촉매) 뉴스"인지 판단해.
 
@@ -198,11 +271,11 @@ async function isMarketMovingHeadline(title, summary) {
   }
 }
 
-async function matchStocks(title, summary) {
+async function matchStocks(title, summary, universeCompanyList) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY 환경변수가 설정되지 않았습니다.");
 
-  const userMessage = `[테마 목록]\n${buildThemeList()}\n\n[종목 목록]\n${buildCompanyList()}\n\n---\n뉴스 제목: ${title}\n뉴스 요약: ${summary}`;
+  const userMessage = `[전체 상장 종목]\n${universeCompanyList}\n\n[테마 목록]\n${buildThemeList()}\n\n---\n뉴스 제목: ${title}\n뉴스 요약: ${summary}`;
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
@@ -227,28 +300,104 @@ async function matchStocks(title, summary) {
     throw new Error("Claude 응답 파싱 실패");
   }
 
-  const directMatches = Array.isArray(parsed.matches) ? parsed.matches : [];
+  const directMatches = (Array.isArray(parsed.matches) ? parsed.matches : []).map((m) => ({ ...m, tier: "direct" }));
   const existingCodes = new Set(directMatches.map((m) => m.code));
-  const themeMatches = expandThemeMatches(parsed.themes, existingCodes);
-  return [...directMatches, ...themeMatches];
+
+  const primaryThemeMatches = parsed.primary_theme
+    ? expandThemeMatches([parsed.primary_theme], "primary", MAX_STOCKS_PER_PRIMARY_THEME, existingCodes)
+    : [];
+  const secondaryThemeMatches = expandThemeMatches(
+    parsed.secondary_themes,
+    "secondary",
+    MAX_STOCKS_PER_SECONDARY_THEME,
+    existingCodes
+  );
+
+  return [...directMatches, ...primaryThemeMatches, ...secondaryThemeMatches];
+}
+
+// Final ordering + cap. Tier order (direct → primary theme → secondary
+// theme) comes first; within each tier, sort by today's change% descending.
+// That second pass is what naturally pushes sluggish mega-caps down without
+// a hardcoded blacklist — a stock that barely moved today just sorts lower
+// than one that's actually reacting to the news, tier for tier.
+const TIER_ORDER = { direct: 0, primary: 1, secondary: 2 };
+function finalizeMatches(matches, priceMap) {
+  const withPrices = matches.map((m) => {
+    const p = priceMap.get(m.code);
+    return { ...m, price: p?.price, change: p?.change };
+  });
+  withPrices.sort((a, b) => {
+    const tierDiff = (TIER_ORDER[a.tier] ?? 9) - (TIER_ORDER[b.tier] ?? 9);
+    if (tierDiff !== 0) return tierDiff;
+    const changeA = typeof a.change === "number" ? a.change : -Infinity;
+    const changeB = typeof b.change === "number" ? b.change : -Infinity;
+    return changeB - changeA;
+  });
+  return withPrices.slice(0, MAX_TOTAL_MATCHES).map(({ tier, ...rest }) => rest); // tier was only for sorting
 }
 
 function articleKey(article) {
-  // Dedup by TITLE, not link. Wire-service content (obituaries, routine
-  // price-report briefs, etc.) often gets republished under a brand-new
-  // URL every time even though the headline is identical — keying on the
-  // link let those slip through dedup and get expensively re-matched on
-  // every single poll. Title collisions are the much rarer, safer trade-off.
+  // Dedup by TITLE, not link — wire-service reposts (obituaries, routine
+  // briefs) often get a brand-new URL each time even though the headline
+  // is identical, which was defeating link-based dedup.
   const normalized = article.title.trim().toLowerCase().replace(/\s+/g, "");
   return "seen:" + Buffer.from(normalized).toString("base64url").slice(0, 120);
 }
 
+// Vercel terminates a function that runs past this many seconds.
+export const maxDuration = 60;
+
+async function processArticle(keyword, article, redis, universeCompanyList, priceMap) {
+  const key = articleKey(article);
+
+  const alreadySeen = await redis.get(key);
+  if (alreadySeen) {
+    return { keyword, title: article.title, skipped: "이미 처리됨" };
+  }
+
+  let passesFilter = false;
+  try {
+    passesFilter = await isMarketMovingHeadline(article.title, article.summary);
+  } catch (err) {
+    return { keyword, title: article.title, error: "필터링 실패: " + String(err.message || err) };
+  }
+
+  if (!passesFilter) {
+    await redis.set(key, "1", { ex: SEEN_TTL_SECONDS });
+    return { keyword, title: article.title, published: false, reason: "재료성 부족으로 필터링됨" };
+  }
+
+  let rawMatches = [];
+  try {
+    rawMatches = await matchStocks(article.title, article.summary, universeCompanyList);
+  } catch (err) {
+    return { keyword, title: article.title, error: String(err.message || err) };
+  }
+
+  await redis.set(key, "1", { ex: SEEN_TTL_SECONDS });
+
+  const matches = finalizeMatches(rawMatches, priceMap);
+
+  if (matches.length > 0) {
+    const feedItem = {
+      id: key,
+      keyword,
+      title: article.title,
+      summary: article.summary,
+      link: article.link,
+      pubDate: article.pubDate,
+      matches,
+      savedAt: new Date().toISOString(),
+    };
+    await redis.lpush("feed", JSON.stringify(feedItem));
+    await redis.ltrim("feed", 0, FEED_MAX_LENGTH - 1);
+    return { keyword, title: article.title, published: true, matchCount: matches.length };
+  }
+  return { keyword, title: article.title, published: false, reason: "관련 종목/테마 없음" };
+}
+
 export async function GET(request) {
-  // Protect this endpoint — every call costs real money (Claude + Naver API
-  // usage), so only requests carrying the correct secret get through.
-  // Accepts it two ways: ?secret=... (easy to paste in a browser URL for
-  // manual testing) or an "Authorization: Bearer ..." header (what the
-  // cron-job.org scheduler will send).
   const cronSecret = process.env.CRON_SECRET;
   if (cronSecret) {
     const { searchParams } = new URL(request.url);
@@ -262,11 +411,20 @@ export async function GET(request) {
 
   const redis = getRedis();
   if (!redis) {
+    return Response.json({ error: "Redis(Upstash) 환경변수가 아직 설정되지 않았습니다." }, { status: 500 });
+  }
+
+  // Fetch the full KOSPI/KOSDAQ universe once per poll cycle (not per
+  // article) — used both as Claude's direct-match candidate pool and as
+  // the price/change lookup for sorting.
+  const krx = await fetchAllStocksToday();
+  if (!krx) {
     return Response.json(
-      { error: "Redis(Upstash) 환경변수가 아직 설정되지 않았습니다." },
+      { error: "KRX_SERVICE_KEY 환경변수가 없거나 시세 데이터를 가져오지 못했습니다." },
       { status: 500 }
     );
   }
+  const { companyList: universeCompanyList, priceMap } = buildUniverseFromKrx(krx.items);
 
   const log = [];
 
@@ -279,59 +437,11 @@ export async function GET(request) {
       continue;
     }
 
-    for (const article of articles) {
-      const key = articleKey(article);
-
-      const alreadySeen = await redis.get(key);
-      if (alreadySeen) {
-        log.push({ keyword, title: article.title, skipped: "이미 처리됨" });
-        continue;
-      }
-
-      let passesFilter = false;
-      try {
-        passesFilter = await isMarketMovingHeadline(article.title, article.summary);
-      } catch (err) {
-        log.push({ keyword, title: article.title, error: "필터링 실패: " + String(err.message || err) });
-        continue; // don't mark as seen on failure — retry next poll
-      }
-
-      if (!passesFilter) {
-        await redis.set(key, "1", { ex: SEEN_TTL_SECONDS });
-        log.push({ keyword, title: article.title, published: false, reason: "재료성 부족으로 필터링됨" });
-        continue;
-      }
-
-      let matches = [];
-      try {
-        matches = await matchStocks(article.title, article.summary);
-      } catch (err) {
-        log.push({ keyword, title: article.title, error: String(err.message || err) });
-        continue; // don't mark as seen on failure — retry next poll
-      }
-
-      // Mark as seen now that matching succeeded, whether or not it published.
-      await redis.set(key, "1", { ex: SEEN_TTL_SECONDS });
-
-      if (matches.length > 0) {
-        const feedItem = {
-          id: key,
-          keyword,
-          title: article.title,
-          summary: article.summary,
-          link: article.link,
-          pubDate: article.pubDate,
-          matches,
-          savedAt: new Date().toISOString(),
-        };
-        await redis.lpush("feed", JSON.stringify(feedItem));
-        await redis.ltrim("feed", 0, FEED_MAX_LENGTH - 1);
-        log.push({ keyword, title: article.title, published: true, matchCount: matches.length });
-      } else {
-        log.push({ keyword, title: article.title, published: false, reason: "관련 종목/테마 없음" });
-      }
-    }
+    const results = await Promise.all(
+      articles.map((article) => processArticle(keyword, article, redis, universeCompanyList, priceMap))
+    );
+    log.push(...results);
   }
 
-  return Response.json({ checkedAt: new Date().toISOString(), log });
+  return Response.json({ checkedAt: new Date().toISOString(), basDt: krx.basDt, log });
 }
