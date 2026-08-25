@@ -5,18 +5,10 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Newspaper, LayoutGrid, Coins } from "lucide-react";
 
-const TICKER_HIGHLIGHTS = [
-  "호르무즈 봉쇄(정유/원유) +4.8%",
-  "보안(사이버/양자) +3.9%",
-  "비만치료제(위고비) +2.1%",
-  "반도체 장비(증착) +1.6%",
-  "방산주 +1.3%",
-  "2차전지 -0.8%",
-];
-
 export default function Header() {
   const pathname = usePathname();
   const [goldPrice, setGoldPrice] = useState(null);
+  const [tickerItems, setTickerItems] = useState([]);
 
   useEffect(() => {
     fetch("/api/gold")
@@ -27,15 +19,31 @@ export default function Header() {
         if (price) setGoldPrice(price);
       })
       .catch(() => {});
+
+    fetch("/api/theme-momentum")
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.themeChanges) return;
+        const sorted = [...data.themeChanges]
+          .filter((t) => typeof t.change1M === "number")
+          .sort((a, b) => b.change1M - a.change1M)
+          .map((t) => `${t.theme} ${t.change1M > 0 ? "+" : ""}${t.change1M.toFixed(1)}%`);
+        setTickerItems(sorted);
+      })
+      .catch(() => {});
   }, []);
 
   return (
     <>
       <div className="ticker-strip">
         <div className="ticker-track">
-          {[...TICKER_HIGHLIGHTS, ...TICKER_HIGHLIGHTS].map((t, i) => (
-            <span key={i} className="ticker-item">{t}</span>
-          ))}
+          {tickerItems.length > 0 ? (
+            [...tickerItems, ...tickerItems].map((t, i) => (
+              <span key={i} className="ticker-item">{t}</span>
+            ))
+          ) : (
+            <span className="ticker-item">테마별 1개월 등락률 불러오는 중...</span>
+          )}
         </div>
       </div>
 

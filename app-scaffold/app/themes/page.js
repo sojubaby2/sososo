@@ -1,9 +1,7 @@
 "use client";
 
-// This page fetches live price data client-side (see the useEffect below),
-// so it can't be meaningfully prerendered at build time. Without this,
-// Next.js tries to statically render it during `next build` and fails with
-// "Unsupported Server Component type: Module" — this line fixes that.
+// This page fetches live data client-side, so it can't be meaningfully
+// prerendered at build time — see the matching note in app/page.js.
 export const dynamic = "force-dynamic";
 
 import { useEffect, useMemo, useState } from "react";
@@ -30,23 +28,23 @@ function ChangeTag({ value }) {
 export default function ThemesPage() {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(THEMES[0]?.theme ?? "");
-  const [priceMap, setPriceMap] = useState({}); // code -> { price, change }
+  const [themeChangeMap, setThemeChangeMap] = useState({}); // theme -> change1M
+  const [stockChangeMap, setStockChangeMap] = useState({}); // code -> change1M
   const [loadState, setLoadState] = useState("loading"); // loading | ready | error
 
   useEffect(() => {
-    fetch("/api/stocks?numOfRows=3000&pageNo=1")
+    fetch("/api/theme-momentum")
       .then((r) => r.json())
       .then((data) => {
-        const items = data?.response?.body?.items?.item ?? [];
-        const map = {};
-        for (const it of items) {
-          map[it.srtnCd] = {
-            price: Number(it.clpr),
-            change: Number(it.fltRt),
-          };
+        if (data.error || !data.themeChanges) {
+          setLoadState("error");
+          return;
         }
-        setPriceMap(map);
-        setLoadState(items.length ? "ready" : "error");
+        const tMap = {};
+        for (const t of data.themeChanges) tMap[t.theme] = t.change1M;
+        setThemeChangeMap(tMap);
+        setStockChangeMap(data.stockChanges || {});
+        setLoadState("ready");
       })
       .catch(() => setLoadState("error"));
   }, []);
@@ -58,25 +56,34 @@ export default function ThemesPage() {
 
   const selectedGroup = THEMES.find((t) => t.theme === selected) ?? THEMES[0];
 
-  const themeAvgChange = (stocks) => {
-    const vals = stocks.map((s) => priceMap[s.code]?.change).filter((v) => typeof v === "number");
-    if (!vals.length) return null;
-    return vals.reduce((a, b) => a + b, 0) / vals.length;
-  };
-
-  // Hottest themes (highest average change%) float to the top. Themes with
-  // no price data yet (still loading, or no matched codes) sink to the
-  // bottom instead of breaking the sort.
+  // Hottest themes (highest 1-month average change) float to the top.
   const sortedThemes = useMemo(() => {
     return [...filteredThemes].sort((a, b) => {
-      const ca = themeAvgChange(a.stocks);
-      const cb = themeAvgChange(b.stocks);
-      if (ca === null && cb === null) return 0;
-      if (ca === null) return 1;
-      if (cb === null) return -1;
+      const ca = themeChangeMap[a.theme];
+      const cb = themeChangeMap[b.theme];
+      const na = typeof ca === "number", nb = typeof cb === "number";
+      if (!na && !nb) return 0;
+      if (!na) return 1;
+      if (!nb) return -1;
       return cb - ca;
     });
-  }, [filteredThemes, priceMap]);
+  }, [filteredThemes, themeChangeMap]);
+
+  // Within the selected theme, sort stocks by 1-month change too — this is
+  // what stands in for a "대장주" leaderboard now that we don't show a
+  // same-day price/change (which looked live but wasn't).
+  const sortedStocks = useMemo(() => {
+    if (!selectedGroup) return [];
+    return [...selectedGroup.stocks].sort((a, b) => {
+      const ca = stockChangeMap[a.code];
+      const cb = stockChangeMap[b.code];
+      const na = typeof ca === "number", nb = typeof cb === "number";
+      if (!na && !nb) return 0;
+      if (!na) return 1;
+      if (!nb) return -1;
+      return cb - ca;
+    });
+  }, [selectedGroup, stockChangeMap]);
 
   return (
     <div>
@@ -89,13 +96,13 @@ export default function ThemesPage() {
 
         {loadState === "error" && (
           <p style={{ fontSize: 13, color: "var(--amber-tint-ink)", background: "var(--amber-tint)", padding: "8px 12px", borderRadius: 8, marginBottom: 16 }}>
-            실시간 시세를 불러오지 못했습니다. KRX_SERVICE_KEY 환경변수 설정을 확인해주세요. (테마·종목 목록은 정상 표시됩니다)
+            시세 데이터를 불러오지 못했습니다. KRX_SERVICE_KEY 환경변수 설정을 확인해주세요. (테마·종목 목록은 정상 표시됩니다)
           </p>
         )}
 
         <div className="theme-layout">
           <aside>
-            <h2 className="section-title">전체 테마 ({sortedThemes.length}) · 🔥 등락률 높은 순</h2>
+            <h2 className="section-title">전체 테마 ({sortedThemes.length}) · 🔥 1개월 등락률 높은 순</h2>
             <div className="theme-list">
               {sortedThemes.map((t) => (
                 <button
@@ -107,7 +114,7 @@ export default function ThemesPage() {
                     {isPoliticalTheme(t.theme) && <ShieldAlert size={14} style={{ color: "var(--amber)" }} />}
                     {t.theme}
                   </span>
-                  <ChangeTag value={themeAvgChange(t.stocks)} />
+                  <ChangeTag value={themeChangeMap[t.theme]} />
                 </button>
               ))}
             </div>
@@ -118,6 +125,7 @@ export default function ThemesPage() {
               <>
                 <div className="theme-heading">
                   <h2>{selectedGroup.theme}</h2>
+                  <span className="text-xs" style={{ color: "var(--ink-muted)", fontSize: 12 }}>1개월 누적 등락률 기준</span>
                   {isPoliticalTheme(selectedGroup.theme) && (
                     <span className="political-tag">
                       <ShieldAlert size={12} />정치테마주 — 사업 실적과 무관한 인맥 기반 편입, 투자 주의
@@ -131,23 +139,18 @@ export default function ThemesPage() {
                       <th>종목명</th>
                       <th>코드</th>
                       <th>시장</th>
-                      <th>현재가</th>
-                      <th>등락률</th>
+                      <th>1개월 등락률</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {selectedGroup.stocks.map((s) => {
-                      const p = priceMap[s.code];
-                      return (
-                        <tr key={s.code}>
-                          <td style={{ fontWeight: 500 }}>{s.name}</td>
-                          <td className="mono" style={{ color: "var(--ink-muted)" }}>{s.code}</td>
-                          <td><span className="market-tag">{s.market}</span></td>
-                          <td className="mono">{p ? `${p.price.toLocaleString("ko-KR")}원` : loadState === "loading" ? "불러오는 중..." : "—"}</td>
-                          <td><ChangeTag value={p?.change} /></td>
-                        </tr>
-                      );
-                    })}
+                    {sortedStocks.map((s) => (
+                      <tr key={s.code}>
+                        <td style={{ fontWeight: 500 }}>{s.name}</td>
+                        <td className="mono" style={{ color: "var(--ink-muted)" }}>{s.code}</td>
+                        <td><span className="market-tag">{s.market}</span></td>
+                        <td><ChangeTag value={stockChangeMap[s.code]} /></td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </>
