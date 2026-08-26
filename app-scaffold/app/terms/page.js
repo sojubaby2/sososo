@@ -1,8 +1,8 @@
 import Header from "../../components/Header";
 
 export const metadata = {
-  title: "이용약관 | 뉴스밈",
-  description: "뉴스밈 서비스 이용약관입니다.",
+  title: "이용약관 | 뉴스매매",
+  description: "뉴스매매 서비스 이용약관입니다.",
 };
 
 export default function TermsPage() {
@@ -14,7 +14,7 @@ export default function TermsPage() {
         <p className="legal-updated">최종 수정일: 2026년 8월 21일</p>
 
         <h2>제1조 (목적)</h2>
-        <p>이 약관은 뉴스밈(이하 "본 서비스")가 제공하는 정보 서비스의 이용 조건 및 절차를 규정함을 목적으로 합니다.</p>
+        <p>이 약관은 뉴스매매(이하 "본 서비스")가 제공하는 정보 서비스의 이용 조건 및 절차를 규정함을 목적으로 합니다.</p>
 
         <h2>제2조 (서비스 내용)</h2>
         <p>본 서비스는 다음과 같은 정보를 제공합니다.</p>
