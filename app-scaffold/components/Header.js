@@ -11,8 +11,7 @@ export default function Header() {
     <header className="site-header">
       <div className="container-wide site-header-inner">
         <div className="brand">
-          <h1>테마보드</h1>
-          <span className="badge">MVP 프로토타입</span>
+          <h1>뉴스밈</h1>
         </div>
         <nav className="nav">
           <Link href="/" className={`nav-btn ${pathname === "/" ? "active" : ""}`}>

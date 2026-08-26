@@ -1,8 +1,8 @@
 import Header from "../../components/Header";
 
 export const metadata = {
-  title: "개인정보처리방침 | 테마보드",
-  description: "테마보드의 개인정보 수집 및 이용, 쿠키, 광고 관련 처리방침입니다.",
+  title: "개인정보처리방침 | 뉴스밈",
+  description: "뉴스밈의 개인정보 수집 및 이용, 쿠키, 광고 관련 처리방침입니다.",
 };
 
 export default function PrivacyPage() {
@@ -14,7 +14,7 @@ export default function PrivacyPage() {
         <p className="legal-updated">최종 수정일: 2026년 8월 21일</p>
 
         <p>
-          테마보드(이하 "본 서비스")는 이용자의 개인정보를 소중히 다루며, 이 개인정보처리방침을 통해 어떤 정보가 어떻게
+          뉴스밈(이하 "본 서비스")는 이용자의 개인정보를 소중히 다루며, 이 개인정보처리방침을 통해 어떤 정보가 어떻게
           수집·이용되는지 안내합니다.
         </p>
 

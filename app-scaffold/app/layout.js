@@ -2,7 +2,7 @@ import "./globals.css";
 import SiteFooterNav from "../components/SiteFooterNav";
 
 export const metadata = {
-  title: "테마보드",
+  title: "뉴스밈",
   description: "뉴스와 자동으로 연결되는 한국 주식 테마·종목 정보",
 };
 

@@ -2,8 +2,8 @@ import Header from "../../components/Header";
 import { Mail } from "lucide-react";
 
 export const metadata = {
-  title: "문의 | 테마보드",
-  description: "테마보드에 문의하는 방법입니다.",
+  title: "문의 | 뉴스밈",
+  description: "뉴스밈에 문의하는 방법입니다.",
 };
 
 // Contact email for the site.
