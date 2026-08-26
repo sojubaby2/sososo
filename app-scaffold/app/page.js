@@ -9,7 +9,7 @@ import NewsCard from "../components/NewsCard";
 import { isPoliticalTheme } from "../lib/themeData";
 
 const HOT_THEME_COUNT = 10;
-const FEED_POLL_MS = 45000; // check for new articles every 45s
+const FEED_POLL_MS = 25000; // check for new articles every 25s
 const TRENDING_STOCK_COUNT = 14;
 
 // Turns a saved /api/poll feed item into the shape NewsCard expects.
@@ -136,7 +136,7 @@ export default function HomePage() {
   const [loadState, setLoadState] = useState("loading");
   const [filter, setFilter] = useState("all");
   const [newIds, setNewIds] = useState(new Set());
-  const [toastCount, setToastCount] = useState(0);
+  const [toast, setToast] = useState(null); // { count, headline } | null
   const knownIdsRef = useRef(new Set());
   const toastTimerRef = useRef(null);
   const newIdsTimerRef = useRef(null);
@@ -147,11 +147,12 @@ export default function HomePage() {
       const freshIds = incomingIds.filter((id) => !knownIdsRef.current.has(id));
       if (freshIds.length > 0) {
         setNewIds(new Set(freshIds));
-        setToastCount(freshIds.length);
+        const latest = items.find((it) => it.id === freshIds[0]);
+        setToast({ count: freshIds.length, headline: latest?.title || "" });
         clearTimeout(newIdsTimerRef.current);
         newIdsTimerRef.current = setTimeout(() => setNewIds(new Set()), 4000);
         clearTimeout(toastTimerRef.current);
-        toastTimerRef.current = setTimeout(() => setToastCount(0), 4000);
+        toastTimerRef.current = setTimeout(() => setToast(null), 4500);
       }
     }
     knownIdsRef.current = new Set(incomingIds);
@@ -201,12 +202,6 @@ export default function HomePage() {
 
         <div className="home-layout">
           <div>
-            {toastCount > 0 && (
-              <div key={Date.now()} className="new-toast">
-                <Bell size={13} />새 소식 {toastCount}건 도착했어요
-              </div>
-            )}
-
             <div className="filter-row">
               <h2 className="section-title" style={{ margin: 0 }}>실시간 뉴스 · 관련주 ({items.length})</h2>
               <div className="filter-btns">
@@ -251,6 +246,18 @@ export default function HomePage() {
           정보를 있는 그대로 전달하는 것으로 투자 추천이 아닙니다.
         </span>
       </footer>
+
+      {toast && (
+        <div className="toast-container">
+          <div key={toast.headline + toast.count} className="new-toast">
+            <Bell size={16} className="new-toast-icon" />
+            <div>
+              <p className="new-toast-title">새 소식 {toast.count}건 도착</p>
+              {toast.headline && <p className="new-toast-headline">{toast.headline}</p>}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
