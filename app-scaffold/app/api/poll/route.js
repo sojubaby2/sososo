@@ -275,16 +275,29 @@ async function matchStocks(title, summary, universeCompanyList) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY 환경변수가 설정되지 않았습니다.");
 
-  const userMessage = `[전체 상장 종목]\n${universeCompanyList}\n\n[테마 목록]\n${buildThemeList()}\n\n---\n뉴스 제목: ${title}\n뉴스 요약: ${summary}`;
+  // The company/theme list is identical across every call in a poll cycle
+  // (and usually across cycles within the same trading day, since KRX data
+  // doesn't change intraday). Putting it in a cached system block means we
+  // only pay full price once per cache window — every other call within
+  // that hour reads it back at 10% of the normal input price instead of
+  // resending ~2,800 companies at full price every single time.
+  const staticContext = `${SYSTEM_PROMPT}\n\n[전체 상장 종목]\n${universeCompanyList}\n\n[테마 목록]\n${buildThemeList()}`;
+
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
     body: JSON.stringify({
       model: "claude-haiku-4-5-20251001",
       max_tokens: 1536,
-      system: SYSTEM_PROMPT,
+      system: [
+        {
+          type: "text",
+          text: staticContext,
+          cache_control: { type: "ephemeral", ttl: "1h" },
+        },
+      ],
       messages: [
-        { role: "user", content: userMessage },
+        { role: "user", content: `뉴스 제목: ${title}\n뉴스 요약: ${summary}` },
         { role: "assistant", content: "{" },
       ],
     }),

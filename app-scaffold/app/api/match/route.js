@@ -115,7 +115,7 @@ export async function matchStocks(title, summary = "") {
     throw new Error("ANTHROPIC_API_KEY 환경변수가 설정되지 않았습니다.");
   }
 
-  const userMessage = `[테마 목록]\n${buildThemeList()}\n\n[종목 목록]\n${buildCompanyList()}\n\n---\n뉴스 제목: ${title}\n뉴스 요약: ${summary}`;
+  const staticContext = `${SYSTEM_PROMPT}\n\n[테마 목록]\n${buildThemeList()}\n\n[종목 목록]\n${buildCompanyList()}`;
 
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -127,9 +127,15 @@ export async function matchStocks(title, summary = "") {
     body: JSON.stringify({
       model: "claude-haiku-4-5-20251001",
       max_tokens: 1536,
-      system: SYSTEM_PROMPT,
+      system: [
+        {
+          type: "text",
+          text: staticContext,
+          cache_control: { type: "ephemeral", ttl: "1h" },
+        },
+      ],
       messages: [
-        { role: "user", content: userMessage },
+        { role: "user", content: `뉴스 제목: ${title}\n뉴스 요약: ${summary}` },
         { role: "assistant", content: "{" },
       ],
     }),
