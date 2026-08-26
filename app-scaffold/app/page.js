@@ -2,13 +2,15 @@
 
 export const dynamic = "force-dynamic";
 
-import { useEffect, useMemo, useState } from "react";
-import { SlidersHorizontal, Newspaper, Loader2, Flame } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { SlidersHorizontal, Newspaper, Loader2, Flame, Bell } from "lucide-react";
 import Header from "../components/Header";
 import NewsCard from "../components/NewsCard";
 import { isPoliticalTheme } from "../lib/themeData";
 
 const HOT_THEME_COUNT = 10;
+const FEED_POLL_MS = 45000; // check for new articles every 45s
+const TRENDING_STOCK_COUNT = 14;
 
 // Turns a saved /api/poll feed item into the shape NewsCard expects.
 function toCardShape(item) {
@@ -28,12 +30,10 @@ function toCardShape(item) {
     link: item.link,
     confidence: hasLegitimate ? "confirmed" : "rumor",
     reason: reason || "관련 근거 정보 없음",
-    stocks: item.matches.map((m) => ({ name: m.name, code: m.code, market: m.market })),
+    stocks: item.matches.map((m) => ({ name: m.name, code: m.code, market: m.market, confidence: m.confidence })),
   };
 }
 
-// 5-step intensity scale so the strongest movers read visually "hotter" —
-// same idea as the reference screenshot's darker-vs-lighter red cards.
 function intensityClass(rank) {
   if (rank === 0) return "hot-1";
   if (rank <= 2) return "hot-2";
@@ -44,7 +44,7 @@ function intensityClass(rank) {
 
 function HotThemeGrid() {
   const [themes, setThemes] = useState([]);
-  const [state, setState] = useState("loading"); // loading | ready | error
+  const [state, setState] = useState("loading");
 
   useEffect(() => {
     fetch("/api/theme-momentum")
@@ -64,10 +64,10 @@ function HotThemeGrid() {
       .catch(() => setState("error"));
   }, []);
 
-  if (state === "error") return null; // fail quietly — the news feed below is the main content
+  if (state === "error") return null;
 
   return (
-    <section style={{ marginBottom: 32 }}>
+    <section style={{ marginBottom: 28 }}>
       <h2 className="section-title" style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <Flame size={13} style={{ color: "var(--up)" }} />
         HOT 테마 · 1개월 등락률
@@ -94,23 +94,98 @@ function HotThemeGrid() {
   );
 }
 
+function TrendingPanel({ rawItems }) {
+  const trending = useMemo(() => {
+    const seen = new Map();
+    for (const item of rawItems) {
+      for (const m of item.matches) {
+        if (seen.has(m.code)) continue;
+        seen.set(m.code, { name: m.name, code: m.code, market: m.market, confidence: m.confidence });
+        if (seen.size >= TRENDING_STOCK_COUNT) break;
+      }
+      if (seen.size >= TRENDING_STOCK_COUNT) break;
+    }
+    return Array.from(seen.values());
+  }, [rawItems]);
+
+  return (
+    <aside className="trending-panel">
+      <h2 className="trending-panel-title">
+        <Flame size={12} style={{ color: "var(--up)" }} />
+        실시간 언급 종목
+      </h2>
+      {trending.length === 0 ? (
+        <p className="trending-empty">아직 매칭된 종목이 없어요.</p>
+      ) : (
+        trending.map((s) => (
+          <div key={s.code} className="trending-row">
+            <span className="trending-row-name">
+              <span className={`dot ${s.confidence}`} />
+              {s.name}
+            </span>
+            <span className="trending-row-code">{s.code}</span>
+          </div>
+        ))
+      )}
+    </aside>
+  );
+}
+
 export default function HomePage() {
   const [rawItems, setRawItems] = useState([]);
-  const [loadState, setLoadState] = useState("loading"); // loading | ready | error
+  const [loadState, setLoadState] = useState("loading");
   const [filter, setFilter] = useState("all");
+  const [newIds, setNewIds] = useState(new Set());
+  const [toastCount, setToastCount] = useState(0);
+  const knownIdsRef = useRef(new Set());
+  const toastTimerRef = useRef(null);
+  const newIdsTimerRef = useRef(null);
+
+  function applyFeed(items, isFirstLoad) {
+    const incomingIds = items.map((it) => it.id);
+    if (!isFirstLoad) {
+      const freshIds = incomingIds.filter((id) => !knownIdsRef.current.has(id));
+      if (freshIds.length > 0) {
+        setNewIds(new Set(freshIds));
+        setToastCount(freshIds.length);
+        clearTimeout(newIdsTimerRef.current);
+        newIdsTimerRef.current = setTimeout(() => setNewIds(new Set()), 4000);
+        clearTimeout(toastTimerRef.current);
+        toastTimerRef.current = setTimeout(() => setToastCount(0), 4000);
+      }
+    }
+    knownIdsRef.current = new Set(incomingIds);
+    setRawItems(items);
+  }
 
   useEffect(() => {
-    fetch("/api/feed")
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.error) {
-          setLoadState("error");
-          return;
-        }
-        setRawItems(data.items || []);
-        setLoadState("ready");
-      })
-      .catch(() => setLoadState("error"));
+    let cancelled = false;
+
+    function load(isFirstLoad) {
+      fetch("/api/feed")
+        .then((r) => r.json())
+        .then((data) => {
+          if (cancelled) return;
+          if (data.error) {
+            setLoadState("error");
+            return;
+          }
+          applyFeed(data.items || [], isFirstLoad);
+          setLoadState("ready");
+        })
+        .catch(() => {
+          if (!cancelled) setLoadState("error");
+        });
+    }
+
+    load(true);
+    const interval = setInterval(() => load(false), FEED_POLL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+      clearTimeout(toastTimerRef.current);
+      clearTimeout(newIdsTimerRef.current);
+    };
   }, []);
 
   const items = useMemo(() => {
@@ -121,39 +196,51 @@ export default function HomePage() {
   return (
     <div>
       <Header />
-      <main className="container" style={{ paddingTop: 32, paddingBottom: 32 }}>
+      <main className="container-wide" style={{ paddingTop: 32, paddingBottom: 32 }}>
         <HotThemeGrid />
 
-        <div className="filter-row">
-          <h2 className="section-title" style={{ margin: 0 }}>실시간 뉴스 · 관련주 ({items.length})</h2>
-          <div className="filter-btns">
-            <SlidersHorizontal size={13} style={{ color: "var(--ink-muted)", marginRight: 4 }} />
-            <button className={`filter-btn ${filter === "all" ? "active" : ""}`} onClick={() => setFilter("all")}>전체</button>
-            <button className={`filter-btn ${filter === "confirmed" ? "active" : ""}`} onClick={() => setFilter("confirmed")}>관련주 확정만</button>
+        <div className="home-layout">
+          <div>
+            {toastCount > 0 && (
+              <div key={Date.now()} className="new-toast">
+                <Bell size={13} />새 소식 {toastCount}건 도착했어요
+              </div>
+            )}
+
+            <div className="filter-row">
+              <h2 className="section-title" style={{ margin: 0 }}>실시간 뉴스 · 관련주 ({items.length})</h2>
+              <div className="filter-btns">
+                <SlidersHorizontal size={13} style={{ color: "var(--ink-muted)", marginRight: 4 }} />
+                <button className={`filter-btn ${filter === "all" ? "active" : ""}`} onClick={() => setFilter("all")}>전체</button>
+                <button className={`filter-btn ${filter === "confirmed" ? "active" : ""}`} onClick={() => setFilter("confirmed")}>관련주 확정만</button>
+              </div>
+            </div>
+
+            {loadState === "loading" && (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--ink-muted)", fontSize: 14, padding: "24px 0" }}>
+                <Loader2 size={16} />
+                불러오는 중...
+              </div>
+            )}
+
+            {loadState === "error" && (
+              <p style={{ fontSize: 13, color: "var(--amber-tint-ink)", background: "var(--amber-tint)", padding: "8px 12px", borderRadius: 8 }}>
+                피드를 불러오지 못했습니다. Redis(Upstash) 환경변수 설정을 확인해주세요.
+              </p>
+            )}
+
+            {loadState === "ready" && items.length === 0 && (
+              <p style={{ fontSize: 14, color: "var(--ink-muted)", padding: "24px 0" }}>
+                아직 자동 수집된 뉴스가 없어요. /api/poll 을 한 번 호출해보시거나, 스케줄러가 연결되면 여기 자동으로 쌓이기 시작해요.
+              </p>
+            )}
+
+            <div className="news-list">
+              {items.map((n) => <NewsCard key={n.id} n={n} isNew={newIds.has(n.id)} />)}
+            </div>
           </div>
-        </div>
 
-        {loadState === "loading" && (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--ink-muted)", fontSize: 14, padding: "24px 0" }}>
-            <Loader2 size={16} />
-            불러오는 중...
-          </div>
-        )}
-
-        {loadState === "error" && (
-          <p style={{ fontSize: 13, color: "var(--amber-tint-ink)", background: "var(--amber-tint)", padding: "8px 12px", borderRadius: 8 }}>
-            피드를 불러오지 못했습니다. Redis(Upstash) 환경변수 설정을 확인해주세요.
-          </p>
-        )}
-
-        {loadState === "ready" && items.length === 0 && (
-          <p style={{ fontSize: 14, color: "var(--ink-muted)", padding: "24px 0" }}>
-            아직 자동 수집된 뉴스가 없어요. /api/poll 을 한 번 호출해보시거나, 1분 스케줄러가 연결되면 여기 자동으로 쌓이기 시작해요.
-          </p>
-        )}
-
-        <div className="news-list">
-          {items.map((n) => <NewsCard key={n.id} n={n} />)}
+          <TrendingPanel rawItems={rawItems} />
         </div>
       </main>
 

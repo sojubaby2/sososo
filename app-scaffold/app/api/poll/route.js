@@ -228,6 +228,8 @@ const FILTER_SYSTEM_PROMPT = `너는 한국 주식시장 뉴스 큐레이터야.
 - 해외 대규모 공장 투자·진출
 - 신기술 인증 등 사업적으로 유의미한 이벤트
 - 횡령·대규모 소송·심각한 경영 위기 등으로 인한 주가 급변동
+- "세계 최초", "국내 최초", "국내 유일" 같은 표현이 붙은 기술·사업 성과 발표 — 이런 표현은 강한 재료 신호이니 절대 걸러내지 마
+- 제목에 "[특징주]"가 붙은 기사 — 이미 실제 주가 변동이 있었다는 뜻이므로 적극적으로 포함해
 
 **제외해야 할 것** (예시 — 이런 건 걸러내):
 - 부고, 인사동정 등 개인 신상 소식
@@ -350,6 +352,42 @@ function finalizeMatches(matches, priceMap) {
   return withPrices.slice(0, MAX_TOTAL_MATCHES).map(({ tier, ...rest }) => rest); // tier was only for sorting
 }
 
+const STORY_DEDUP_WINDOW_MS = 6 * 60 * 60 * 1000; // 6 hours
+const STORY_DEDUP_CHECK_COUNT = 20; // how many recent feed items to check against
+
+// Different outlets cover the same real event (a merger, a big deal) with
+// completely different headlines, so title-based dedup alone lets a dozen
+// near-duplicate articles about one story flood the feed. This checks
+// whether the new article's LEAD stock (matches[0], already sorted to be
+// the strongest/most relevant match) was already the lead stock of
+// something published recently — if so, treat it as the same story.
+async function isDuplicateStory(redis, matches) {
+  if (!matches.length) return false;
+  const leadCode = matches[0].code;
+
+  let recentRaw;
+  try {
+    recentRaw = await redis.lrange("feed", 0, STORY_DEDUP_CHECK_COUNT - 1);
+  } catch {
+    return false; // if we can't check, don't block publishing over it
+  }
+
+  const now = Date.now();
+  for (const raw of recentRaw) {
+    let item;
+    try {
+      item = typeof raw === "string" ? JSON.parse(raw) : raw;
+    } catch {
+      continue;
+    }
+    if (!item?.savedAt || !Array.isArray(item.matches) || !item.matches.length) continue;
+    const age = now - new Date(item.savedAt).getTime();
+    if (age > STORY_DEDUP_WINDOW_MS) continue;
+    if (item.matches[0].code === leadCode) return true;
+  }
+  return false;
+}
+
 function articleKey(article) {
   // Dedup by TITLE, not link — wire-service reposts (obituaries, routine
   // briefs) often get a brand-new URL each time even though the headline
@@ -393,6 +431,11 @@ async function processArticle(keyword, article, redis, universeCompanyList, pric
   const matches = finalizeMatches(rawMatches, priceMap);
 
   if (matches.length > 0) {
+    const isDupStory = await isDuplicateStory(redis, matches);
+    if (isDupStory) {
+      return { keyword, title: article.title, published: false, reason: "동일 종목 관련 최근 기사 이미 게재됨(중복 스토리)" };
+    }
+
     const feedItem = {
       id: key,
       keyword,
