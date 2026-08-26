@@ -27,22 +27,27 @@ async function fetchExim(authkey, searchdate) {
   const qs = new URLSearchParams({ authkey, searchdate, data: "AP01" });
   const url = `https://oapi.koreaexim.go.kr/site/program/financial/exchangeJSON?${qs.toString()}`;
   const res = await fetch(url, { next: { revalidate: 10800 } }); // 3h cache
-  if (!res.ok) return null;
+  if (!res.ok) return { ok: false, status: res.status };
   try {
-    return await res.json();
+    const json = await res.json();
+    return { ok: true, json };
   } catch {
-    return null;
+    return { ok: false, status: res.status, parseError: true };
   }
 }
 
 async function fetchLatestExim(authkey) {
   const gen = businessDaysFrom(new Date());
+  let lastAttempt = null;
   for (let i = 0; i < 7; i++) {
     const date = gen.next().value;
-    const data = await fetchExim(authkey, date);
-    if (Array.isArray(data) && data.length > 0) return { data, date };
+    const result = await fetchExim(authkey, date);
+    lastAttempt = { date, result };
+    if (result.ok && Array.isArray(result.json) && result.json.length > 0) {
+      return { data: result.json, date };
+    }
   }
-  return null;
+  return { data: null, lastAttempt };
 }
 
 async function fetchGold() {
@@ -65,14 +70,21 @@ export async function GET() {
   const authkey = process.env.EXIM_API_KEY;
   const result = { usd: null, jpy: null, gold: null, fxDate: null };
 
-  if (authkey) {
+  if (!authkey) {
+    result.fxError = "EXIM_API_KEY 환경변수가 설정되지 않았습니다.";
+  } else {
     const exim = await fetchLatestExim(authkey);
-    if (exim) {
+    if (exim.data) {
       result.fxDate = exim.date;
       result.usd = parseRate(exim.data.find((r) => r.cur_unit === "USD"));
       // JPY is quoted per 100 yen by convention (both by the bank and by
       // Korean media) — displayed as-is, not divided down to per-1-yen.
       result.jpy = parseRate(exim.data.find((r) => r.cur_unit === "JPY(100)"));
+    } else {
+      // Surface exactly what the last attempt returned, so a bad key vs an
+      // empty/holiday response are distinguishable instead of both being null.
+      result.fxError = "7영업일 내에 환율 데이터를 찾지 못했습니다.";
+      result.fxDebug = exim.lastAttempt;
     }
   }
 
