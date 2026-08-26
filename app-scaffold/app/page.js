@@ -8,7 +8,7 @@ import Header from "../components/Header";
 import NewsCard from "../components/NewsCard";
 import { isPoliticalTheme } from "../lib/themeData";
 
-const HOT_THEME_COUNT = 10;
+const HOT_THEME_COUNT = 8;
 const FEED_POLL_MS = 25000; // check for new articles every 25s
 const TRENDING_STOCK_COUNT = 14;
 
@@ -34,15 +34,11 @@ function toCardShape(item) {
   };
 }
 
-function intensityClass(rank) {
-  if (rank === 0) return "hot-1";
-  if (rank <= 2) return "hot-2";
-  if (rank <= 4) return "hot-3";
-  if (rank <= 6) return "hot-4";
-  return "hot-5";
-}
-
-function HotThemeGrid() {
+// Compact sidebar list — this used to be a big colored grid across the top
+// of the page, which visually competed with the news feed for attention.
+// The news feed is the actual point of the site, so this is now a small
+// reference panel that lives beside it instead of above it.
+function HotThemePanel() {
   const [themes, setThemes] = useState([]);
   const [state, setState] = useState("loading");
 
@@ -67,30 +63,25 @@ function HotThemeGrid() {
   if (state === "error") return null;
 
   return (
-    <section style={{ marginBottom: 28 }}>
-      <h2 className="section-title" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <Flame size={13} style={{ color: "var(--up)" }} />
-        HOT 테마 · 1개월 등락률
+    <aside className="trending-panel">
+      <h2 className="trending-panel-title">
+        <Flame size={12} style={{ color: "var(--up)" }} />
+        HOT 테마 · 1개월
       </h2>
       {state === "loading" ? (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--ink-muted)", fontSize: 14, padding: "12px 0" }}>
-          <Loader2 size={16} />
-          불러오는 중...
-        </div>
+        <p className="trending-empty">불러오는 중...</p>
       ) : (
-        <div className="hot-theme-grid">
-          {themes.map((t, i) => (
-            <div key={t.theme} className={`hot-theme-card ${intensityClass(i)}`}>
-              <span className="hot-theme-name">{t.theme}</span>
-              <span className="hot-theme-change">
-                {t.change1M > 0 ? "+" : ""}
-                {t.change1M.toFixed(2)}%
-              </span>
-            </div>
-          ))}
-        </div>
+        themes.map((t) => (
+          <div key={t.theme} className="trending-row">
+            <span className="trending-row-name">{t.theme}</span>
+            <span className="mono up" style={{ fontSize: 13, fontWeight: 700 }}>
+              {t.change1M > 0 ? "+" : ""}
+              {t.change1M.toFixed(1)}%
+            </span>
+          </div>
+        ))
       )}
-    </section>
+    </aside>
   );
 }
 
@@ -198,8 +189,6 @@ export default function HomePage() {
     <div>
       <Header />
       <main className="container-wide" style={{ paddingTop: 32, paddingBottom: 32 }}>
-        <HotThemeGrid />
-
         <div className="home-layout">
           <div>
             <div className="filter-row">
@@ -235,7 +224,10 @@ export default function HomePage() {
             </div>
           </div>
 
-          <TrendingPanel rawItems={rawItems} />
+          <div className="sidebar-stack">
+            <HotThemePanel />
+            <TrendingPanel rawItems={rawItems} />
+          </div>
         </div>
       </main>
 
