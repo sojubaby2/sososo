@@ -366,9 +366,17 @@ const STORY_DEDUP_CHECK_COUNT = 20; // how many recent feed items to check again
 // whether the new article's LEAD stock (matches[0], already sorted to be
 // the strongest/most relevant match) was already the lead stock of
 // something published recently — if so, treat it as the same story.
-async function isDuplicateStory(redis, matches) {
+async function isDuplicateStory(redis, matches, publishedThisRun = []) {
   if (!matches.length) return false;
   const leadCode = matches[0].code;
+
+  // Check against items already published earlier in THIS run first — this
+  // is what actually closes the race condition (multiple articles about
+  // one breaking story, processed concurrently in the same poll cycle,
+  // couldn't see each other in Redis yet since none had been written).
+  for (const publishedMatches of publishedThisRun) {
+    if (publishedMatches[0]?.code === leadCode) return true;
+  }
 
   let recentRaw;
   try {
@@ -404,58 +412,76 @@ function articleKey(article) {
 // Vercel terminates a function that runs past this many seconds.
 export const maxDuration = 60;
 
-async function processArticle(keyword, article, redis, universeCompanyList, priceMap) {
+// Phase 1 (safe to run concurrently): dedup-by-title check, cheap filter,
+// then the expensive match call. Does NOT publish or make the story-level
+// dedup decision — that has to happen sequentially afterward (see below).
+async function computeArticleResult(keyword, article, redis, universeCompanyList, priceMap) {
   const key = articleKey(article);
 
   const alreadySeen = await redis.get(key);
   if (alreadySeen) {
-    return { keyword, title: article.title, skipped: "이미 처리됨" };
+    return { type: "skip", log: { keyword, title: article.title, skipped: "이미 처리됨" } };
   }
 
   let passesFilter = false;
   try {
     passesFilter = await isMarketMovingHeadline(article.title, article.summary);
   } catch (err) {
-    return { keyword, title: article.title, error: "필터링 실패: " + String(err.message || err) };
+    return { type: "skip", log: { keyword, title: article.title, error: "필터링 실패: " + String(err.message || err) } };
   }
 
   if (!passesFilter) {
     await redis.set(key, "1", { ex: SEEN_TTL_SECONDS });
-    return { keyword, title: article.title, published: false, reason: "재료성 부족으로 필터링됨" };
+    return { type: "skip", log: { keyword, title: article.title, published: false, reason: "재료성 부족으로 필터링됨" } };
   }
 
   let rawMatches = [];
   try {
     rawMatches = await matchStocks(article.title, article.summary, universeCompanyList);
   } catch (err) {
-    return { keyword, title: article.title, error: String(err.message || err) };
+    return { type: "skip", log: { keyword, title: article.title, error: String(err.message || err) } };
   }
 
   await redis.set(key, "1", { ex: SEEN_TTL_SECONDS });
-
   const matches = finalizeMatches(rawMatches, priceMap);
 
-  if (matches.length > 0) {
-    const isDupStory = await isDuplicateStory(redis, matches);
-    if (isDupStory) {
-      return { keyword, title: article.title, published: false, reason: "동일 종목 관련 최근 기사 이미 게재됨(중복 스토리)" };
-    }
-
-    const feedItem = {
-      id: key,
-      keyword,
-      title: article.title,
-      summary: article.summary,
-      link: article.link,
-      pubDate: article.pubDate,
-      matches,
-      savedAt: new Date().toISOString(),
-    };
-    await redis.lpush("feed", JSON.stringify(feedItem));
-    await redis.ltrim("feed", 0, FEED_MAX_LENGTH - 1);
-    return { keyword, title: article.title, published: true, matchCount: matches.length };
+  if (matches.length === 0) {
+    return { type: "skip", log: { keyword, title: article.title, published: false, reason: "관련 종목/테마 없음" } };
   }
-  return { keyword, title: article.title, published: false, reason: "관련 종목/테마 없음" };
+
+  return { type: "candidate", keyword, key, article, matches };
+}
+
+// Phase 2 (must run one at a time, not in parallel): the actual
+// dedup-against-recent-stories decision and the Redis write. Cheap and
+// fast (no AI calls), so doing this sequentially doesn't reintroduce the
+// timeout problem — but it DOES fix the race condition where several
+// articles about the same breaking story (e.g. 3 outlets all covering one
+// earnings report in the same poll cycle) were all processed concurrently
+// and none of them could see the others yet, so all three passed the
+// dedup check and got published separately.
+async function publishCandidate(redis, candidate, publishedThisRun) {
+  const { keyword, key, article, matches } = candidate;
+
+  const isDupStory = await isDuplicateStory(redis, matches, publishedThisRun);
+  if (isDupStory) {
+    return { keyword, title: article.title, published: false, reason: "동일 종목 관련 최근 기사 이미 게재됨(중복 스토리)" };
+  }
+
+  const feedItem = {
+    id: key,
+    keyword,
+    title: article.title,
+    summary: article.summary,
+    link: article.link,
+    pubDate: article.pubDate,
+    matches,
+    savedAt: new Date().toISOString(),
+  };
+  await redis.lpush("feed", JSON.stringify(feedItem));
+  await redis.ltrim("feed", 0, FEED_MAX_LENGTH - 1);
+  publishedThisRun.push(matches); // so later candidates in this same run can see it too
+  return { keyword, title: article.title, published: true, matchCount: matches.length };
 }
 
 export async function GET(request) {
@@ -488,6 +514,7 @@ export async function GET(request) {
   const { companyList: universeCompanyList, priceMap } = buildUniverseFromKrx(krx.items);
 
   const log = [];
+  const candidates = [];
 
   for (const keyword of WATCHED_KEYWORDS) {
     let articles;
@@ -499,9 +526,18 @@ export async function GET(request) {
     }
 
     const results = await Promise.all(
-      articles.map((article) => processArticle(keyword, article, redis, universeCompanyList, priceMap))
+      articles.map((article) => computeArticleResult(keyword, article, redis, universeCompanyList, priceMap))
     );
-    log.push(...results);
+    for (const r of results) {
+      if (r.type === "skip") log.push(r.log);
+      else candidates.push(r);
+    }
+  }
+
+  // Sequential on purpose — see publishCandidate's comment above.
+  const publishedThisRun = [];
+  for (const candidate of candidates) {
+    log.push(await publishCandidate(redis, candidate, publishedThisRun));
   }
 
   return Response.json({ checkedAt: new Date().toISOString(), basDt: krx.basDt, log });
