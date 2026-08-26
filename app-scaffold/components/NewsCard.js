@@ -21,7 +21,7 @@ export default function NewsCard({ n, isNew }) {
 
       <div className="chip-row">
         {n.stocks.map((s) => (
-          <StockChip key={s.code} name={s.name} code={s.code} market={s.market} change={s.change} confidence={s.confidence} />
+          <StockChip key={s.code} name={s.name} code={s.code} market={s.market} change={s.change} />
         ))}
       </div>
 

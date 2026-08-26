@@ -14,7 +14,7 @@ export async function GET() {
     );
   }
 
-  const raw = await redis.lrange("feed", 0, 49);
+  const raw = await redis.lrange("feed", 0, 249); // ~5 "pages" worth
   const items = raw
     .map((r) => {
       try {

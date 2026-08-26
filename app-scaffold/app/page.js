@@ -3,7 +3,7 @@
 export const dynamic = "force-dynamic";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { SlidersHorizontal, Newspaper, Loader2, Flame, Bell } from "lucide-react";
+import { Newspaper, Loader2, Flame, Bell, Globe } from "lucide-react";
 import Header from "../components/Header";
 import NewsCard from "../components/NewsCard";
 import { isPoliticalTheme } from "../lib/themeData";
@@ -30,14 +30,12 @@ function toCardShape(item) {
     link: item.link,
     confidence: hasLegitimate ? "confirmed" : "rumor",
     reason: reason || "관련 근거 정보 없음",
-    stocks: item.matches.map((m) => ({ name: m.name, code: m.code, market: m.market, confidence: m.confidence })),
+    stocks: item.matches.map((m) => ({ name: m.name, code: m.code, market: m.market })),
   };
 }
 
-// Compact sidebar list — this used to be a big colored grid across the top
-// of the page, which visually competed with the news feed for attention.
-// The news feed is the actual point of the site, so this is now a small
-// reference panel that lives beside it instead of above it.
+// Compact sidebar panel — a smaller reference version of what used to be a
+// big colored grid across the top of the page.
 function HotThemePanel() {
   const [themes, setThemes] = useState([]);
   const [state, setState] = useState("loading");
@@ -85,13 +83,50 @@ function HotThemePanel() {
   );
 }
 
+// Replaces the old scrolling top ticker — everything visible at once
+// instead of waiting for text to scroll by.
+function GlobalMarketPanel() {
+  const [data, setData] = useState(null);
+
+  useEffect(() => {
+    fetch("/api/market-ticker")
+      .then((r) => r.json())
+      .then(setData)
+      .catch(() => {});
+  }, []);
+
+  const rows = [];
+  if (data?.usd) rows.push(["원/달러", `${data.usd.toLocaleString("ko-KR")}원`]);
+  if (data?.jpy) rows.push(["원/엔(100엔)", `${data.jpy.toLocaleString("ko-KR")}원`]);
+  if (data?.gold) rows.push(["국제 금값(1oz)", `$${Number(data.gold).toLocaleString("ko-KR")}`]);
+
+  return (
+    <aside className="trending-panel">
+      <h2 className="trending-panel-title">
+        <Globe size={12} style={{ color: "var(--amber)" }} />
+        글로벌 시황
+      </h2>
+      {rows.length === 0 ? (
+        <p className="trending-empty">불러오는 중...</p>
+      ) : (
+        rows.map(([label, value]) => (
+          <div key={label} className="trending-row">
+            <span className="trending-row-name">{label}</span>
+            <span className="mono" style={{ fontSize: 13, fontWeight: 700 }}>{value}</span>
+          </div>
+        ))
+      )}
+    </aside>
+  );
+}
+
 function TrendingPanel({ rawItems }) {
   const trending = useMemo(() => {
     const seen = new Map();
     for (const item of rawItems) {
       for (const m of item.matches) {
         if (seen.has(m.code)) continue;
-        seen.set(m.code, { name: m.name, code: m.code, market: m.market, confidence: m.confidence });
+        seen.set(m.code, { name: m.name, code: m.code, market: m.market });
         if (seen.size >= TRENDING_STOCK_COUNT) break;
       }
       if (seen.size >= TRENDING_STOCK_COUNT) break;
@@ -110,10 +145,7 @@ function TrendingPanel({ rawItems }) {
       ) : (
         trending.map((s) => (
           <div key={s.code} className="trending-row">
-            <span className="trending-row-name">
-              <span className={`dot ${s.confidence}`} />
-              {s.name}
-            </span>
+            <span className="trending-row-name">{s.name}</span>
             <span className="trending-row-code">{s.code}</span>
           </div>
         ))
@@ -125,7 +157,6 @@ function TrendingPanel({ rawItems }) {
 export default function HomePage() {
   const [rawItems, setRawItems] = useState([]);
   const [loadState, setLoadState] = useState("loading");
-  const [filter, setFilter] = useState("all");
   const [newIds, setNewIds] = useState(new Set());
   const [toast, setToast] = useState(null); // { count, headline } | null
   const knownIdsRef = useRef(new Set());
@@ -180,10 +211,7 @@ export default function HomePage() {
     };
   }, []);
 
-  const items = useMemo(() => {
-    const mapped = rawItems.map(toCardShape);
-    return filter === "confirmed" ? mapped.filter((n) => n.confidence === "confirmed") : mapped;
-  }, [rawItems, filter]);
+  const items = useMemo(() => rawItems.map(toCardShape), [rawItems]);
 
   return (
     <div>
@@ -191,14 +219,7 @@ export default function HomePage() {
       <main className="container-wide" style={{ paddingTop: 32, paddingBottom: 32 }}>
         <div className="home-layout">
           <div>
-            <div className="filter-row">
-              <h2 className="section-title" style={{ margin: 0 }}>실시간 뉴스 · 관련주 ({items.length})</h2>
-              <div className="filter-btns">
-                <SlidersHorizontal size={13} style={{ color: "var(--ink-muted)", marginRight: 4 }} />
-                <button className={`filter-btn ${filter === "all" ? "active" : ""}`} onClick={() => setFilter("all")}>전체</button>
-                <button className={`filter-btn ${filter === "confirmed" ? "active" : ""}`} onClick={() => setFilter("confirmed")}>관련주 확정만</button>
-              </div>
-            </div>
+            <h2 className="section-title">실시간 뉴스 · 관련주 ({items.length})</h2>
 
             {loadState === "loading" && (
               <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--ink-muted)", fontSize: 14, padding: "24px 0" }}>
@@ -225,6 +246,7 @@ export default function HomePage() {
           </div>
 
           <div className="sidebar-stack">
+            <GlobalMarketPanel />
             <HotThemePanel />
             <TrendingPanel rawItems={rawItems} />
           </div>
