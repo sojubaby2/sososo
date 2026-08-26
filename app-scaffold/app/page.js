@@ -3,16 +3,14 @@
 export const dynamic = "force-dynamic";
 
 import { useEffect, useMemo, useState } from "react";
-import { SlidersHorizontal, Newspaper, Loader2 } from "lucide-react";
+import { SlidersHorizontal, Newspaper, Loader2, Flame } from "lucide-react";
 import Header from "../components/Header";
 import NewsCard from "../components/NewsCard";
+import { isPoliticalTheme } from "../lib/themeData";
+
+const HOT_THEME_COUNT = 10;
 
 // Turns a saved /api/poll feed item into the shape NewsCard expects.
-// Matches can now be tiered three ways: "confirmed" (directly named),
-// "theme" (pulled in via a matched investment theme), or "rumor". Both
-// confirmed and theme-tier are legitimate, non-fabricated connections, so
-// either one is enough to earn the card's green "관련주" styling — only
-// pure rumor-only cards get the dashed/amber treatment.
 function toCardShape(item) {
   const hasLegitimate = item.matches.some((m) => m.confidence === "confirmed" || m.confidence === "theme");
   const reason = item.matches
@@ -32,6 +30,68 @@ function toCardShape(item) {
     reason: reason || "관련 근거 정보 없음",
     stocks: item.matches.map((m) => ({ name: m.name, code: m.code, market: m.market })),
   };
+}
+
+// 5-step intensity scale so the strongest movers read visually "hotter" —
+// same idea as the reference screenshot's darker-vs-lighter red cards.
+function intensityClass(rank) {
+  if (rank === 0) return "hot-1";
+  if (rank <= 2) return "hot-2";
+  if (rank <= 4) return "hot-3";
+  if (rank <= 6) return "hot-4";
+  return "hot-5";
+}
+
+function HotThemeGrid() {
+  const [themes, setThemes] = useState([]);
+  const [state, setState] = useState("loading"); // loading | ready | error
+
+  useEffect(() => {
+    fetch("/api/theme-momentum")
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.themeChanges) {
+          setState("error");
+          return;
+        }
+        const top = data.themeChanges
+          .filter((t) => typeof t.change1M === "number" && !isPoliticalTheme(t.theme))
+          .sort((a, b) => b.change1M - a.change1M)
+          .slice(0, HOT_THEME_COUNT);
+        setThemes(top);
+        setState("ready");
+      })
+      .catch(() => setState("error"));
+  }, []);
+
+  if (state === "error") return null; // fail quietly — the news feed below is the main content
+
+  return (
+    <section style={{ marginBottom: 32 }}>
+      <h2 className="section-title" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <Flame size={13} style={{ color: "var(--up)" }} />
+        HOT 테마 · 1개월 등락률
+      </h2>
+      {state === "loading" ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--ink-muted)", fontSize: 14, padding: "12px 0" }}>
+          <Loader2 size={16} />
+          불러오는 중...
+        </div>
+      ) : (
+        <div className="hot-theme-grid">
+          {themes.map((t, i) => (
+            <div key={t.theme} className={`hot-theme-card ${intensityClass(i)}`}>
+              <span className="hot-theme-name">{t.theme}</span>
+              <span className="hot-theme-change">
+                {t.change1M > 0 ? "+" : ""}
+                {t.change1M.toFixed(2)}%
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
 }
 
 export default function HomePage() {
@@ -62,6 +122,8 @@ export default function HomePage() {
     <div>
       <Header />
       <main className="container" style={{ paddingTop: 32, paddingBottom: 32 }}>
+        <HotThemeGrid />
+
         <div className="filter-row">
           <h2 className="section-title" style={{ margin: 0 }}>실시간 뉴스 · 관련주 ({items.length})</h2>
           <div className="filter-btns">

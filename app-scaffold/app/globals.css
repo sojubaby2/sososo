@@ -122,3 +122,15 @@ button, input { font-family: inherit; }
 .footer-nav { max-width: 960px; margin: 0 auto; padding: 0 24px 16px; display: flex; gap: 16px; font-size: 12px; }
 .footer-nav a { color: var(--ink-muted); text-decoration: none; }
 .footer-nav a:hover { text-decoration: underline; color: var(--amber); }
+
+/* HOT 테마 grid (homepage) */
+.hot-theme-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+@media (max-width: 640px) { .hot-theme-grid { grid-template-columns: repeat(2, 1fr); } }
+.hot-theme-card { border-radius: 10px; padding: 16px 14px; display: flex; flex-direction: column; gap: 8px; color: #fff; min-height: 84px; justify-content: center; }
+.hot-theme-name { font-size: 13px; font-weight: 600; line-height: 1.3; }
+.hot-theme-change { font-family: var(--font-mono); font-size: 18px; font-weight: 700; }
+.hot-theme-card.hot-1 { background: #B4282E; }
+.hot-theme-card.hot-2 { background: #C23B3B; }
+.hot-theme-card.hot-3 { background: #CE5252; }
+.hot-theme-card.hot-4 { background: #D96C6C; }
+.hot-theme-card.hot-5 { background: #E58989; }
