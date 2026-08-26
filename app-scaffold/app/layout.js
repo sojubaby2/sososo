@@ -14,6 +14,12 @@ export default function RootLayout({ children }) {
           href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@600;700&family=Noto+Sans+KR:wght@400;500;600;700&family=Roboto+Mono:wght@500;700&display=swap"
           rel="stylesheet"
         />
+        {/* Google AdSense site verification / ad loader */}
+        <script
+          async
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1329092235174593"
+          crossOrigin="anonymous"
+        ></script>
       </head>
       <body>
         {children}
