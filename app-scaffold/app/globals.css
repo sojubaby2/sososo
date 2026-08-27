@@ -196,3 +196,50 @@ button, input { font-family: inherit; }
 .footer-nav a { color: var(--ink-muted); text-decoration: none; }
 .footer-nav a:hover { text-decoration: underline; color: var(--amber); }
 
+/* 차트 가이드 */
+.guide-intro { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 24px; }
+.guide-title { font-family: var(--font-display); font-size: 24px; font-weight: 700; margin: 0 0 4px; }
+.guide-subtitle { font-size: 13px; color: var(--ink-muted); margin: 0; }
+
+.guide-tabs { display: flex; gap: 6px; margin-bottom: 20px; border-bottom: 1px solid var(--border); }
+.guide-tab { padding: 8px 4px; margin-right: 16px; font-size: 14px; font-weight: 600; color: var(--ink-muted); background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; }
+.guide-tab.active { color: var(--amber); border-bottom-color: var(--amber); }
+
+.guide-list { display: flex; flex-direction: column; gap: 10px; }
+.guide-card { border: 1px solid var(--border); border-radius: 12px; background: var(--surface); padding: 14px 16px; }
+.guide-card.open { border-color: var(--amber); }
+.guide-card-head { display: flex; align-items: center; justify-content: space-between; width: 100%; background: none; border: none; cursor: pointer; padding: 0; text-align: left; }
+.guide-card-name { font-family: var(--font-display); font-size: 15px; font-weight: 700; margin-right: 8px; }
+.guide-card-eng { font-size: 11px; color: var(--ink-muted); font-family: var(--font-mono); }
+.guide-chevron { color: var(--ink-muted); transition: transform 200ms ease; flex-shrink: 0; }
+.guide-card.open .guide-chevron { transform: rotate(180deg); color: var(--amber); }
+.guide-card-summary { font-size: 13px; color: var(--ink-muted); margin: 6px 0 0; line-height: 1.5; }
+
+.guide-card-body { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
+.guide-demo-wrap { background: var(--bg); border-radius: 10px; padding: 10px; margin-bottom: 12px; }
+.demo-svg { width: 100%; height: auto; display: block; }
+.guide-detail { font-size: 13px; line-height: 1.7; color: var(--ink); margin: 0 0 10px; }
+.guide-tip { font-size: 12px; line-height: 1.6; background: var(--amber-tint); color: var(--amber-tint-ink); padding: 8px 12px; border-radius: 8px; }
+.guide-tip strong { font-weight: 700; }
+.guide-footnote { font-size: 12px; color: var(--ink-muted); margin-top: 24px; line-height: 1.6; }
+
+/* demo animations */
+.candle-fade { animation: candle-fade-in 260ms ease both; }
+@keyframes candle-fade-in { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
+
+.demo-draw-line { stroke-dasharray: 260; stroke-dashoffset: 260; animation: draw-line 900ms ease forwards; }
+@keyframes draw-line { to { stroke-dashoffset: 0; } }
+
+.demo-fade-in { opacity: 0; animation: simple-fade-in 500ms ease forwards; }
+@keyframes simple-fade-in { to { opacity: 1; } }
+
+.demo-dot-pop { opacity: 0; transform: scale(0.3); transform-box: fill-box; transform-origin: center; animation: dot-pop 320ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+@keyframes dot-pop { to { opacity: 1; transform: scale(1); } }
+
+.demo-bar-grow { transform: scaleY(0); animation: bar-grow 380ms ease forwards; }
+@keyframes bar-grow { to { transform: scaleY(1); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .candle-fade, .demo-draw-line, .demo-fade-in, .demo-dot-pop, .demo-bar-grow { animation: none; opacity: 1; transform: none; stroke-dashoffset: 0; }
+}
+
