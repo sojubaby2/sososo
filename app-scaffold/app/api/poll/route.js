@@ -203,6 +203,13 @@ const SYSTEM_PROMPT = `너는 한국 주식 뉴스와 종목/테마를 연결하
 
 **중요한 오판 방지 규칙**: 증권사가 기사에 "OO증권 리서치센터는 ~라고 분석했다", "OO증권 애널리스트는 ~라고 말했다"처럼 **코멘트·리포트의 출처로만** 언급된 경우, 그 증권사를 절대 관련주로 넣지 마. 그 증권사가 그 사건의 당사자(계약 주체, 투자자, 사업 파트너 등)일 때만 포함해. 단순히 "누가 이 기사에 대해 말했는지"와 "누가 사업적으로 관련 있는지"는 다른 문제야.
 
+**계열사 이름 혼동 주의**: 회사 이름에 같은 단어가 들어간다고 같은 그룹이라고 착각하지 마. 특히 아래처럼 과거엔 한 뿌리였지만 지금은 완전히 남남인 그룹들을 절대 혼동하면 안 돼:
+- "현대차그룹"(현대자동차·기아·현대모비스·현대건설 등)과 "HD현대"(옛 현대중공업그룹, HD현대중공업·HD현대마린엔진·HD한국조선해양·HD현대일렉트릭 등)는 완전히 별개의 그룹이야. "현대"라는 이름만 보고 현대차그룹 계열사라고 단정하지 마.
+- "현대백화점그룹"(현대그린푸드·현대홈쇼핑 등)과 "현대해상화재보험"도 위 두 그룹과 전부 무관해.
+- "LG그룹"과 "LX그룹"(LX하우시스·LX인터내셔널 등)은 2021년에 완전히 분리된 별개 회사야.
+- "삼성그룹"과 "신세계그룹"·"CJ그룹"·"한솔그룹"도 과거엔 한 뿌리였지만 지금은 전부 무관한 별개 회사야.
+- 회사가 정확히 어느 그룹 소속인지, 그 그룹이 실제로 그 사업(예: 로봇, 반도체 등)을 하는 계열사를 갖고 있는지 확신이 서지 않으면, 절대 추측으로 넣지 말고 아예 빼. 애매하면 넣는 것보다 안 넣는 게 훨씬 나아.
+
 **하락 뉴스 처리 규칙**: 어떤 회사 자체의 주가 하락·실적 악화만 다루고 다른 종목에 미치는 영향이 없다면, 그 회사를 관련주로 넣지 마(애초에 이런 기사는 필터 단계에서 대부분 걸러질 거야). 다만 그 하락·악재가 **다른 회사에는 반사이익·기회**가 되는 경우(예: A사 해킹 사고→보안업체 B에 호재, A사 실적 부진→경쟁사 C에 반사이익, A사가 지배하던 시장에 B사가 새로 진입)에는, 그 수혜 회사(B, C) 관점에서 "confirmed"로 포함해.
 
 **B. 핵심 테마 (primary_theme)**: [테마 목록] 중, 이 기사의 "가장 좁고 정확한 핵심 초점" 딱 하나만 골라. 예를 들어 전기차 배터리에 쓰이는 리튬 공급 얘기라면 "2차전지"가 아니라 "원자재(리튬)"을 골라야 해 — 기사가 진짜 말하고 있는 게 뭔지가 기준이야. 명확한 핵심이 없으면 null.
@@ -343,10 +350,12 @@ async function matchStocks(title, summary, universeCompanyList) {
 }
 
 // Final ordering + cap. Tier order (direct → primary theme → secondary
-// theme) comes first; within each tier, sort by today's change% descending.
-// That second pass is what naturally pushes sluggish mega-caps down without
-// a hardcoded blacklist — a stock that barely moved today just sorts lower
-// than one that's actually reacting to the news, tier for tier.
+// theme) comes first. Within the theme tiers, sort by today's change%
+// descending — that's what naturally pushes sluggish mega-caps down
+// without a hardcoded blacklist. Within the "direct" tier, though, keep
+// Claude's own ordering instead: the article's actual subject is usually
+// listed first, and re-sorting by price would let an unrelated mover
+// (even a wrongly-matched one) outrank the real subject as "대장주".
 const TIER_ORDER = { direct: 0, primary: 1, secondary: 2 };
 function finalizeMatches(matches, priceMap) {
   const withPrices = matches.map((m) => {
@@ -356,6 +365,7 @@ function finalizeMatches(matches, priceMap) {
   withPrices.sort((a, b) => {
     const tierDiff = (TIER_ORDER[a.tier] ?? 9) - (TIER_ORDER[b.tier] ?? 9);
     if (tierDiff !== 0) return tierDiff;
+    if (a.tier === "direct") return 0; // preserve original order (stable sort)
     const changeA = typeof a.change === "number" ? a.change : -Infinity;
     const changeB = typeof b.change === "number" ? b.change : -Infinity;
     return changeB - changeA;
