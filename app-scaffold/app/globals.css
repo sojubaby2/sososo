@@ -224,22 +224,28 @@ button, input { font-family: inherit; }
 .guide-footnote { font-size: 12px; color: var(--ink-muted); margin-top: 24px; line-height: 1.6; }
 
 /* demo animations */
-.candle-fade { animation: candle-fade-in 260ms ease both; }
-@keyframes candle-fade-in { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
+.demo-reveal-rect { fill: white; animation: reveal-sweep 850ms cubic-bezier(0.65, 0, 0.35, 1) forwards; }
+@keyframes reveal-sweep { to { width: 100; } }
 
-.demo-draw-line { stroke-dasharray: 260; stroke-dashoffset: 260; animation: draw-line 900ms ease forwards; }
+.demo-draw-line { stroke-dasharray: 340; stroke-dashoffset: 340; animation: draw-line 750ms cubic-bezier(0.45, 0, 0.2, 1) forwards; }
 @keyframes draw-line { to { stroke-dashoffset: 0; } }
 
 .demo-fade-in { opacity: 0; animation: simple-fade-in 500ms ease forwards; }
 @keyframes simple-fade-in { to { opacity: 1; } }
 
-.demo-dot-pop { opacity: 0; transform: scale(0.3); transform-box: fill-box; transform-origin: center; animation: dot-pop 320ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+.demo-dot-pop { opacity: 0; transform: scale(0.3); transform-box: fill-box; transform-origin: center; animation: dot-pop 340ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
 @keyframes dot-pop { to { opacity: 1; transform: scale(1); } }
+.demo-dot-flip { animation: dot-pop 340ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards, dot-flip-ring 1200ms ease 340ms; }
+@keyframes dot-flip-ring {
+  0% { filter: drop-shadow(0 0 0 rgba(198, 134, 43, 0)); }
+  30% { filter: drop-shadow(0 0 1.5px rgba(198, 134, 43, 0.9)); }
+  100% { filter: drop-shadow(0 0 0 rgba(198, 134, 43, 0)); }
+}
 
-.demo-bar-grow { transform: scaleY(0); animation: bar-grow 380ms ease forwards; }
+.demo-bar-grow { transform: scaleY(0); animation: bar-grow 380ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
 @keyframes bar-grow { to { transform: scaleY(1); } }
 
 @media (prefers-reduced-motion: reduce) {
-  .candle-fade, .demo-draw-line, .demo-fade-in, .demo-dot-pop, .demo-bar-grow { animation: none; opacity: 1; transform: none; stroke-dashoffset: 0; }
+  .demo-reveal-rect, .demo-draw-line, .demo-fade-in, .demo-dot-pop, .demo-dot-flip, .demo-bar-grow { animation: none !important; opacity: 1; transform: none; stroke-dashoffset: 0; width: 100 !important; }
 }
 

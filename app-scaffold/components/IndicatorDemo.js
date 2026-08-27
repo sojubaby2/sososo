@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import {
   SAMPLE_CANDLES,
   SAMPLE_VOLUME,
@@ -14,27 +14,45 @@ import {
   obv,
   disparity,
   simpleSar,
+  ichimoku,
 } from "../lib/chartDemoData";
 
 const N = SAMPLE_CANDLES.length;
 const UP = "#c23b3b"; // Korean convention: red = up
 const DOWN = "#2e5fa3"; // blue = down
+const REVEAL_MS = 850; // how long the base chart takes to sweep in
+const IND_DELAY = REVEAL_MS + 80; // indicators wait for the base chart to finish first
 
-function linePath(values, toY) {
+function linePath(values, toY, xFor = (i) => xAt(i)) {
   let d = "";
   values.forEach((v, i) => {
     if (v == null) return;
-    const x = xAt(i);
+    const x = xFor(i);
     const y = toY(v, i);
     d += d === "" ? `M ${x} ${y}` : ` L ${x} ${y}`;
   });
   return d;
 }
 
-// The base candlestick chart every demo is drawn on top of.
-function Candles({ dim = false }) {
+// Every demo is wrapped in this — a rectangular clip that sweeps open
+// left-to-right, so the base chart reads as "being drawn" as one continuous
+// motion instead of a scattered per-element fade.
+function Reveal({ id, children, height = 100 }) {
   return (
-    <g opacity={dim ? 0.35 : 1}>
+    <>
+      <defs>
+        <clipPath id={id}>
+          <rect x={0} y={0} width={0} height={height} className="demo-reveal-rect" />
+        </clipPath>
+      </defs>
+      <g clipPath={`url(#${id})`}>{children}</g>
+    </>
+  );
+}
+
+function Candles() {
+  return (
+    <g>
       {SAMPLE_CANDLES.map((c, i) => {
         const x = xAt(i);
         const up = c.c >= c.o;
@@ -46,7 +64,7 @@ function Candles({ dim = false }) {
         const bodyTop = Math.min(yOpen, yClose);
         const bodyH = Math.max(Math.abs(yOpen - yClose), 0.6);
         return (
-          <g key={i} className="candle-fade" style={{ animationDelay: `${i * 28}ms` }}>
+          <g key={i}>
             <line x1={x} x2={x} y1={yHigh} y2={yLow} stroke={color} strokeWidth={0.5} />
             <rect x={x - 1.3} y={bodyTop} width={2.6} height={bodyH} fill={color} />
           </g>
@@ -56,13 +74,13 @@ function Candles({ dim = false }) {
   );
 }
 
-function AnimatedLine({ d, color, delay = 0, dash = false }) {
+function AnimatedLine({ d, color, delay = IND_DELAY, dash = false, width = 1.1 }) {
   return (
     <path
       d={d}
       fill="none"
       stroke={color}
-      strokeWidth={1.1}
+      strokeWidth={width}
       className="demo-draw-line"
       strokeDasharray={dash ? "3 2" : undefined}
       style={{ animationDelay: `${delay}ms` }}
@@ -71,19 +89,23 @@ function AnimatedLine({ d, color, delay = 0, dash = false }) {
 }
 
 export default function IndicatorDemo({ visual }) {
+  const uid = useId().replace(/[^a-zA-Z0-9]/g, "");
   const [playKey, setPlayKey] = useState(0);
   useEffect(() => {
     setPlayKey((k) => k + 1);
   }, [visual]);
 
   const closes = SAMPLE_CANDLES.map((c) => c.c);
+  const clipId = `${uid}-reveal`;
 
   // ---- chart-type variants (replace the candle rendering itself) ----
   if (visual.type === "chartform") {
     if (visual.form === "line") {
       return (
         <svg viewBox="0 0 100 100" className="demo-svg" key={playKey}>
-          <AnimatedLine d={linePath(closes, (v) => priceToY(v))} color="var(--amber)" />
+          <Reveal id={clipId}>
+            <AnimatedLine d={linePath(closes, (v) => priceToY(v))} color="var(--amber)" delay={0} width={1.4} />
+          </Reveal>
         </svg>
       );
     }
@@ -92,31 +114,34 @@ export default function IndicatorDemo({ visual }) {
       const areaD = `${d} L ${xAt(N - 1)} 96 L ${xAt(0)} 96 Z`;
       return (
         <svg viewBox="0 0 100 100" className="demo-svg" key={playKey}>
-          <path d={areaD} fill="var(--amber-tint)" className="demo-fade-in" />
-          <AnimatedLine d={d} color="var(--amber)" />
+          <Reveal id={clipId}>
+            <path d={areaD} fill="var(--amber-tint)" />
+            <AnimatedLine d={d} color="var(--amber)" delay={0} width={1.4} />
+          </Reveal>
         </svg>
       );
     }
     if (visual.form === "bar") {
       return (
         <svg viewBox="0 0 100 100" className="demo-svg" key={playKey}>
-          {SAMPLE_CANDLES.map((c, i) => {
-            const x = xAt(i);
-            const up = c.c >= c.o;
-            const color = up ? UP : DOWN;
-            return (
-              <g key={i} className="candle-fade" style={{ animationDelay: `${i * 28}ms` }}>
-                <line x1={x} x2={x} y1={priceToY(c.h)} y2={priceToY(c.l)} stroke={color} strokeWidth={0.6} />
-                <line x1={x - 1.2} x2={x} y1={priceToY(c.o)} y2={priceToY(c.o)} stroke={color} strokeWidth={0.6} />
-                <line x1={x} x2={x + 1.2} y1={priceToY(c.c)} y2={priceToY(c.c)} stroke={color} strokeWidth={0.6} />
-              </g>
-            );
-          })}
+          <Reveal id={clipId}>
+            {SAMPLE_CANDLES.map((c, i) => {
+              const x = xAt(i);
+              const up = c.c >= c.o;
+              const color = up ? UP : DOWN;
+              return (
+                <g key={i}>
+                  <line x1={x} x2={x} y1={priceToY(c.h)} y2={priceToY(c.l)} stroke={color} strokeWidth={0.6} />
+                  <line x1={x - 1.2} x2={x} y1={priceToY(c.o)} y2={priceToY(c.o)} stroke={color} strokeWidth={0.6} />
+                  <line x1={x} x2={x + 1.2} y1={priceToY(c.c)} y2={priceToY(c.c)} stroke={color} strokeWidth={0.6} />
+                </g>
+              );
+            })}
+          </Reveal>
         </svg>
       );
     }
     if (visual.form === "heikin") {
-      // Simplified Heikin-Ashi: smooths each candle toward the running average.
       const ha = [];
       SAMPLE_CANDLES.forEach((c, i) => {
         const prevHa = ha[i - 1] || c;
@@ -126,26 +151,29 @@ export default function IndicatorDemo({ visual }) {
       });
       return (
         <svg viewBox="0 0 100 100" className="demo-svg" key={playKey}>
-          {ha.map((c, i) => {
-            const x = xAt(i);
-            const up = c.c >= c.o;
-            const color = up ? UP : DOWN;
-            const bodyTop = Math.min(priceToY(c.o), priceToY(c.c));
-            const bodyH = Math.max(Math.abs(priceToY(c.o) - priceToY(c.c)), 0.6);
-            return (
-              <g key={i} className="candle-fade" style={{ animationDelay: `${i * 28}ms` }}>
-                <line x1={x} x2={x} y1={priceToY(c.h)} y2={priceToY(c.l)} stroke={color} strokeWidth={0.5} />
-                <rect x={x - 1.3} y={bodyTop} width={2.6} height={bodyH} fill={color} rx={0.3} />
-              </g>
-            );
-          })}
+          <Reveal id={clipId}>
+            {ha.map((c, i) => {
+              const x = xAt(i);
+              const up = c.c >= c.o;
+              const color = up ? UP : DOWN;
+              const bodyTop = Math.min(priceToY(c.o), priceToY(c.c));
+              const bodyH = Math.max(Math.abs(priceToY(c.o) - priceToY(c.c)), 0.6);
+              return (
+                <g key={i}>
+                  <line x1={x} x2={x} y1={priceToY(c.h)} y2={priceToY(c.l)} stroke={color} strokeWidth={0.5} />
+                  <rect x={x - 1.3} y={bodyTop} width={2.6} height={bodyH} fill={color} rx={0.3} />
+                </g>
+              );
+            })}
+          </Reveal>
         </svg>
       );
     }
-    // default: candle
     return (
       <svg viewBox="0 0 100 100" className="demo-svg" key={playKey}>
-        <Candles />
+        <Reveal id={clipId}>
+          <Candles />
+        </Reveal>
       </svg>
     );
   }
@@ -155,8 +183,10 @@ export default function IndicatorDemo({ visual }) {
     const line = sma(closes, visual.period || 6);
     return (
       <svg viewBox="0 0 100 100" className="demo-svg" key={playKey}>
-        <Candles dim />
-        <AnimatedLine d={linePath(line, (v) => priceToY(v))} color="var(--amber)" delay={200} />
+        <Reveal id={clipId}>
+          <Candles />
+        </Reveal>
+        <AnimatedLine d={linePath(line, (v) => priceToY(v))} color="var(--amber)" width={1.3} />
       </svg>
     );
   }
@@ -165,22 +195,68 @@ export default function IndicatorDemo({ visual }) {
     const { upper, mid, lower } = bollinger(closes, 10, 1.6);
     return (
       <svg viewBox="0 0 100 100" className="demo-svg" key={playKey}>
-        <Candles dim />
-        <AnimatedLine d={linePath(upper, (v) => priceToY(v))} color="var(--amber)" delay={150} dash />
-        <AnimatedLine d={linePath(mid, (v) => priceToY(v))} color="var(--ink-muted)" delay={250} />
-        <AnimatedLine d={linePath(lower, (v) => priceToY(v))} color="var(--amber)" delay={150} dash />
+        <Reveal id={clipId}>
+          <Candles />
+        </Reveal>
+        <AnimatedLine d={linePath(upper, (v) => priceToY(v))} color="var(--amber)" delay={IND_DELAY} dash />
+        <AnimatedLine d={linePath(mid, (v) => priceToY(v))} color="var(--ink-muted)" delay={IND_DELAY + 120} />
+        <AnimatedLine d={linePath(lower, (v) => priceToY(v))} color="var(--amber)" delay={IND_DELAY} dash />
       </svg>
     );
   }
 
   if (visual.type === "overlay-cloud") {
-    const conv = sma(closes, 4);
-    const base = sma(closes, 9);
+    const { tenkan, kijun, senkouA, senkouB, total } = ichimoku(SAMPLE_CANDLES);
+    const xProj = (i) => xAt(i, total);
+    const toY = (v) => priceToY(v);
+
+    // Build the filled cloud polygon: senkouA forward, then senkouB backward.
+    const aPts = [];
+    const bPts = [];
+    for (let i = 0; i < total; i++) {
+      if (senkouA[i] != null) aPts.push([xProj(i), toY(senkouA[i])]);
+      if (senkouB[i] != null) bPts.push([xProj(i), toY(senkouB[i])]);
+    }
+    const cloudUp = senkouA[total - 1] >= senkouB[total - 1];
+    const cloudPath =
+      aPts.length && bPts.length
+        ? `M ${aPts.map((p) => p.join(",")).join(" L ")} L ${bPts
+            .slice()
+            .reverse()
+            .map((p) => p.join(","))
+            .join(" L ")} Z`
+        : "";
+
     return (
       <svg viewBox="0 0 100 100" className="demo-svg" key={playKey}>
-        <Candles dim />
-        <AnimatedLine d={linePath(conv, (v) => priceToY(v))} color={UP} delay={150} />
-        <AnimatedLine d={linePath(base, (v) => priceToY(v))} color={DOWN} delay={250} />
+        <Reveal id={clipId}>
+          <Candles />
+        </Reveal>
+        {cloudPath && (
+          <path
+            d={cloudPath}
+            fill={cloudUp ? UP : DOWN}
+            opacity={0.14}
+            className="demo-fade-in"
+            style={{ animationDelay: `${IND_DELAY}ms` }}
+          />
+        )}
+        <AnimatedLine
+          d={linePath(senkouA, toY, xProj)}
+          color={cloudUp ? UP : DOWN}
+          delay={IND_DELAY}
+          width={0.6}
+          dash
+        />
+        <AnimatedLine
+          d={linePath(senkouB, toY, xProj)}
+          color={cloudUp ? UP : DOWN}
+          delay={IND_DELAY}
+          width={0.6}
+          dash
+        />
+        <AnimatedLine d={linePath(tenkan, toY)} color={UP} delay={IND_DELAY + 150} width={1} />
+        <AnimatedLine d={linePath(kijun, toY)} color={DOWN} delay={IND_DELAY + 220} width={1} />
       </svg>
     );
   }
@@ -189,28 +265,48 @@ export default function IndicatorDemo({ visual }) {
     const sar = simpleSar(SAMPLE_CANDLES);
     return (
       <svg viewBox="0 0 100 100" className="demo-svg" key={playKey}>
-        <Candles dim />
-        {sar.map((s, i) => (
-          <circle
-            key={i}
-            cx={xAt(i)}
-            cy={priceToY(s.price)}
-            r={0.9}
-            fill={s.above ? DOWN : UP}
-            className="demo-dot-pop"
-            style={{ animationDelay: `${i * 45}ms` }}
-          />
-        ))}
+        <Reveal id={clipId}>
+          <Candles />
+        </Reveal>
+        {sar.map((s, i) => {
+          const flipped = i > 0 && sar[i - 1].above !== s.above;
+          return (
+            <g key={i}>
+              {flipped && (
+                <line
+                  x1={xAt(i)}
+                  x2={xAt(i)}
+                  y1={priceToY(sar[i - 1].price)}
+                  y2={priceToY(s.price)}
+                  stroke="var(--ink-muted)"
+                  strokeWidth={0.3}
+                  strokeDasharray="1 1"
+                  className="demo-fade-in"
+                  style={{ animationDelay: `${IND_DELAY + i * 55}ms` }}
+                />
+              )}
+              <circle
+                cx={xAt(i)}
+                cy={priceToY(s.price)}
+                r={flipped ? 1.3 : 0.85}
+                fill={s.above ? DOWN : UP}
+                className={flipped ? "demo-dot-pop demo-dot-flip" : "demo-dot-pop"}
+                style={{ animationDelay: `${IND_DELAY + i * 55}ms` }}
+              />
+            </g>
+          );
+        })}
       </svg>
     );
   }
 
   if (visual.type === "overlay-zone") {
-    // 매물대: horizontal bands where price spent the most time.
     const zones = [{ p: 53, h: 6 }, { p: 66, h: 4 }];
     return (
       <svg viewBox="0 0 100 100" className="demo-svg" key={playKey}>
-        <Candles dim />
+        <Reveal id={clipId}>
+          <Candles />
+        </Reveal>
         {zones.map((z, i) => (
           <rect
             key={i}
@@ -219,9 +315,9 @@ export default function IndicatorDemo({ visual }) {
             width={96}
             height={priceToY(z.p - z.h / 2) - priceToY(z.p + z.h / 2)}
             fill="var(--amber)"
-            opacity={0.14}
+            opacity={0.16}
             className="demo-fade-in"
-            style={{ animationDelay: `${i * 200}ms` }}
+            style={{ animationDelay: `${IND_DELAY + i * 250}ms` }}
           />
         ))}
       </svg>
@@ -233,7 +329,10 @@ export default function IndicatorDemo({ visual }) {
     const max = Math.max(...SAMPLE_VOLUME);
     return (
       <svg viewBox="0 0 100 130" className="demo-svg" key={playKey}>
-        <g transform="translate(0,0)"><Candles /></g>
+        <Reveal id={clipId} height={130}>
+          <Candles />
+          <line x1={2} x2={98} y1={106} y2={106} stroke="var(--border)" strokeWidth={0.4} />
+        </Reveal>
         {SAMPLE_VOLUME.map((v, i) => {
           const x = xAt(i);
           const h = (v / max) * 24;
@@ -246,13 +345,12 @@ export default function IndicatorDemo({ visual }) {
               width={2.4}
               height={h}
               fill={up ? UP : DOWN}
-              opacity={0.75}
+              opacity={0.8}
               className="demo-bar-grow"
-              style={{ animationDelay: `${i * 25}ms`, transformOrigin: `${x}px 106px` }}
+              style={{ animationDelay: `${IND_DELAY + i * 22}ms`, transformOrigin: `${x}px 106px` }}
             />
           );
         })}
-        <line x1={2} x2={98} y1={106} y2={106} stroke="var(--border)" strokeWidth={0.4} />
       </svg>
     );
   }
@@ -263,11 +361,13 @@ export default function IndicatorDemo({ visual }) {
     const toY = (v) => 106 + ((100 - v) / 100) * 24;
     return (
       <svg viewBox="0 0 100 130" className="demo-svg" key={playKey}>
-        <Candles dim />
+        <Reveal id={clipId} height={130}>
+          <Candles />
+          <line x1={2} x2={98} y1={106} y2={106} stroke="var(--border)" strokeWidth={0.4} />
+        </Reveal>
         <line x1={2} x2={98} y1={toY(hi)} y2={toY(hi)} stroke="var(--border)" strokeDasharray="2 2" strokeWidth={0.4} />
         <line x1={2} x2={98} y1={toY(lo)} y2={toY(lo)} stroke="var(--border)" strokeDasharray="2 2" strokeWidth={0.4} />
-        <AnimatedLine d={linePath(series, toY)} color="var(--amber)" delay={200} />
-        <line x1={2} x2={98} y1={106} y2={106} stroke="var(--border)" strokeWidth={0.4} />
+        <AnimatedLine d={linePath(series, toY)} color="var(--amber)" width={1.2} />
       </svg>
     );
   }
@@ -279,9 +379,11 @@ export default function IndicatorDemo({ visual }) {
     const toY = (v) => 130 - ((v - min) / (max - min || 1)) * 22 - 4;
     return (
       <svg viewBox="0 0 100 130" className="demo-svg" key={playKey}>
-        <Candles dim />
-        <AnimatedLine d={linePath(series, toY)} color="var(--amber)" delay={200} />
-        <line x1={2} x2={98} y1={106} y2={106} stroke="var(--border)" strokeWidth={0.4} />
+        <Reveal id={clipId} height={130}>
+          <Candles />
+          <line x1={2} x2={98} y1={106} y2={106} stroke="var(--border)" strokeWidth={0.4} />
+        </Reveal>
+        <AnimatedLine d={linePath(series, toY)} color="var(--amber)" width={1.2} />
       </svg>
     );
   }
@@ -293,10 +395,12 @@ export default function IndicatorDemo({ visual }) {
     const toY = (v) => 130 - ((v - min) / (max - min || 1)) * 22 - 4;
     return (
       <svg viewBox="0 0 100 130" className="demo-svg" key={playKey}>
-        <Candles dim />
+        <Reveal id={clipId} height={130}>
+          <Candles />
+          <line x1={2} x2={98} y1={106} y2={106} stroke="var(--border)" strokeWidth={0.4} />
+        </Reveal>
         <line x1={2} x2={98} y1={toY(100)} y2={toY(100)} stroke="var(--border)" strokeDasharray="2 2" strokeWidth={0.4} />
-        <AnimatedLine d={linePath(series, toY)} color="var(--amber)" delay={200} />
-        <line x1={2} x2={98} y1={106} y2={106} stroke="var(--border)" strokeWidth={0.4} />
+        <AnimatedLine d={linePath(series, toY)} color="var(--amber)" width={1.2} />
       </svg>
     );
   }
@@ -308,7 +412,10 @@ export default function IndicatorDemo({ visual }) {
     const toY = (v) => 130 - ((v - min) / (max - min || 1)) * 22 - 4;
     return (
       <svg viewBox="0 0 100 130" className="demo-svg" key={playKey}>
-        <Candles dim />
+        <Reveal id={clipId} height={130}>
+          <Candles />
+          <line x1={2} x2={98} y1={106} y2={106} stroke="var(--border)" strokeWidth={0.4} />
+        </Reveal>
         {histogram.map((v, i) => {
           if (v == null) return null;
           const x = xAt(i);
@@ -323,15 +430,14 @@ export default function IndicatorDemo({ visual }) {
               width={2}
               height={h}
               fill={v >= 0 ? UP : DOWN}
-              opacity={0.5}
+              opacity={0.55}
               className="demo-fade-in"
-              style={{ animationDelay: `${i * 20}ms` }}
+              style={{ animationDelay: `${IND_DELAY + i * 18}ms` }}
             />
           );
         })}
-        <AnimatedLine d={linePath(line, toY)} color="var(--amber)" delay={250} />
-        <AnimatedLine d={linePath(signal, toY)} color="var(--down)" delay={350} />
-        <line x1={2} x2={98} y1={106} y2={106} stroke="var(--border)" strokeWidth={0.4} />
+        <AnimatedLine d={linePath(line, toY)} color="var(--amber)" delay={IND_DELAY + 200} width={1.2} />
+        <AnimatedLine d={linePath(signal, toY)} color="var(--down)" delay={IND_DELAY + 320} width={1.2} />
       </svg>
     );
   }

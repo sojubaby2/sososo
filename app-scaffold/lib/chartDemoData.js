@@ -175,3 +175,32 @@ export function simpleSar(candles) {
   }
   return out;
 }
+
+// Ichimoku: tenkan(전환선)/kijun(기준선) are short/medium high-low midpoints;
+// senkou A/B are projected `shift` periods AHEAD of price — that forward
+// projection, and the shaded area between A and B, is literally what makes
+// it "the cloud". Periods are scaled down from the textbook 9/26/52 to fit
+// our short 24-candle demo while keeping the same structure.
+export function ichimoku(candles, { tenkanP = 4, kijunP = 9, senkouBP = 16, shift = 5 } = {}) {
+  const n = candles.length;
+  function highLowAvg(endIdx, period) {
+    const start = Math.max(0, endIdx - period + 1);
+    const slice = candles.slice(start, endIdx + 1);
+    const hh = Math.max(...slice.map((c) => c.h));
+    const ll = Math.min(...slice.map((c) => c.l));
+    return (hh + ll) / 2;
+  }
+  const tenkan = candles.map((_, i) => highLowAvg(i, tenkanP));
+  const kijun = candles.map((_, i) => highLowAvg(i, kijunP));
+  const senkouARaw = candles.map((_, i) => (tenkan[i] + kijun[i]) / 2);
+  const senkouBRaw = candles.map((_, i) => highLowAvg(i, senkouBP));
+
+  const total = n + shift;
+  const senkouA = new Array(total).fill(null);
+  const senkouB = new Array(total).fill(null);
+  for (let i = 0; i < n; i++) {
+    senkouA[i + shift] = senkouARaw[i];
+    senkouB[i + shift] = senkouBRaw[i];
+  }
+  return { tenkan, kijun, senkouA, senkouB, shift, total };
+}
