@@ -250,7 +250,7 @@ button, input { font-family: inherit; }
 .guide-card-summary { font-size: 13px; color: var(--ink-muted); margin: 6px 0 0; line-height: 1.5; }
 
 .guide-card-body { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
-.guide-demo-wrap { background: var(--bg); border-radius: 10px; padding: 10px; margin-bottom: 12px; }
+.guide-demo-wrap { background: var(--bg); border-radius: 10px; padding: 10px; margin: 0 auto 12px; max-width: 240px; }
 .demo-svg { width: 100%; height: auto; display: block; }
 .guide-detail { font-size: 13px; line-height: 1.7; color: var(--ink); margin: 0 0 10px; }
 .guide-tip { font-size: 12px; line-height: 1.6; background: var(--amber-tint); color: var(--amber-tint-ink); padding: 8px 12px; border-radius: 8px; }

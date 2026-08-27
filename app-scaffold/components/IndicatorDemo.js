@@ -128,7 +128,7 @@ export default function IndicatorDemo({ visual }) {
     return (
       <div>
         <p className="guide-mini-label">일봉 — 하루에 캔들 1개 (24개)</p>
-        <svg viewBox="0 0 100 60" className="demo-svg">
+        <svg viewBox="0 0 100 60" className="demo-svg" style={{ aspectRatio: "100 / 60" }}>
           <Reveal id={`${clipId}-a`} height={60}>
             {SAMPLE_CANDLES.map((c, i) => {
               const x = dailyXAt(i);
@@ -148,7 +148,7 @@ export default function IndicatorDemo({ visual }) {
           </Reveal>
         </svg>
         <p className="guide-mini-label" style={{ marginTop: 10 }}>주봉 느낌 — 4일씩 묶어서 캔들 1개 (6개)</p>
-        <svg viewBox="0 0 100 60" className="demo-svg">
+        <svg viewBox="0 0 100 60" className="demo-svg" style={{ aspectRatio: "100 / 60" }}>
           <Reveal id={`${clipId}-b`} height={60}>
             {weekly.map((c, i) => {
               const x = weeklyXAt(i);
@@ -175,7 +175,7 @@ export default function IndicatorDemo({ visual }) {
   if (visual.type === "chartform") {
     if (visual.form === "line") {
       return (
-        <svg viewBox="0 0 100 100" className="demo-svg" key={playKey}>
+        <svg viewBox="0 0 100 100" className="demo-svg" style={{ aspectRatio: "1 / 1" }} key={playKey}>
           <Reveal id={clipId}>
             <AnimatedLine d={linePath(closes, (v) => priceToY(v))} color="var(--amber)" delay={0} width={1.4} />
           </Reveal>
@@ -186,7 +186,7 @@ export default function IndicatorDemo({ visual }) {
       const d = linePath(closes, (v) => priceToY(v));
       const areaD = `${d} L ${xAt(N - 1)} 96 L ${xAt(0)} 96 Z`;
       return (
-        <svg viewBox="0 0 100 100" className="demo-svg" key={playKey}>
+        <svg viewBox="0 0 100 100" className="demo-svg" style={{ aspectRatio: "1 / 1" }} key={playKey}>
           <Reveal id={clipId}>
             <path d={areaD} fill="var(--amber-tint)" />
             <AnimatedLine d={d} color="var(--amber)" delay={0} width={1.4} />
@@ -196,7 +196,7 @@ export default function IndicatorDemo({ visual }) {
     }
     if (visual.form === "bar") {
       return (
-        <svg viewBox="0 0 100 100" className="demo-svg" key={playKey}>
+        <svg viewBox="0 0 100 100" className="demo-svg" style={{ aspectRatio: "1 / 1" }} key={playKey}>
           <Reveal id={clipId}>
             {SAMPLE_CANDLES.map((c, i) => {
               const x = xAt(i);
@@ -223,7 +223,7 @@ export default function IndicatorDemo({ visual }) {
         ha.push({ o: haOpen, c: haClose, h: Math.max(c.h, haOpen, haClose), l: Math.min(c.l, haOpen, haClose) });
       });
       return (
-        <svg viewBox="0 0 100 100" className="demo-svg" key={playKey}>
+        <svg viewBox="0 0 100 100" className="demo-svg" style={{ aspectRatio: "1 / 1" }} key={playKey}>
           <Reveal id={clipId}>
             {ha.map((c, i) => {
               const x = xAt(i);
@@ -247,7 +247,7 @@ export default function IndicatorDemo({ visual }) {
       const bricks = renkoBricks(closes, 3);
       const bw = 90 / bricks.length;
       return (
-        <svg viewBox="0 0 100 100" className="demo-svg" key={playKey}>
+        <svg viewBox="0 0 100 100" className="demo-svg" style={{ aspectRatio: "1 / 1" }} key={playKey}>
           <Reveal id={clipId}>
             {bricks.map((b, i) => {
               const color = b.up ? UP : DOWN;
@@ -270,7 +270,7 @@ export default function IndicatorDemo({ visual }) {
       }
       const colW = 88 / cols.length;
       return (
-        <svg viewBox="0 0 100 100" className="demo-svg" key={playKey}>
+        <svg viewBox="0 0 100 100" className="demo-svg" style={{ aspectRatio: "1 / 1" }} key={playKey}>
           <Reveal id={clipId}>
             {cols.map((col, ci) => {
               const color = col.up ? UP : DOWN;
@@ -290,7 +290,7 @@ export default function IndicatorDemo({ visual }) {
       const lines = threeLineBreak(closes);
       const bw = 90 / lines.length;
       return (
-        <svg viewBox="0 0 100 100" className="demo-svg" key={playKey}>
+        <svg viewBox="0 0 100 100" className="demo-svg" style={{ aspectRatio: "1 / 1" }} key={playKey}>
           <Reveal id={clipId}>
             {lines.map((b, i) => {
               const color = b.up ? UP : DOWN;
@@ -312,7 +312,7 @@ export default function IndicatorDemo({ visual }) {
         d += i === 0 ? `M ${x} ${y}` : ` L ${x} ${y}`;
       });
       return (
-        <svg viewBox="0 0 100 100" className="demo-svg" key={playKey}>
+        <svg viewBox="0 0 100 100" className="demo-svg" style={{ aspectRatio: "1 / 1" }} key={playKey}>
           <Reveal id={clipId}>
             <path d={d} fill="none" stroke={UP} strokeWidth={1.6} strokeLinejoin="round" />
           </Reveal>
@@ -329,7 +329,7 @@ export default function IndicatorDemo({ visual }) {
         d += i === 0 ? `M ${x} ${y}` : ` L ${x} ${y}`;
       });
       return (
-        <svg viewBox="0 0 100 100" className="demo-svg" key={playKey}>
+        <svg viewBox="0 0 100 100" className="demo-svg" style={{ aspectRatio: "1 / 1" }} key={playKey}>
           <Reveal id={clipId}>
             <Candles />
           </Reveal>
@@ -342,7 +342,7 @@ export default function IndicatorDemo({ visual }) {
     }
 
     return (
-      <svg viewBox="0 0 100 100" className="demo-svg" key={playKey}>
+      <svg viewBox="0 0 100 100" className="demo-svg" style={{ aspectRatio: "1 / 1" }} key={playKey}>
         <Reveal id={clipId}>
           <Candles />
         </Reveal>
@@ -359,7 +359,7 @@ export default function IndicatorDemo({ visual }) {
     const startX = xAt(0) - 1.3;
     const endX = xAt(N - period) - 1.3;
     return (
-      <svg viewBox="0 0 100 100" className="demo-svg" key={playKey}>
+      <svg viewBox="0 0 100 100" className="demo-svg" style={{ aspectRatio: "1 / 1" }} key={playKey}>
         <Reveal id={clipId}>
           <Candles />
         </Reveal>
@@ -387,7 +387,7 @@ export default function IndicatorDemo({ visual }) {
       });
     }
     return (
-      <svg viewBox="0 0 100 100" className="demo-svg" key={playKey}>
+      <svg viewBox="0 0 100 100" className="demo-svg" style={{ aspectRatio: "1 / 1" }} key={playKey}>
         <Reveal id={clipId}>
           <Candles />
         </Reveal>
@@ -438,7 +438,7 @@ export default function IndicatorDemo({ visual }) {
         : "";
 
     return (
-      <svg viewBox="0 0 100 100" className="demo-svg" key={playKey}>
+      <svg viewBox="0 0 100 100" className="demo-svg" style={{ aspectRatio: "1 / 1" }} key={playKey}>
         <Reveal id={clipId}>
           <Candles />
         </Reveal>
@@ -474,7 +474,7 @@ export default function IndicatorDemo({ visual }) {
   if (visual.type === "overlay-dots") {
     const sar = simpleSar(SAMPLE_CANDLES);
     return (
-      <svg viewBox="0 0 100 100" className="demo-svg" key={playKey}>
+      <svg viewBox="0 0 100 100" className="demo-svg" style={{ aspectRatio: "1 / 1" }} key={playKey}>
         <Reveal id={clipId}>
           <Candles />
         </Reveal>
@@ -513,7 +513,7 @@ export default function IndicatorDemo({ visual }) {
   if (visual.type === "overlay-zone") {
     const zones = [{ p: 53, h: 6 }, { p: 66, h: 4 }];
     return (
-      <svg viewBox="0 0 100 100" className="demo-svg" key={playKey}>
+      <svg viewBox="0 0 100 100" className="demo-svg" style={{ aspectRatio: "1 / 1" }} key={playKey}>
         <Reveal id={clipId}>
           <Candles />
         </Reveal>
@@ -542,7 +542,7 @@ export default function IndicatorDemo({ visual }) {
       { v: s1, label: "S1 지지", color: DOWN },
     ];
     return (
-      <svg viewBox="0 0 100 100" className="demo-svg" key={playKey}>
+      <svg viewBox="0 0 100 100" className="demo-svg" style={{ aspectRatio: "1 / 1" }} key={playKey}>
         <Reveal id={clipId}>
           <Candles />
         </Reveal>
@@ -571,7 +571,7 @@ export default function IndicatorDemo({ visual }) {
     segments.push({ up: current[0].up, points: current, startIdx: trail.length - current.length });
 
     return (
-      <svg viewBox="0 0 100 100" className="demo-svg" key={playKey}>
+      <svg viewBox="0 0 100 100" className="demo-svg" style={{ aspectRatio: "1 / 1" }} key={playKey}>
         <Reveal id={clipId}>
           <Candles />
         </Reveal>
@@ -592,7 +592,7 @@ export default function IndicatorDemo({ visual }) {
   if (visual.type === "pane-bars") {
     const max = Math.max(...SAMPLE_VOLUME);
     return (
-      <svg viewBox="0 0 100 130" className="demo-svg" key={playKey}>
+      <svg viewBox="0 0 100 130" className="demo-svg" style={{ aspectRatio: "100 / 130" }} key={playKey}>
         <Reveal id={clipId} height={130}>
           <Candles />
           <line x1={2} x2={98} y1={106} y2={106} stroke="var(--border)" strokeWidth={0.4} />
@@ -632,7 +632,7 @@ export default function IndicatorDemo({ visual }) {
     const [lo, hi] = visual.bands;
     const toY = (v) => 106 + ((scaleMax - v) / (scaleMax - scaleMin)) * 24;
     return (
-      <svg viewBox="0 0 100 130" className="demo-svg" key={playKey}>
+      <svg viewBox="0 0 100 130" className="demo-svg" style={{ aspectRatio: "100 / 130" }} key={playKey}>
         <Reveal id={clipId} height={130}>
           <Candles />
           <line x1={2} x2={98} y1={106} y2={106} stroke="var(--border)" strokeWidth={0.4} />
@@ -660,7 +660,7 @@ export default function IndicatorDemo({ visual }) {
     const toY = (v) => 130 - ((v - min) / (max - min || 1)) * 22 - 4;
     const zeroY = toY(centerVal);
     return (
-      <svg viewBox="0 0 100 130" className="demo-svg" key={playKey}>
+      <svg viewBox="0 0 100 130" className="demo-svg" style={{ aspectRatio: "100 / 130" }} key={playKey}>
         <Reveal id={clipId} height={130}>
           <Candles />
           <line x1={2} x2={98} y1={106} y2={106} stroke="var(--border)" strokeWidth={0.4} />
@@ -686,7 +686,7 @@ export default function IndicatorDemo({ visual }) {
     const min = Math.min(...vals), max = Math.max(...vals);
     const toY = (v) => 130 - ((v - min) / (max - min || 1)) * 22 - 4;
     return (
-      <svg viewBox="0 0 100 130" className="demo-svg" key={playKey}>
+      <svg viewBox="0 0 100 130" className="demo-svg" style={{ aspectRatio: "100 / 130" }} key={playKey}>
         <Reveal id={clipId} height={130}>
           <Candles />
           <line x1={2} x2={98} y1={106} y2={106} stroke="var(--border)" strokeWidth={0.4} />
@@ -701,7 +701,7 @@ export default function IndicatorDemo({ visual }) {
     const avg = volumeSma(SAMPLE_VOLUME, 5);
     const toY = (v) => 130 - (v / max) * 24;
     return (
-      <svg viewBox="0 0 100 130" className="demo-svg" key={playKey}>
+      <svg viewBox="0 0 100 130" className="demo-svg" style={{ aspectRatio: "100 / 130" }} key={playKey}>
         <Reveal id={clipId} height={130}>
           <Candles />
           <line x1={2} x2={98} y1={106} y2={106} stroke="var(--border)" strokeWidth={0.4} />
@@ -735,7 +735,7 @@ export default function IndicatorDemo({ visual }) {
     const min = Math.min(...vals), max = Math.max(...vals);
     const toY = (v) => 130 - ((v - min) / (max - min || 1)) * 22 - 4;
     return (
-      <svg viewBox="0 0 100 130" className="demo-svg" key={playKey}>
+      <svg viewBox="0 0 100 130" className="demo-svg" style={{ aspectRatio: "100 / 130" }} key={playKey}>
         <Reveal id={clipId} height={130}>
           <Candles />
           <line x1={2} x2={98} y1={106} y2={106} stroke="var(--border)" strokeWidth={0.4} />
