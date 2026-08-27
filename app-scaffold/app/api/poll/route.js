@@ -30,6 +30,7 @@
 
 import { getRedis } from "../../../lib/redis";
 import rawThemeData from "../../../lib/themeData.json";
+import { buildSubsidiaryPromptBlock } from "../../../lib/subsidiaryMap";
 
 const WATCHED_KEYWORDS = ["증권"];
 const ARTICLES_PER_KEYWORD = 5;
@@ -182,15 +183,20 @@ function extractJsonObject(prefilledText) {
 
 const SYSTEM_PROMPT = `너는 한국 주식 뉴스와 종목/테마를 연결하는 분석가야.
 
-너한테는 두 가지 목록이 주어져:
+너한테는 세 가지 목록이 주어져:
 1. [전체 상장 종목]: 코스피·코스닥에 상장된 전체 종목 (코드|이름|시장 형식)
 2. [테마 목록]: 우리가 관리하는 투자 테마 이름들
+3. [계열사-모회사 매핑]: 비상장(또는 우리 시스템에 코드가 없는) 자회사 이름 → 그 자회사를 소유한 상장 모회사
 
-뉴스 기사 하나가 주어지면, 세 가지를 판단해:
+뉴스 기사 하나가 주어지면, 네 가지를 판단해:
 
 **A. 직접 관련 종목 (matches)**: [전체 상장 종목] 중에서, 이 기사와 실제로 관련 있는 종목을 찾아. 목록에 없는 종목·코드는 절대 지어내면 안 돼.
 
 [전체 상장 종목]에는 [테마 목록]에서 다루는 회사들보다 훨씬 많은 회사가 들어있어. 테마 목록에 없는 회사라도 절대 무시하지 마 — 네가 원래 알고 있는 배경지식(그 회사가 실제로 어떤 사업을 하는지, 무슨 제품을 만드는지)을 적극적으로 활용해서 [전체 상장 종목] 전체를 대상으로 판단해. 익숙한 대기업이 아니거나 우리가 미리 분류해두지 않은 회사라는 이유로 후보에서 제외하지 마 — 실제로 관련 있다면 반드시 포함시켜.
+
+**비상장 자회사 처리 규칙**: 기사에 [계열사-모회사 매핑]에 있는 자회사 이름이 나오고, 그 자회사에 대한 사업적으로 의미 있는 소식(계약, 투자, 신사업, 실적 등)이 있다면, 그 자회사 자체는 [전체 상장 종목]에 없더라도 매핑에 적힌 모회사를 "confirmed"로 포함시켜. reason에는 "자회사 OOO 관련 소식"이라고 명시해서, 직접 언급이 아니라 자회사를 통한 연결이라는 걸 알 수 있게 해.
+
+**주의**: 기사에 나온 회사 이름이 [계열사-모회사 매핑]에는 없지만 [전체 상장 종목]에 자기 자신의 코드로 이미 있다면(예: 삼성SDI, LG에너지솔루션처럼 자체 상장된 계열사), 그건 모회사로 연결하지 말고 반드시 그 회사 자신의 코드로 매칭해. 모회사 연결은 오직 [계열사-모회사 매핑] 목록에 있는, 자체 코드가 없는 회사에만 적용해.
 
 - "confirmed" (사업근거 확인): 그 회사명·제품명이 기사에 직접 언급되거나, 정부 정책·규제·계약·사고 등이 그 회사의 실제 사업 영역에 직접 영향을 미치는 경우.
 - "rumor" (시장 추정): 구체적으로 존재하는 연결고리(특정 인물과의 동창·지연 관계, 커뮤니티에 도는 특정 소문)가 있을 때만. 막연한 업종 추측은 여기 넣지 말고 아예 빼.
@@ -288,7 +294,7 @@ async function matchStocks(title, summary, universeCompanyList) {
   // only pay full price once per cache window — every other call within
   // that hour reads it back at 10% of the normal input price instead of
   // resending ~2,800 companies at full price every single time.
-  const staticContext = `${SYSTEM_PROMPT}\n\n[전체 상장 종목]\n${universeCompanyList}\n\n[테마 목록]\n${buildThemeList()}`;
+  const staticContext = `${SYSTEM_PROMPT}\n\n[전체 상장 종목]\n${universeCompanyList}\n\n[테마 목록]\n${buildThemeList()}\n\n[계열사-모회사 매핑]\n${buildSubsidiaryPromptBlock()}`;
 
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
