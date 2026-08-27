@@ -223,7 +223,6 @@ export default function HomePage() {
               <span className="live-dot" />
               <span className="live-label">실시간 뉴스 검색 중</span>
               <span className="loading-dots"><span>.</span><span>.</span><span>.</span></span>
-              <span className="live-count">· 관련주 ({items.length})</span>
             </h2>
 
             {loadState === "loading" && (
