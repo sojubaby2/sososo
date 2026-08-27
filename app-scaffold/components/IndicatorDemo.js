@@ -57,20 +57,14 @@ function linePath(values, toY, xFor = (i) => xAt(i)) {
   return d;
 }
 
-// Every demo is wrapped in this — a rectangular clip that sweeps open
-// left-to-right, so the base chart reads as "being drawn" as one continuous
-// motion instead of a scattered per-element fade.
-function Reveal({ id, children, height = 100 }) {
-  return (
-    <>
-      <defs>
-        <clipPath id={id}>
-          <rect x={0} y={0} width={0} height={height} className="demo-reveal-rect" />
-        </clipPath>
-      </defs>
-      <g clipPath={`url(#${id})`}>{children}</g>
-    </>
-  );
+// Every demo is wrapped in this. Previously used an animated clip-path
+// "sweep" reveal, but animating an SVG rect's width INSIDE a <clipPath>
+// isn't reliably supported across browsers — some engines just never fire
+// that animation, which permanently clips the content to zero width
+// (invisible). A plain opacity fade is far more basic and universally
+// supported, so this trades a bit of visual flourish for actually working.
+function Reveal({ id, children }) {
+  return <g className="demo-reveal-fade">{children}</g>;
 }
 
 function Candles() {
