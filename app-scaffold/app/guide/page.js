@@ -8,6 +8,15 @@ import Header from "../../components/Header";
 import IndicatorDemo from "../../components/IndicatorDemo";
 import { CATEGORIES, INDICATORS } from "../../lib/indicatorCatalog";
 
+// Most demos use viewBox "0 0 100 100" (square); the pane-* types (RSI,
+// MACD, volume, etc.) add a lower oscillator pane and use "0 0 100 130".
+// timeframe-compare is a special case that lays out its own two mini
+// charts internally, so it's excluded here.
+const PANE_TYPES = new Set(["pane-bars", "pane-bars-avg", "pane-oscillator", "pane-oscillator-center", "pane-line", "pane-macd"]);
+function aspectPaddingPct(visual) {
+  return PANE_TYPES.has(visual.type) ? 130 : 100;
+}
+
 export default function GuidePage() {
   const [activeCategory, setActiveCategory] = useState("chartform");
   const [openId, setOpenId] = useState(null);
@@ -58,7 +67,13 @@ export default function GuidePage() {
                 {isOpen && (
                   <div className="guide-card-body">
                     <div className="guide-demo-wrap">
-                      <IndicatorDemo visual={it.visual} />
+                      {it.visual.type === "timeframe-compare" ? (
+                        <IndicatorDemo visual={it.visual} />
+                      ) : (
+                        <div className="demo-frame" style={{ paddingTop: `${aspectPaddingPct(it.visual)}%` }}>
+                          <IndicatorDemo visual={it.visual} />
+                        </div>
+                      )}
                     </div>
                     <p className="guide-detail">{it.detail}</p>
                     <div className="guide-tip">

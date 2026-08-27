@@ -128,45 +128,49 @@ export default function IndicatorDemo({ visual }) {
     return (
       <div>
         <p className="guide-mini-label">일봉 — 하루에 캔들 1개 (24개)</p>
-        <svg viewBox="0 0 100 60" className="demo-svg" style={{ aspectRatio: "100 / 60" }}>
-          <Reveal id={`${clipId}-a`} height={60}>
-            {SAMPLE_CANDLES.map((c, i) => {
-              const x = dailyXAt(i);
-              const up = c.c >= c.o;
-              const color = up ? UP : DOWN;
-              const yHigh = 60 - ((c.h - 42) / 45) * 56 - 2;
-              const yLow = 60 - ((c.l - 42) / 45) * 56 - 2;
-              const yOpen = 60 - ((c.o - 42) / 45) * 56 - 2;
-              const yClose = 60 - ((c.c - 42) / 45) * 56 - 2;
-              return (
-                <g key={i}>
-                  <line x1={x} x2={x} y1={yHigh} y2={yLow} stroke={color} strokeWidth={0.5} />
-                  <rect x={x - 1.2} y={Math.min(yOpen, yClose)} width={2.4} height={Math.max(Math.abs(yOpen - yClose), 0.6)} fill={color} />
-                </g>
-              );
-            })}
-          </Reveal>
-        </svg>
+        <div className="demo-frame" style={{ paddingTop: "60%" }}>
+          <svg viewBox="0 0 100 60" className="demo-svg">
+            <Reveal id={`${clipId}-a`} height={60}>
+              {SAMPLE_CANDLES.map((c, i) => {
+                const x = dailyXAt(i);
+                const up = c.c >= c.o;
+                const color = up ? UP : DOWN;
+                const yHigh = 60 - ((c.h - 42) / 45) * 56 - 2;
+                const yLow = 60 - ((c.l - 42) / 45) * 56 - 2;
+                const yOpen = 60 - ((c.o - 42) / 45) * 56 - 2;
+                const yClose = 60 - ((c.c - 42) / 45) * 56 - 2;
+                return (
+                  <g key={i}>
+                    <line x1={x} x2={x} y1={yHigh} y2={yLow} stroke={color} strokeWidth={0.5} />
+                    <rect x={x - 1.2} y={Math.min(yOpen, yClose)} width={2.4} height={Math.max(Math.abs(yOpen - yClose), 0.6)} fill={color} />
+                  </g>
+                );
+              })}
+            </Reveal>
+          </svg>
+        </div>
         <p className="guide-mini-label" style={{ marginTop: 10 }}>주봉 느낌 — 4일씩 묶어서 캔들 1개 (6개)</p>
-        <svg viewBox="0 0 100 60" className="demo-svg" style={{ aspectRatio: "100 / 60" }}>
-          <Reveal id={`${clipId}-b`} height={60}>
-            {weekly.map((c, i) => {
-              const x = weeklyXAt(i);
-              const up = c.c >= c.o;
-              const color = up ? UP : DOWN;
-              const yHigh = 60 - ((c.h - 42) / 45) * 56 - 2;
-              const yLow = 60 - ((c.l - 42) / 45) * 56 - 2;
-              const yOpen = 60 - ((c.o - 42) / 45) * 56 - 2;
-              const yClose = 60 - ((c.c - 42) / 45) * 56 - 2;
-              return (
-                <g key={i}>
-                  <line x1={x} x2={x} y1={yHigh} y2={yLow} stroke={color} strokeWidth={0.9} />
-                  <rect x={x - 3.2} y={Math.min(yOpen, yClose)} width={6.4} height={Math.max(Math.abs(yOpen - yClose), 0.6)} fill={color} />
-                </g>
-              );
-            })}
-          </Reveal>
-        </svg>
+        <div className="demo-frame" style={{ paddingTop: "60%" }}>
+          <svg viewBox="0 0 100 60" className="demo-svg">
+            <Reveal id={`${clipId}-b`} height={60}>
+              {weekly.map((c, i) => {
+                const x = weeklyXAt(i);
+                const up = c.c >= c.o;
+                const color = up ? UP : DOWN;
+                const yHigh = 60 - ((c.h - 42) / 45) * 56 - 2;
+                const yLow = 60 - ((c.l - 42) / 45) * 56 - 2;
+                const yOpen = 60 - ((c.o - 42) / 45) * 56 - 2;
+                const yClose = 60 - ((c.c - 42) / 45) * 56 - 2;
+                return (
+                  <g key={i}>
+                    <line x1={x} x2={x} y1={yHigh} y2={yLow} stroke={color} strokeWidth={0.9} />
+                    <rect x={x - 3.2} y={Math.min(yOpen, yClose)} width={6.4} height={Math.max(Math.abs(yOpen - yClose), 0.6)} fill={color} />
+                  </g>
+                );
+              })}
+            </Reveal>
+          </svg>
+        </div>
       </div>
     );
   }
