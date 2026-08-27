@@ -103,10 +103,13 @@ export async function GET() {
     sampleSize: count,
   }));
 
-  return Response.json({
-    recentBasDt: recent.basDt,
-    pastBasDt: past.basDt,
-    themeChanges,
-    stockChanges,
-  });
+  return Response.json(
+    {
+      recentBasDt: recent.basDt,
+      pastBasDt: past.basDt,
+      themeChanges,
+      stockChanges,
+    },
+    { headers: { "Cache-Control": "public, max-age=0, s-maxage=1800, stale-while-revalidate=3600" } }
+  );
 }

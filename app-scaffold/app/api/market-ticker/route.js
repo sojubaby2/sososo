@@ -90,5 +90,7 @@ export async function GET() {
 
   result.gold = await fetchGold();
 
-  return Response.json(result);
+  return Response.json(result, {
+    headers: { "Cache-Control": "public, max-age=0, s-maxage=300, stale-while-revalidate=600" },
+  });
 }

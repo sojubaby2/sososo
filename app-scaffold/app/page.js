@@ -9,7 +9,7 @@ import NewsCard from "../components/NewsCard";
 import { isPoliticalTheme } from "../lib/themeData";
 
 const HOT_THEME_COUNT = 8;
-const FEED_POLL_MS = 25000; // check for new articles every 25s
+const FEED_POLL_MS = 10000; // check for new articles every 10s
 const TRENDING_STOCK_COUNT = 14;
 const ALERT_KEYWORDS = ["공급계약", "특허", "FDA", "무상증자", "단독", "세계 최초", "국내 최초", "인수", "합병", "수주", "유상증자"];
 

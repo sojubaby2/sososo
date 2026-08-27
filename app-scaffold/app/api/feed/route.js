@@ -2,6 +2,11 @@
 //
 // Serves whatever /api/poll has saved to Redis so far. The homepage calls
 // this to render the real, automatically-collected news feed.
+//
+// Cached at the edge for 8s (just under our 10s client poll interval) so
+// N concurrent visitors polling this share ONE Redis read instead of N —
+// Redis command usage otherwise scales with (visitor count × poll
+// frequency), which is the actual cost risk of polling more often.
 
 import { getRedis } from "../../../lib/redis";
 
@@ -25,5 +30,8 @@ export async function GET() {
     })
     .filter(Boolean);
 
-  return Response.json({ items });
+  return Response.json(
+    { items },
+    { headers: { "Cache-Control": "public, max-age=0, s-maxage=8, stale-while-revalidate=20" } }
+  );
 }
