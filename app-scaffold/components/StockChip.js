@@ -1,16 +1,37 @@
-import { TrendingUp, TrendingDown, Minus } from "lucide-react";
+"use client";
 
-// `change` is optional (themes page has it, news feed doesn't — that's
-// intentional, see the change log on why daily change was dropped from
-// the news feed).
-export default function StockChip({ name, code, market, change }) {
+import { useState } from "react";
+import { TrendingUp, TrendingDown, Minus, Crown } from "lucide-react";
+
+// `change` is optional (themes page has it, news feed doesn't). `isLead`
+// marks the first/strongest match in a card — matches/poll route already
+// sorts direct-confirmed matches first and today's-strongest-movers first
+// within each tier, so index 0 is a reasonable "대장주" proxy.
+export default function StockChip({ name, code, market, change, isLead }) {
+  const [copied, setCopied] = useState(false);
   const hasChange = typeof change === "number";
   const isUp = hasChange && change > 0;
   const isDown = hasChange && change < 0;
   const cls = isUp ? "up" : isDown ? "down" : "flat";
   const Icon = isUp ? TrendingUp : isDown ? TrendingDown : Minus;
+
+  async function handleClick() {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1400);
+    } catch {
+      // clipboard API unavailable (e.g. insecure context) — fail quietly
+    }
+  }
+
   return (
-    <span className="chip">
+    <button type="button" onClick={handleClick} className={`chip ${isLead ? "chip-lead" : ""}`}>
+      {isLead && (
+        <span className="lead-badge">
+          <Crown size={10} />대장주
+        </span>
+      )}
       <span style={{ fontWeight: 500 }}>{name}</span>
       <span className="code">{code}</span>
       {hasChange && (
@@ -20,6 +41,7 @@ export default function StockChip({ name, code, market, change }) {
           {change.toFixed(1)}%
         </span>
       )}
-    </span>
+      {copied && <span className="chip-copied">코드 복사됨!</span>}
+    </button>
   );
 }

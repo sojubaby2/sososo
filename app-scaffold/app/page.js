@@ -3,7 +3,7 @@
 export const dynamic = "force-dynamic";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Newspaper, Loader2, Flame, Bell, Globe } from "lucide-react";
+import { Newspaper, Loader2, Flame, Bell, Globe, Volume2, VolumeX, Smartphone, X } from "lucide-react";
 import Header from "../components/Header";
 import NewsCard from "../components/NewsCard";
 import { isPoliticalTheme } from "../lib/themeData";
@@ -11,6 +11,31 @@ import { isPoliticalTheme } from "../lib/themeData";
 const HOT_THEME_COUNT = 8;
 const FEED_POLL_MS = 25000; // check for new articles every 25s
 const TRENDING_STOCK_COUNT = 14;
+const ALERT_KEYWORDS = ["공급계약", "특허", "FDA", "무상증자", "단독", "세계 최초", "국내 최초", "인수", "합병", "수주", "유상증자"];
+
+// Short beep via Web Audio — no audio file to host/fetch. Browsers block
+// audio autoplay until the user has interacted with the page at least
+// once, which is exactly what clicking the toggle button provides.
+function playAlertBeep() {
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    const ctx = new Ctx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(880, ctx.currentTime);
+    osc.frequency.setValueAtTime(1046, ctx.currentTime + 0.12);
+    gain.gain.setValueAtTime(0.001, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.18, ctx.currentTime + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.42);
+  } catch {
+    // Web Audio unavailable — fail quietly, the visual toast still shows
+  }
+}
 
 // Turns a saved /api/poll feed item into the shape NewsCard expects.
 function toCardShape(item) {
@@ -154,14 +179,44 @@ function TrendingPanel({ rawItems }) {
   );
 }
 
+function InstallHintBanner() {
+  const [dismissed, setDismissed] = useState(true); // hidden until localStorage check to avoid a flash
+  useEffect(() => {
+    setDismissed(localStorage.getItem("installHintDismissed") === "1");
+  }, []);
+
+  function dismiss() {
+    localStorage.setItem("installHintDismissed", "1");
+    setDismissed(true);
+  }
+
+  if (dismissed) return null;
+  return (
+    <div className="install-hint">
+      <Smartphone size={15} style={{ flexShrink: 0 }} />
+      <span>모바일에서는 "홈 화면에 추가"를 하면 앱처럼 빠르게 열어볼 수 있어요. PC에서는 Ctrl+D로 즐겨찾기 해두세요.</span>
+      <button type="button" className="install-hint-close" onClick={dismiss}><X size={14} /></button>
+    </div>
+  );
+}
+
 export default function HomePage() {
   const [rawItems, setRawItems] = useState([]);
   const [loadState, setLoadState] = useState("loading");
   const [newIds, setNewIds] = useState(new Set());
   const [toast, setToast] = useState(null); // { count, headline } | null
+  const [soundEnabled, setSoundEnabled] = useState(false);
   const knownIdsRef = useRef(new Set());
   const toastTimerRef = useRef(null);
   const newIdsTimerRef = useRef(null);
+  const soundEnabledRef = useRef(false);
+
+  function toggleSound() {
+    const next = !soundEnabled;
+    setSoundEnabled(next);
+    soundEnabledRef.current = next;
+    if (next) playAlertBeep(); // confirms it's on AND unlocks autoplay for later
+  }
 
   function applyFeed(items, isFirstLoad) {
     const incomingIds = items.map((it) => it.id);
@@ -169,12 +224,18 @@ export default function HomePage() {
       const freshIds = incomingIds.filter((id) => !knownIdsRef.current.has(id));
       if (freshIds.length > 0) {
         setNewIds(new Set(freshIds));
-        const latest = items.find((it) => it.id === freshIds[0]);
+        const freshItems = items.filter((it) => freshIds.includes(it.id));
+        const latest = freshItems[0];
         setToast({ count: freshIds.length, headline: latest?.title || "" });
         clearTimeout(newIdsTimerRef.current);
         newIdsTimerRef.current = setTimeout(() => setNewIds(new Set()), 4000);
         clearTimeout(toastTimerRef.current);
         toastTimerRef.current = setTimeout(() => setToast(null), 4500);
+
+        if (soundEnabledRef.current) {
+          const hasKeywordHit = freshItems.some((it) => ALERT_KEYWORDS.some((k) => it.title?.includes(k)));
+          if (hasKeywordHit) playAlertBeep();
+        }
       }
     }
     knownIdsRef.current = new Set(incomingIds);
@@ -217,13 +278,20 @@ export default function HomePage() {
     <div>
       <Header />
       <main className="container-wide" style={{ paddingTop: 32, paddingBottom: 32 }}>
+        <InstallHintBanner />
         <div className="home-layout">
           <div>
-            <h2 className="live-heading">
-              <span className="live-dot" />
-              <span className="live-label">실시간 뉴스 검색 중</span>
-              <span className="loading-dots"><span>.</span><span>.</span><span>.</span></span>
-            </h2>
+            <div className="filter-row">
+              <h2 className="live-heading" style={{ margin: 0 }}>
+                <span className="live-dot" />
+                <span className="live-label">실시간 뉴스 검색 중</span>
+                <span className="loading-dots"><span>.</span><span>.</span><span>.</span></span>
+              </h2>
+              <button type="button" className={`sound-toggle ${soundEnabled ? "on" : ""}`} onClick={toggleSound}>
+                {soundEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
+                주요 키워드 알림음 {soundEnabled ? "켜짐" : "꺼짐"}
+              </button>
+            </div>
 
             {loadState === "loading" && (
               <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--ink-muted)", fontSize: 14, padding: "24px 0" }}>
