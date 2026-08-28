@@ -165,7 +165,7 @@ button, input { font-family: inherit; }
 @media (min-width: 900px) { .home-layout { grid-template-columns: 1fr 300px; } }
 
 .trending-panel { border-radius: 14px; border: 1px solid var(--border); background: var(--surface); padding: 18px; }
-.sidebar-stack { position: sticky; top: 20px; display: flex; flex-direction: column; gap: 16px; }
+.sidebar-stack {display: flex; flex-direction: column; gap: 16px; }
 .trending-panel-title { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-muted); margin: 0 0 14px; }
 .trending-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); }
 .trending-row:last-child { border-bottom: none; }
