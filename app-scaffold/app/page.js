@@ -145,7 +145,7 @@ function GlobalMarketPanel() {
   );
 }
 
-function TrendingPanel({ rawItems }) {
+function TrendingPanel({ rawItems, activeCode, onSelect }) {
   const trending = useMemo(() => {
     const seen = new Map();
     for (const item of rawItems) {
@@ -168,12 +168,30 @@ function TrendingPanel({ rawItems }) {
       {trending.length === 0 ? (
         <p className="trending-empty">아직 매칭된 종목이 없어요.</p>
       ) : (
-        trending.map((s) => (
-          <div key={s.code} className="trending-row">
-            <span className="trending-row-name">{s.name}</span>
-            <span className="trending-row-code">{s.code}</span>
-          </div>
-        ))
+        trending.map((s) => {
+          const isActive = activeCode === s.code;
+          return (
+            <button
+              type="button"
+              key={s.code}
+              className="trending-row"
+              onClick={() => onSelect(isActive ? null : s)}
+              style={{
+                display: "flex",
+                width: "100%",
+                background: isActive ? "var(--amber-tint)" : "transparent",
+                border: "none",
+                cursor: "pointer",
+                textAlign: "left",
+                borderRadius: 6,
+              }}
+              title={`'${s.name}' 관련 뉴스만 보기`}
+            >
+              <span className="trending-row-name">{s.name}</span>
+              <span className="trending-row-code">{s.code}</span>
+            </button>
+          );
+        })
       )}
     </aside>
   );
@@ -206,6 +224,7 @@ export default function HomePage() {
   const [newIds, setNewIds] = useState(new Set());
   const [toast, setToast] = useState(null); // { count, headline } | null
   const [soundEnabled, setSoundEnabled] = useState(false);
+  const [filterStock, setFilterStock] = useState(null); // { code, name } | null
   const knownIdsRef = useRef(new Set());
   const toastTimerRef = useRef(null);
   const newIdsTimerRef = useRef(null);
@@ -273,6 +292,10 @@ export default function HomePage() {
   }, []);
 
   const items = useMemo(() => rawItems.map(toCardShape), [rawItems]);
+  const displayedItems = useMemo(() => {
+    if (!filterStock) return items;
+    return items.filter((it) => it.stocks.some((s) => s.code === filterStock.code));
+  }, [items, filterStock]);
 
   return (
     <div>
@@ -312,15 +335,49 @@ export default function HomePage() {
               </p>
             )}
 
+            {filterStock && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 8,
+                  fontSize: 13,
+                  color: "var(--amber-tint-ink)",
+                  background: "var(--amber-tint)",
+                  padding: "8px 12px",
+                  borderRadius: 8,
+                  marginBottom: 12,
+                }}
+              >
+                <span>
+                  <strong>{filterStock.name}</strong>({filterStock.code}) 관련 뉴스만 보는 중
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setFilterStock(null)}
+                  style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", fontSize: 13, fontWeight: 600 }}
+                >
+                  필터 해제 ✕
+                </button>
+              </div>
+            )}
+
+            {loadState === "ready" && items.length > 0 && filterStock && displayedItems.length === 0 && (
+              <p style={{ fontSize: 14, color: "var(--ink-muted)", padding: "24px 0" }}>
+                최근 수집된 뉴스 중 "{filterStock.name}" 관련 기사가 아직 없어요.
+              </p>
+            )}
+
             <div className="news-list">
-              {items.map((n) => <NewsCard key={n.id} n={n} isNew={newIds.has(n.id)} />)}
+              {displayedItems.map((n) => <NewsCard key={n.id} n={n} isNew={newIds.has(n.id)} />)}
             </div>
           </div>
 
           <div className="sidebar-stack">
             <GlobalMarketPanel />
             <HotThemePanel />
-            <TrendingPanel rawItems={rawItems} />
+            <TrendingPanel rawItems={rawItems} activeCode={filterStock?.code} onSelect={setFilterStock} />
           </div>
         </div>
       </main>
