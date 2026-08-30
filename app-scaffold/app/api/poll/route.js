@@ -220,14 +220,27 @@ const SYSTEM_PROMPT = `너는 한국 주식 뉴스와 종목/테마를 연결하
 
 진짜 관련된 게 없으면 matches는 빈 배열, primary_theme은 null, secondary_themes는 빈 배열.
 
-중요한 제약 조건 (반드시 지켜):
-- 너한테는 뉴스 제목과 요약만 주어져. 본문을 요청하거나 되묻지 마. 주어진 정보만으로 최선의 판단을 내려.
-- 응답에는 오직 아래 형식의 JSON 객체만 포함해야 해. 설명, 사과, 코드블록 표시 등 그 어떤 추가 텍스트도 붙이면 안 돼.
+**D. 악재 유형 판단 (negative_catalyst)**: 기사의 핵심 사건이, matches에 넣은 회사(주로 직접 언급된 그 회사 자신) 입장에서 아래의 "확정된 악재 유형" 목록 중 하나에 **명확하고 객관적으로** 해당하는 공시성 이벤트인지 판단해. 이건 "실적이 나쁘다", "주가가 떨어졌다" 같은 막연한 부정적 뉘앙스가 아니라, 기사 제목·요약에 사실관계가 명시적으로 나오는 구체적 기업행위/사건만 대상이야.
 
-각 matches 항목의 reason은 한국어 한 문장, 20단어 이내.
+허용된 유형 목록 (반드시 이 중 하나의 문자열 그대로 사용, 새로 만들어내지 마):
+"유상증자", "무상감자", "전환사채/신주인수권부사채 발행", "최대주주 지분 매도", "관리종목 지정", "거래정지", "상장폐지", "상장적격성 실질심사", "감사의견 거절·한정", "횡령·배임", "신용등급 강등", "소송 패소·피소", "어닝쇼크", "대규모 리콜"
+
+규칙:
+- 반드시 matches 배열에 이미 넣은 종목 중 하나의 code여야 해 (새 코드를 지어내지 마).
+- confidence가 "confirmed"인 매치에만 적용해. "rumor"·테마 동반 종목에는 적용하지 마.
+- 기사에 명시된 사실이 위 목록 중 정확히 하나에 해당할 때만 채워. 애매하거나 목록에 없는 종류의 부정적 뉴스면 null로 둬 — 억지로 끼워맞추지 마.
+- 해당하는 게 없으면 negative_catalyst는 null.
 
 응답은 반드시 아래 JSON 객체 형식이어야 해:
-{"matches":[{"code":"005930","name":"삼성전자","market":"코스피","confidence":"confirmed","reason":"..."}],"primary_theme":"반도체","secondary_themes":[]}`;
+{"matches":[{"code":"005930","name":"삼성전자","market":"코스피","confidence":"confirmed","reason":"..."}],"primary_theme":"반도체","secondary_themes":[],"negative_catalyst":null}
+
+negative_catalyst 예시: {"code":"338220","type":"유상증자"}
+
+중요한 제약 조건 (반드시 지켜):
+- 너한테는 뉴스 제목과 요약만 주어져. 본문을 요청하거나 되묻지 마. 주어진 정보만으로 최선의 판단을 내려.
+- 응답에는 오직 위 형식의 JSON 객체만 포함해야 해. 설명, 사과, 코드블록 표시 등 그 어떤 추가 텍스트도 붙이면 안 돼.
+
+각 matches 항목의 reason은 한국어 한 문장, 20단어 이내.`;
 
 const FILTER_SYSTEM_PROMPT = `너는 한국 주식시장 뉴스 큐레이터야. 주어진 뉴스 제목·요약이 "주가에 실질적 영향을 줄 수 있는 구체적 재료(촉매) 뉴스"인지 판단해.
 
@@ -335,6 +348,15 @@ async function matchStocks(title, summary, universeCompanyList) {
 
   const directMatches = (Array.isArray(parsed.matches) ? parsed.matches : []).map((m) => ({ ...m, tier: "direct" }));
   const existingCodes = new Set(directMatches.map((m) => m.code));
+
+  // Attach the (optional) negative-catalyst label to whichever direct match
+  // it names — only ever a code we already matched above, confirmed-tier
+  // only (enforced in the prompt, double-checked here too).
+  const catalyst = parsed.negative_catalyst;
+  if (catalyst?.code && catalyst?.type) {
+    const target = directMatches.find((m) => m.code === catalyst.code && m.confidence === "confirmed");
+    if (target) target.catalyst = catalyst.type;
+  }
 
   const primaryThemeMatches = parsed.primary_theme
     ? expandThemeMatches([parsed.primary_theme], "primary", MAX_STOCKS_PER_PRIMARY_THEME, existingCodes)

@@ -45,6 +45,10 @@ function toCardShape(item) {
     .filter(Boolean)
     .slice(0, 3)
     .join(" / ");
+  // Any match Claude tagged with a confirmed negative-catalyst type (유상증자
+  // 등) — surfaced once at the card level for the "악재" badge, and again
+  // per-chip so it's clear exactly which stock it's about.
+  const badMatch = item.matches.find((m) => m.catalyst);
 
   return {
     id: item.id,
@@ -55,7 +59,8 @@ function toCardShape(item) {
     link: item.link,
     confidence: hasLegitimate ? "confirmed" : "rumor",
     reason: reason || "관련 근거 정보 없음",
-    stocks: item.matches.map((m) => ({ name: m.name, code: m.code, market: m.market })),
+    badCatalyst: badMatch?.catalyst || null,
+    stocks: item.matches.map((m) => ({ name: m.name, code: m.code, market: m.market, catalyst: m.catalyst || null })),
   };
 }
 
@@ -386,7 +391,8 @@ export default function HomePage() {
         <Newspaper size={14} style={{ marginTop: 2, flexShrink: 0 }} />
         <span>
           "관련주"는 사업내용상 근거가 확인된 연결이며, "시장 추정 · 검증되지 않은 연관"은 실적과 무관한 풍문·인맥 기반
-          정보를 있는 그대로 전달하는 것으로 투자 추천이 아닙니다.
+          정보를 있는 그대로 전달하는 것으로 투자 추천이 아닙니다. "악재" 표시는 유상증자·감자·거래정지 등 공시로 확인되는
+          객관적 이벤트에만 표시되며, 그 자체로 매도·매수를 권유하는 것이 아닙니다.
         </span>
       </footer>
 

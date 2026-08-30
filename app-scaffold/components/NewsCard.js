@@ -1,4 +1,4 @@
-import { Clock, CheckCircle2, ShieldAlert, ExternalLink } from "lucide-react";
+import { Clock, CheckCircle2, ShieldAlert, AlertTriangle, ExternalLink } from "lucide-react";
 import StockChip from "./StockChip";
 
 export default function NewsCard({ n, isNew }) {
@@ -14,14 +14,30 @@ export default function NewsCard({ n, isNew }) {
 
       <h3 className="news-title">{n.headline}</h3>
 
-      <span className={`credibility-tag ${isRumor ? "rumor" : "confirmed"}`}>
-        {isRumor ? <ShieldAlert size={11} /> : <CheckCircle2 size={11} />}
-        {isRumor ? "시장 추정" : "관련주 확정"}
-      </span>
+      <div className="credibility-row">
+        <span className={`credibility-tag ${isRumor ? "rumor" : "confirmed"}`}>
+          {isRumor ? <ShieldAlert size={11} /> : <CheckCircle2 size={11} />}
+          {isRumor ? "시장 추정" : "관련주 확정"}
+        </span>
+        {n.badCatalyst && (
+          <span className="credibility-tag bad">
+            <AlertTriangle size={11} />
+            악재 · {n.badCatalyst}
+          </span>
+        )}
+      </div>
 
       <div className="chip-row">
         {n.stocks.map((s, i) => (
-          <StockChip key={s.code} name={s.name} code={s.code} market={s.market} change={s.change} isLead={i === 0 && n.stocks.length > 1} />
+          <StockChip
+            key={s.code}
+            name={s.name}
+            code={s.code}
+            market={s.market}
+            change={s.change}
+            catalyst={s.catalyst}
+            isLead={i === 0 && n.stocks.length > 1}
+          />
         ))}
       </div>
 

@@ -12,6 +12,9 @@
   --green-tint-ink: #2e6b3e;
   --up: #c23b3b;
   --down: #2e5fa3;
+  --bad: #8a1f2b;
+  --bad-tint: #f7e2e4;
+  --bad-tint-ink: #7a1b26;
   --strip: #14181f;
   --font-display: "Noto Serif KR", serif;
   --font-body: "Noto Sans KR", sans-serif;
@@ -112,9 +115,11 @@ button, input { font-family: inherit; }
 .news-title { font-family: var(--font-display); font-size: 17px; font-weight: 700; line-height: 1.4; margin: 0 0 12px; }
 
 /* Credibility tag — compact pill instead of a heavy colored block */
-.credibility-tag { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; margin-bottom: 10px; }
+.credibility-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.credibility-tag { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; }
 .credibility-tag.confirmed { background: var(--green-tint); color: var(--green-tint-ink); }
 .credibility-tag.rumor { background: var(--amber-tint); color: var(--amber-tint-ink); }
+.credibility-tag.bad { background: var(--bad-tint); color: var(--bad-tint-ink); }
 
 /* Stock chips — the hero element, sits right under the headline */
 .chip-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
@@ -134,6 +139,10 @@ button, input { font-family: inherit; }
 
 .chip-lead { border: 1.5px solid var(--amber); background: var(--amber-tint); }
 .lead-badge { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 700; color: var(--amber-tint-ink); background: var(--amber-bright); padding: 2px 6px; border-radius: 999px; }
+
+.chip-bad { border-color: var(--bad); }
+.chip-bad:hover { border-color: var(--bad); background: var(--bad-tint); }
+.chip-bad-icon { color: var(--bad); flex-shrink: 0; }
 
 .chip-copied {
   position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
@@ -165,7 +174,7 @@ button, input { font-family: inherit; }
 @media (min-width: 900px) { .home-layout { grid-template-columns: 1fr 300px; } }
 
 .trending-panel { border-radius: 14px; border: 1px solid var(--border); background: var(--surface); padding: 18px; }
-.sidebar-stack {display: flex; flex-direction: column; gap: 16px; }
+.sidebar-stack { display: flex; flex-direction: column; gap: 16px; }
 .trending-panel-title { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-muted); margin: 0 0 14px; }
 .trending-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); }
 .trending-row:last-child { border-bottom: none; }
