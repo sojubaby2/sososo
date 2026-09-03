@@ -43,7 +43,7 @@ export default function ThemesPage() {
         const tMap = {};
         for (const t of data.themeChanges) tMap[t.theme] = t.change1M;
         setThemeChangeMap(tMap);
-                setStockChangeMap(data.stockChanges1M || {});
+        setStockChangeMap(data.stockChanges1M || {});
         setLoadState("ready");
       })
       .catch(() => setLoadState("error"));
