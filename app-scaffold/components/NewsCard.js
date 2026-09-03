@@ -19,10 +19,10 @@ export default function NewsCard({ n, isNew }) {
           {isRumor ? <ShieldAlert size={11} /> : <CheckCircle2 size={11} />}
           {isRumor ? "시장 추정" : "관련주 확정"}
         </span>
-        {n.badCatalyst && (
-          <span className="credibility-tag bad">
+                {n.badCatalyst && (
+          <span className="credibility-tag bad" title={n.badCatalyst}>
             <AlertTriangle size={11} />
-            악재 · {n.badCatalyst}
+            악재
           </span>
         )}
       </div>
