@@ -5,7 +5,7 @@
 // weekends/holidays — same "walk back to the last business day with data"
 // pattern used elsewhere), gold is close to real-time. Cached a few hours
 // since none of this needs to be second-by-second fresh.
-
+export const dynamic = "force-dynamic";
 function toYmd(d) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
