@@ -14,7 +14,6 @@
 export const dynamic = "force-dynamic";
 
 import rawThemeData from "../../../lib/themeData.json";
-import rawThemeData from "../../../lib/themeData.json";
 
 function toBasDt(d) {
   const y = d.getFullYear();
