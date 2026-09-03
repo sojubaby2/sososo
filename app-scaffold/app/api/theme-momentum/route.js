@@ -12,17 +12,23 @@
 // 1주일/1개월 두 기간을 동시에 계산해서 프론트(HOT 테마 패널의 토글)에서
 // 고르게 함.
 //
-// Cached for 6 hours (this is inherently daily-granularity data, no need
-// to refetch on every page load).
-//
-// force-dynamic: no `request` param + a cacheable fetch means Next.js would
-// otherwise try to call the KRX API once at BUILD time to prerender this
-// route — if that build-time call fails (network hiccup in the CI
-// container), it fails the whole Cloudflare deploy. This makes it run only
-// per actual request instead, like the rest of this app's API routes.
+// 상장주식수(lstgStCnt) 변동 종목 제외: KRX 종가는 감자·주식병합·유상증자·
+// 무상증자 같은 이벤트가 있어도 그 사실을 전혀 반영하지 않고 그냥 "그날의
+// 1주 가격"만 줌. 예를 들어 삼부토건은 2026년 6월 법원 회생계획 인가로
+// 27대 1 주식병합(96.3% 감자)을 거쳐 2026-09-01에 신주가 새로 상장됐는데,
+// 병합 전/후 종가를 그대로 비교하면 실제로는 아무 일도 없었는데(가치는
+// 그대로, 주식 수만 27분의 1로 줄고 주당가격만 그만큼 뛴 것) 등락률이
+// +1500%대로 튀어 보이는 문제가 있었음. 상장주식수가 두 시점 사이에 크게
+// 달라진 종목은 애초에 "종가 비교"라는 계산 자체가 성립하지 않으므로,
+// 개별 종목의 등락률(stockChanges)과 테마 평균 양쪽 모두에서 제외함.
 export const dynamic = "force-dynamic";
 
 import rawThemeData from "../../../lib/themeData.json";
+
+// 상장주식수가 두 시점 사이에 이 비율 이상 달라지면 감자/병합/증자 등으로
+// 보고, 가격 비교 대상에서 제외함. 상장주식수는 평소엔 거의 안 바뀌므로
+// 넉넉하게 잡아도(0.5%) 오탐은 거의 없음.
+const SHARE_CHANGE_THRESHOLD = 0.005;
 
 function toBasDt(d) {
   const y = d.getFullYear();
@@ -67,12 +73,34 @@ function toPriceMap(items) {
   return map;
 }
 
-// recentPrices/pastPrices 두 시점의 가격 맵을 비교해 종목코드 -> 등락률(%) 맵을 만듦.
-function computeChanges(recentPrices, pastPrices) {
+// 종목코드 -> 상장주식수(lstgStCnt) 맵. 값이 없거나 0이면 그 종목은 그냥
+// 건너뜀(있는 값만 가지고 비교).
+function toSharesMap(items) {
+  const map = new Map();
+  for (const it of items) {
+    if (!it.srtnCd || !it.lstgStCnt) continue;
+    const n = Number(it.lstgStCnt);
+    if (Number.isFinite(n) && n > 0) map.set(it.srtnCd, n);
+  }
+  return map;
+}
+
+// recentPrices/pastPrices 두 시점의 가격 맵을 비교해 종목코드 -> 등락률(%) 맵을
+// 만듦. recentShares/pastShares로 상장주식수가 크게 달라진 종목(감자·병합·
+// 증자 등)은 가격 비교 자체가 무의미하므로 결과에서 제외함.
+function computeChanges(recentPrices, pastPrices, recentShares, pastShares) {
   const changes = {};
   for (const [code, nowPrice] of recentPrices.entries()) {
     const pastPrice = pastPrices.get(code);
     if (!pastPrice) continue;
+
+    const nowShares = recentShares.get(code);
+    const pastSharesCount = pastShares.get(code);
+    if (nowShares && pastSharesCount) {
+      const shareDiffRatio = Math.abs(nowShares - pastSharesCount) / pastSharesCount;
+      if (shareDiffRatio > SHARE_CHANGE_THRESHOLD) continue; // 감자/병합/증자 등 — 비교 불가
+    }
+
     changes[code] = ((nowPrice - pastPrice) / pastPrice) * 100;
   }
   return changes;
@@ -118,8 +146,12 @@ export async function GET() {
   const weekPrices = toPriceMap(week.items);
   const monthPrices = toPriceMap(month.items);
 
-  const stockChanges1W = computeChanges(recentPrices, weekPrices);
-  const stockChanges1M = computeChanges(recentPrices, monthPrices);
+  const recentShares = toSharesMap(recent.items);
+  const weekShares = toSharesMap(week.items);
+  const monthShares = toSharesMap(month.items);
+
+  const stockChanges1W = computeChanges(recentPrices, weekPrices, recentShares, weekShares);
+  const stockChanges1M = computeChanges(recentPrices, monthPrices, recentShares, monthShares);
 
   const themeAgg1W = aggregateByTheme(stockChanges1W);
   const themeAgg1M = aggregateByTheme(stockChanges1M);
