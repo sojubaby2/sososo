@@ -129,6 +129,8 @@ function GlobalMarketPanel() {
   if (data?.usd) rows.push(["원/달러", `${data.usd.toLocaleString("ko-KR")}원`]);
   if (data?.jpy) rows.push(["원/엔(100엔)", `${data.jpy.toLocaleString("ko-KR")}원`]);
   if (data?.gold) rows.push(["국제 금값(1oz)", `$${Number(data.gold).toLocaleString("ko-KR")}`]);
+    if (data?.wti) rows.push(["WTI", `$${Number(data.wti).toLocaleString("ko-KR")}`]);
+  if (data?.brent) rows.push(["브렌트유", `$${Number(data.brent).toLocaleString("ko-KR")}`]);
 
   return (
     <aside className="trending-panel">
