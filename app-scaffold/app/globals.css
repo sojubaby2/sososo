@@ -137,9 +137,6 @@ button, input { font-family: inherit; }
 .chip .dot.rumor { background: var(--up); }
 .chip .code { color: var(--ink-muted); font-family: var(--font-mono); font-size: 12px; }
 
-.chip-lead { border: 1.5px solid var(--amber); background: var(--amber-tint); }
-.lead-badge { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 700; color: var(--amber-tint-ink); background: var(--amber-bright); padding: 2px 6px; border-radius: 999px; }
-
 .chip-bad { border-color: var(--bad); }
 .chip-bad:hover { border-color: var(--bad); background: var(--bad-tint); }
 .chip-bad-icon { color: var(--bad); flex-shrink: 0; }
