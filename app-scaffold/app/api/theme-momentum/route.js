@@ -11,6 +11,12 @@
 //
 // Cached for 6 hours (this is inherently daily-granularity data, no need
 // to refetch on every page load).
+//
+// force-dynamic: no `request` param + a cacheable fetch means Next.js would
+// otherwise try to call the KRX API once at BUILD time to prerender this
+// route — if that build-time call fails (network hiccup in the CI
+// container), it fails the whole Cloudflare deploy. This makes it run only
+// per actual request instead, like the rest of this app's API routes.
 export const dynamic = "force-dynamic";
 
 import rawThemeData from "../../../lib/themeData.json";
@@ -80,7 +86,6 @@ export async function GET() {
   const recentPrices = toPriceMap(recent.items);
   const pastPrices = toPriceMap(past.items);
 
-  // Per-stock 1-month change, for every code we have both endpoints for.
   const stockChanges = {};
   for (const [code, nowPrice] of recentPrices.entries()) {
     const pastPrice = pastPrices.get(code);
@@ -88,8 +93,7 @@ export async function GET() {
     stockChanges[code] = ((nowPrice - pastPrice) / pastPrice) * 100;
   }
 
-  // Aggregate into per-theme averages using our theme→stock groupings.
-  const themeAgg = new Map(); // theme -> {sum, count}
+  const themeAgg = new Map();
   for (const row of rawThemeData) {
     const pct = stockChanges[row.code];
     if (typeof pct !== "number") continue;
