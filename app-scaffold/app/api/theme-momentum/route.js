@@ -11,7 +11,9 @@
 //
 // Cached for 6 hours (this is inherently daily-granularity data, no need
 // to refetch on every page load).
+export const dynamic = "force-dynamic";
 
+import rawThemeData from "../../../lib/themeData.json";
 import rawThemeData from "../../../lib/themeData.json";
 
 function toBasDt(d) {
