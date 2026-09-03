@@ -32,7 +32,7 @@ import { getRedis } from "../../../lib/redis";
 import rawThemeData from "../../../lib/themeData.json";
 import { buildSubsidiaryPromptBlock } from "../../../lib/subsidiaryMap";
 
-const WATCHED_KEYWORDS = ["증권"];
+const WATCHED_KEYWORDS = ["특징주", "수주", "공시", "속보", "단독", "코스피", "코스닥", "잭팟"];
 const ARTICLES_PER_KEYWORD = 5;
 const SEEN_TTL_SECONDS = 60 * 60 * 24 * 7; // remember an article for 7 days
 const FEED_MAX_LENGTH = 300; // roughly 5 "pages" worth of retained history
