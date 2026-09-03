@@ -1,13 +1,16 @@
 // GET /api/theme-momentum
 //
 // We only have daily KRX snapshots, not a real historical time series, so
-// "1-month change" here is computed by diffing TWO snapshots: the most
-// recent available business day, and the closest available business day
+// "N-day change" here is computed by diffing snapshots: the most recent
+// available business day, against the closest available business day ~7 and
 // ~30 calendar days earlier. This deliberately replaces daily change%
 // everywhere it was shown next to news/theme data that isn't itself
 // real-time — a same-day % next to a headline read like "this just
-// happened", which was misleading. A 1-month figure doesn't carry that
+// happened", which was misleading. A multi-day figure doesn't carry that
 // same false-immediacy problem.
+//
+// 1주일/1개월 두 기간을 동시에 계산해서 프론트(HOT 테마 패널의 토글)에서
+// 고르게 함.
 //
 // Cached for 6 hours (this is inherently daily-granularity data, no need
 // to refetch on every page load).
@@ -64,35 +67,19 @@ function toPriceMap(items) {
   return map;
 }
 
-export async function GET() {
-  const serviceKey = process.env.KRX_SERVICE_KEY;
-  if (!serviceKey) {
-    return Response.json({ error: "KRX_SERVICE_KEY 환경변수가 설정되지 않았습니다." }, { status: 500 });
-  }
-
-  const now = new Date();
-  const monthAgo = new Date(now);
-  monthAgo.setDate(monthAgo.getDate() - 30);
-
-  const [recent, past] = await Promise.all([
-    fetchLatestAvailable(serviceKey, now),
-    fetchLatestAvailable(serviceKey, monthAgo),
-  ]);
-
-  if (!recent || !past) {
-    return Response.json({ error: "시세 데이터를 가져오지 못했습니다." }, { status: 502 });
-  }
-
-  const recentPrices = toPriceMap(recent.items);
-  const pastPrices = toPriceMap(past.items);
-
-  const stockChanges = {};
+// recentPrices/pastPrices 두 시점의 가격 맵을 비교해 종목코드 -> 등락률(%) 맵을 만듦.
+function computeChanges(recentPrices, pastPrices) {
+  const changes = {};
   for (const [code, nowPrice] of recentPrices.entries()) {
     const pastPrice = pastPrices.get(code);
     if (!pastPrice) continue;
-    stockChanges[code] = ((nowPrice - pastPrice) / pastPrice) * 100;
+    changes[code] = ((nowPrice - pastPrice) / pastPrice) * 100;
   }
+  return changes;
+}
 
+// stockChanges(종목코드 -> 등락률)를 테마별로 집계.
+function aggregateByTheme(stockChanges) {
   const themeAgg = new Map();
   for (const row of rawThemeData) {
     const pct = stockChanges[row.code];
@@ -102,18 +89,62 @@ export async function GET() {
     agg.sum += pct;
     agg.count += 1;
   }
-  const themeChanges = Array.from(themeAgg.entries()).map(([theme, { sum, count }]) => ({
-    theme,
-    change1M: sum / count,
-    sampleSize: count,
-  }));
+  return themeAgg;
+}
+
+export async function GET() {
+  const serviceKey = process.env.KRX_SERVICE_KEY;
+  if (!serviceKey) {
+    return Response.json({ error: "KRX_SERVICE_KEY 환경변수가 설정되지 않았습니다." }, { status: 500 });
+  }
+
+  const now = new Date();
+  const weekAgo = new Date(now);
+  weekAgo.setDate(weekAgo.getDate() - 7);
+  const monthAgo = new Date(now);
+  monthAgo.setDate(monthAgo.getDate() - 30);
+
+  const [recent, week, month] = await Promise.all([
+    fetchLatestAvailable(serviceKey, now),
+    fetchLatestAvailable(serviceKey, weekAgo),
+    fetchLatestAvailable(serviceKey, monthAgo),
+  ]);
+
+  if (!recent || !week || !month) {
+    return Response.json({ error: "시세 데이터를 가져오지 못했습니다." }, { status: 502 });
+  }
+
+  const recentPrices = toPriceMap(recent.items);
+  const weekPrices = toPriceMap(week.items);
+  const monthPrices = toPriceMap(month.items);
+
+  const stockChanges1W = computeChanges(recentPrices, weekPrices);
+  const stockChanges1M = computeChanges(recentPrices, monthPrices);
+
+  const themeAgg1W = aggregateByTheme(stockChanges1W);
+  const themeAgg1M = aggregateByTheme(stockChanges1M);
+
+  const themeNames = new Set([...themeAgg1W.keys(), ...themeAgg1M.keys()]);
+  const themeChanges = Array.from(themeNames).map((theme) => {
+    const w = themeAgg1W.get(theme);
+    const m = themeAgg1M.get(theme);
+    return {
+      theme,
+      change1W: w ? w.sum / w.count : null,
+      sampleSize1W: w ? w.count : 0,
+      change1M: m ? m.sum / m.count : null,
+      sampleSize1M: m ? m.count : 0,
+    };
+  });
 
   return Response.json(
     {
       recentBasDt: recent.basDt,
-      pastBasDt: past.basDt,
+      weekBasDt: week.basDt,
+      monthBasDt: month.basDt,
       themeChanges,
-      stockChanges,
+      stockChanges1W,
+      stockChanges1M,
     },
     { headers: { "Cache-Control": "public, max-age=0, s-maxage=1800, stale-while-revalidate=3600" } }
   );
