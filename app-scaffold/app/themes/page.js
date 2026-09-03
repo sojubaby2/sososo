@@ -28,9 +28,11 @@ function ChangeTag({ value }) {
 export default function ThemesPage() {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(THEMES[0]?.theme ?? "");
-  const [themeChangeMap, setThemeChangeMap] = useState({}); // theme -> change1M
-  const [stockChangeMap, setStockChangeMap] = useState({}); // code -> change1M
+  const [rawThemeChanges, setRawThemeChanges] = useState([]); // [{theme, change1W, change1M}, ...]
+  const [stockChanges1W, setStockChanges1W] = useState({}); // code -> change1W
+  const [stockChanges1M, setStockChanges1M] = useState({}); // code -> change1M
   const [loadState, setLoadState] = useState("loading"); // loading | ready | error
+  const [range, setRange] = useState("1M"); // "1W" | "1M"
 
   useEffect(() => {
     fetch("/api/theme-momentum")
@@ -40,14 +42,24 @@ export default function ThemesPage() {
           setLoadState("error");
           return;
         }
-        const tMap = {};
-        for (const t of data.themeChanges) tMap[t.theme] = t.change1M;
-        setThemeChangeMap(tMap);
-        setStockChangeMap(data.stockChanges1M || {});
+        setRawThemeChanges(data.themeChanges);
+        setStockChanges1W(data.stockChanges1W || {});
+        setStockChanges1M(data.stockChanges1M || {});
         setLoadState("ready");
       })
       .catch(() => setLoadState("error"));
   }, []);
+
+  const themeField = range === "1W" ? "change1W" : "change1M";
+  const rangeLabel = range === "1W" ? "1주일" : "1개월";
+
+  const themeChangeMap = useMemo(() => {
+    const map = {};
+    for (const t of rawThemeChanges) map[t.theme] = t[themeField];
+    return map;
+  }, [rawThemeChanges, themeField]);
+
+  const stockChangeMap = range === "1W" ? stockChanges1W : stockChanges1M;
 
   const filteredThemes = useMemo(
     () => THEMES.filter((t) => t.theme.toLowerCase().includes(query.toLowerCase())),
@@ -56,7 +68,7 @@ export default function ThemesPage() {
 
   const selectedGroup = THEMES.find((t) => t.theme === selected) ?? THEMES[0];
 
-  // Hottest themes (highest 1-month average change) float to the top.
+  // Hottest themes (highest change in the selected range) float to the top.
   const sortedThemes = useMemo(() => {
     return [...filteredThemes].sort((a, b) => {
       const ca = themeChangeMap[a.theme];
@@ -69,8 +81,8 @@ export default function ThemesPage() {
     });
   }, [filteredThemes, themeChangeMap]);
 
-  // Within the selected theme, sort stocks by 1-month change too — this is
-  // what stands in for a "대장주" leaderboard now that we don't show a
+  // Within the selected theme, sort stocks by the same range's change — this
+  // is what stands in for a "대장주" leaderboard now that we don't show a
   // same-day price/change (which looked live but wasn't).
   const sortedStocks = useMemo(() => {
     if (!selectedGroup) return [];
@@ -89,9 +101,27 @@ export default function ThemesPage() {
     <div>
       <Header />
       <main className="container-wide" style={{ paddingTop: 32, paddingBottom: 32 }}>
-        <div className="search-box">
-          <Search size={16} />
-          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="테마 검색 (예: 반도체, 위고비, 호르무즈)" />
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
+          <div className="search-box" style={{ marginBottom: 0 }}>
+            <Search size={16} />
+            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="테마 검색 (예: 반도체, 위고비, 호르무즈)" />
+          </div>
+          <div className="range-toggle">
+            <button
+              type="button"
+              className={`range-toggle-btn ${range === "1W" ? "active" : ""}`}
+              onClick={() => setRange("1W")}
+            >
+              1주일
+            </button>
+            <button
+              type="button"
+              className={`range-toggle-btn ${range === "1M" ? "active" : ""}`}
+              onClick={() => setRange("1M")}
+            >
+              1개월
+            </button>
+          </div>
         </div>
 
         {loadState === "error" && (
@@ -102,7 +132,7 @@ export default function ThemesPage() {
 
         <div className="theme-layout">
           <aside>
-            <h2 className="section-title">전체 테마 ({sortedThemes.length}) · 🔥 1개월 등락률 높은 순</h2>
+            <h2 className="section-title">전체 테마 ({sortedThemes.length}) · 🔥 {rangeLabel} 등락률 높은 순</h2>
             <div className="theme-list">
               {sortedThemes.map((t) => (
                 <button
@@ -125,7 +155,7 @@ export default function ThemesPage() {
               <>
                 <div className="theme-heading">
                   <h2>{selectedGroup.theme}</h2>
-                  <span className="text-xs" style={{ color: "var(--ink-muted)", fontSize: 12 }}>1개월 누적 등락률 기준</span>
+                  <span className="text-xs" style={{ color: "var(--ink-muted)", fontSize: 12 }}>{rangeLabel} 누적 등락률 기준</span>
                   {isPoliticalTheme(selectedGroup.theme) && (
                     <span className="political-tag">
                       <ShieldAlert size={12} />정치테마주 — 사업 실적과 무관한 인맥 기반 편입, 투자 주의
@@ -139,7 +169,7 @@ export default function ThemesPage() {
                       <th>종목명</th>
                       <th>코드</th>
                       <th>시장</th>
-                      <th>1개월 등락률</th>
+                      <th>{rangeLabel} 등락률</th>
                     </tr>
                   </thead>
                   <tbody>
