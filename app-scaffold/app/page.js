@@ -65,10 +65,12 @@ function toCardShape(item) {
 }
 
 // Compact sidebar panel — a smaller reference version of what used to be a
-// big colored grid across the top of the page.
+// big colored grid across the top of the page. Toggle switches between the
+// 1-week and 1-month change field from /api/theme-momentum.
 function HotThemePanel() {
-  const [themes, setThemes] = useState([]);
+  const [rawThemes, setRawThemes] = useState([]);
   const [state, setState] = useState("loading");
+  const [range, setRange] = useState("1M"); // "1W" | "1M"
 
   useEffect(() => {
     fetch("/api/theme-momentum")
@@ -78,337 +80,63 @@ function HotThemePanel() {
           setState("error");
           return;
         }
-        const top = data.themeChanges
-          .filter((t) => typeof t.change1M === "number" && !isPoliticalTheme(t.theme))
-          .sort((a, b) => b.change1M - a.change1M)
-          .slice(0, HOT_THEME_COUNT);
-        setThemes(top);
+        setRawThemes(data.themeChanges);
         setState("ready");
       })
       .catch(() => setState("error"));
   }, []);
 
+  const field = range === "1W" ? "change1W" : "change1M";
+
+  const themes = useMemo(() => {
+    return rawThemes
+      .filter((t) => typeof t[field] === "number" && !isPoliticalTheme(t.theme))
+      .sort((a, b) => b[field] - a[field])
+      .slice(0, HOT_THEME_COUNT);
+  }, [rawThemes, field]);
+
   if (state === "error") return null;
 
   return (
     <aside className="trending-panel">
-      <h2 className="trending-panel-title">
-        <Flame size={12} style={{ color: "var(--up)" }} />
-        HOT 테마 · 1개월
-      </h2>
+      <div className="trending-panel-header">
+        <h2 className="trending-panel-title">
+          <Flame size={12} style={{ color: "var(--up)" }} />
+          HOT 테마
+        </h2>
+        <div className="range-toggle">
+          <button
+            type="button"
+            className={`range-toggle-btn ${range === "1W" ? "active" : ""}`}
+            onClick={() => setRange("1W")}
+          >
+            1주일
+          </button>
+          <button
+            type="button"
+            className={`range-toggle-btn ${range === "1M" ? "active" : ""}`}
+            onClick={() => setRange("1M")}
+          >
+            1개월
+          </button>
+        </div>
+      </div>
       {state === "loading" ? (
         <p className="trending-empty">불러오는 중...</p>
       ) : (
-        themes.map((t) => (
-          <div key={t.theme} className="trending-row">
-            <span className="trending-row-name">{t.theme}</span>
-            <span className="mono up" style={{ fontSize: 13, fontWeight: 700 }}>
-              {t.change1M > 0 ? "+" : ""}
-              {t.change1M.toFixed(1)}%
-            </span>
-          </div>
-        ))
-      )}
-    </aside>
-  );
-}
-
-// Replaces the old scrolling top ticker — everything visible at once
-// instead of waiting for text to scroll by.
-function GlobalMarketPanel() {
-  const [data, setData] = useState(null);
-
-  useEffect(() => {
-    fetch("/api/market-ticker")
-      .then((r) => r.json())
-      .then(setData)
-      .catch(() => {});
-  }, []);
-
-  const rows = [];
-  if (data?.usd) rows.push(["원/달러", `${data.usd.toLocaleString("ko-KR")}원`]);
-  if (data?.jpy) rows.push(["원/엔(100엔)", `${data.jpy.toLocaleString("ko-KR")}원`]);
-  if (data?.gold) rows.push(["국제 금값(1oz)", `$${Number(data.gold).toLocaleString("ko-KR")}`]);
-    if (data?.wti) rows.push(["WTI", `$${Number(data.wti).toLocaleString("ko-KR")}`]);
-  if (data?.brent) rows.push(["브렌트유", `$${Number(data.brent).toLocaleString("ko-KR")}`]);
-
-  return (
-    <aside className="trending-panel">
-      <h2 className="trending-panel-title">
-        <Globe size={12} style={{ color: "var(--amber)" }} />
-        글로벌 시황
-      </h2>
-      {rows.length === 0 ? (
-        <p className="trending-empty">불러오는 중...</p>
-      ) : (
-        rows.map(([label, value]) => (
-          <div key={label} className="trending-row">
-            <span className="trending-row-name">{label}</span>
-            <span className="mono" style={{ fontSize: 13, fontWeight: 700 }}>{value}</span>
-          </div>
-        ))
-      )}
-    </aside>
-  );
-}
-
-function TrendingPanel({ rawItems, activeCode, onSelect }) {
-  const trending = useMemo(() => {
-    const seen = new Map();
-    for (const item of rawItems) {
-      for (const m of item.matches) {
-        if (seen.has(m.code)) continue;
-        seen.set(m.code, { name: m.name, code: m.code, market: m.market });
-        if (seen.size >= TRENDING_STOCK_COUNT) break;
-      }
-      if (seen.size >= TRENDING_STOCK_COUNT) break;
-    }
-    return Array.from(seen.values());
-  }, [rawItems]);
-
-  return (
-    <aside className="trending-panel">
-      <h2 className="trending-panel-title">
-        <Flame size={12} style={{ color: "var(--up)" }} />
-        실시간 언급 종목
-      </h2>
-      {trending.length === 0 ? (
-        <p className="trending-empty">아직 매칭된 종목이 없어요.</p>
-      ) : (
-        trending.map((s) => {
-          const isActive = activeCode === s.code;
+        themes.map((t) => {
+          const val = t[field];
           return (
-            <button
-              type="button"
-              key={s.code}
-              className="trending-row"
-              onClick={() => onSelect(isActive ? null : s)}
-              style={{
-                display: "flex",
-                width: "100%",
-                background: isActive ? "var(--amber-tint)" : "transparent",
-                border: "none",
-                cursor: "pointer",
-                textAlign: "left",
-                borderRadius: 6,
-              }}
-              title={`'${s.name}' 관련 뉴스만 보기`}
-            >
-              <span className="trending-row-name">{s.name}</span>
-              <span className="trending-row-code">{s.code}</span>
-            </button>
+            <div key={t.theme} className="trending-row">
+              <span className="trending-row-name">{t.theme}</span>
+              <span className="mono up" style={{ fontSize: 13, fontWeight: 700 }}>
+                {val > 0 ? "+" : ""}
+                {val.toFixed(1)}%
+              </span>
+            </div>
           );
         })
       )}
     </aside>
-  );
-}
-
-function InstallHintBanner() {
-  const [dismissed, setDismissed] = useState(true); // hidden until localStorage check to avoid a flash
-  useEffect(() => {
-    setDismissed(localStorage.getItem("installHintDismissed") === "1");
-  }, []);
-
-  function dismiss() {
-    localStorage.setItem("installHintDismissed", "1");
-    setDismissed(true);
-  }
-
-  if (dismissed) return null;
-  return (
-    <div className="install-hint">
-      <Smartphone size={15} style={{ flexShrink: 0 }} />
-      <span>모바일에서는 "홈 화면에 추가"를 하면 앱처럼 빠르게 열어볼 수 있어요. PC에서는 Ctrl+D로 즐겨찾기 해두세요.</span>
-      <button type="button" className="install-hint-close" onClick={dismiss}><X size={14} /></button>
-    </div>
-  );
-}
-
-export default function HomePage() {
-  const [rawItems, setRawItems] = useState([]);
-  const [loadState, setLoadState] = useState("loading");
-  const [newIds, setNewIds] = useState(new Set());
-  const [toast, setToast] = useState(null); // { count, headline } | null
-  const [soundEnabled, setSoundEnabled] = useState(false);
-  const [filterStock, setFilterStock] = useState(null); // { code, name } | null
-  const knownIdsRef = useRef(new Set());
-  const toastTimerRef = useRef(null);
-  const newIdsTimerRef = useRef(null);
-  const soundEnabledRef = useRef(false);
-
-  function toggleSound() {
-    const next = !soundEnabled;
-    setSoundEnabled(next);
-    soundEnabledRef.current = next;
-    if (next) playAlertBeep(); // confirms it's on AND unlocks autoplay for later
-  }
-
-  function applyFeed(items, isFirstLoad) {
-    const incomingIds = items.map((it) => it.id);
-    if (!isFirstLoad) {
-      const freshIds = incomingIds.filter((id) => !knownIdsRef.current.has(id));
-      if (freshIds.length > 0) {
-        setNewIds(new Set(freshIds));
-        const freshItems = items.filter((it) => freshIds.includes(it.id));
-        const latest = freshItems[0];
-        setToast({ count: freshIds.length, headline: latest?.title || "" });
-        clearTimeout(newIdsTimerRef.current);
-        newIdsTimerRef.current = setTimeout(() => setNewIds(new Set()), 4000);
-        clearTimeout(toastTimerRef.current);
-        toastTimerRef.current = setTimeout(() => setToast(null), 4500);
-
-        if (soundEnabledRef.current) {
-          const hasKeywordHit = freshItems.some((it) => ALERT_KEYWORDS.some((k) => it.title?.includes(k)));
-          if (hasKeywordHit) playAlertBeep();
-        }
-      }
-    }
-    knownIdsRef.current = new Set(incomingIds);
-    setRawItems(items);
-  }
-
-  useEffect(() => {
-    let cancelled = false;
-
-    function load(isFirstLoad) {
-      fetch("/api/feed")
-        .then((r) => r.json())
-        .then((data) => {
-          if (cancelled) return;
-          if (data.error) {
-            setLoadState("error");
-            return;
-          }
-          applyFeed(data.items || [], isFirstLoad);
-          setLoadState("ready");
-        })
-        .catch(() => {
-          if (!cancelled) setLoadState("error");
-        });
-    }
-
-    load(true);
-    const interval = setInterval(() => load(false), FEED_POLL_MS);
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-      clearTimeout(toastTimerRef.current);
-      clearTimeout(newIdsTimerRef.current);
-    };
-  }, []);
-
-  const items = useMemo(() => rawItems.map(toCardShape), [rawItems]);
-  const displayedItems = useMemo(() => {
-    if (!filterStock) return items;
-    return items.filter((it) => it.stocks.some((s) => s.code === filterStock.code));
-  }, [items, filterStock]);
-
-  return (
-    <div>
-      <Header />
-      <main className="container-wide" style={{ paddingTop: 32, paddingBottom: 32 }}>
-        <InstallHintBanner />
-        <div className="home-layout">
-          <div>
-            <div className="filter-row">
-              <h2 className="live-heading" style={{ margin: 0 }}>
-                <span className="live-dot" />
-                <span className="live-label">실시간 뉴스 검색 중</span>
-                <span className="loading-dots"><span>.</span><span>.</span><span>.</span></span>
-              </h2>
-              <button type="button" className={`sound-toggle ${soundEnabled ? "on" : ""}`} onClick={toggleSound}>
-                {soundEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
-                주요 키워드 알림음 {soundEnabled ? "켜짐" : "꺼짐"}
-              </button>
-            </div>
-
-            {loadState === "loading" && (
-              <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--ink-muted)", fontSize: 14, padding: "24px 0" }}>
-                <Loader2 size={16} />
-                불러오는 중...
-              </div>
-            )}
-
-            {loadState === "error" && (
-              <p style={{ fontSize: 13, color: "var(--amber-tint-ink)", background: "var(--amber-tint)", padding: "8px 12px", borderRadius: 8 }}>
-                피드를 불러오지 못했습니다. Redis(Upstash) 환경변수 설정을 확인해주세요.
-              </p>
-            )}
-
-            {loadState === "ready" && items.length === 0 && (
-              <p style={{ fontSize: 14, color: "var(--ink-muted)", padding: "24px 0" }}>
-                아직 자동 수집된 뉴스가 없어요. /api/poll 을 한 번 호출해보시거나, 스케줄러가 연결되면 여기 자동으로 쌓이기 시작해요.
-              </p>
-            )}
-
-            {filterStock && (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 8,
-                  fontSize: 13,
-                  color: "var(--amber-tint-ink)",
-                  background: "var(--amber-tint)",
-                  padding: "8px 12px",
-                  borderRadius: 8,
-                  marginBottom: 12,
-                }}
-              >
-                <span>
-                  <strong>{filterStock.name}</strong>({filterStock.code}) 관련 뉴스만 보는 중
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setFilterStock(null)}
-                  style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", fontSize: 13, fontWeight: 600 }}
-                >
-                  필터 해제 ✕
-                </button>
-              </div>
-            )}
-
-            {loadState === "ready" && items.length > 0 && filterStock && displayedItems.length === 0 && (
-              <p style={{ fontSize: 14, color: "var(--ink-muted)", padding: "24px 0" }}>
-                최근 수집된 뉴스 중 "{filterStock.name}" 관련 기사가 아직 없어요.
-              </p>
-            )}
-
-            <div className="news-list">
-              {displayedItems.map((n) => <NewsCard key={n.id} n={n} isNew={newIds.has(n.id)} />)}
-            </div>
-          </div>
-
-          <div className="sidebar-stack">
-            <GlobalMarketPanel />
-            <HotThemePanel />
-            <TrendingPanel rawItems={rawItems} activeCode={filterStock?.code} onSelect={setFilterStock} />
-          </div>
-        </div>
-      </main>
-
-      <footer className="site-footer">
-        <Newspaper size={14} style={{ marginTop: 2, flexShrink: 0 }} />
-        <span>
-          "관련주"는 사업내용상 근거가 확인된 연결이며, "시장 추정 · 검증되지 않은 연관"은 실적과 무관한 풍문·인맥 기반
-          정보를 있는 그대로 전달하는 것으로 투자 추천이 아닙니다. "악재" 표시는 유상증자·감자·거래정지 등 공시로 확인되는
-          객관적 이벤트에만 표시되며, 그 자체로 매도·매수를 권유하는 것이 아닙니다.
-        </span>
-      </footer>
-
-      {toast && (
-        <div className="toast-container">
-          <div key={toast.headline + toast.count} className="new-toast">
-            <Bell size={16} className="new-toast-icon" />
-            <div>
-              <p className="new-toast-title">새 소식 {toast.count}건 도착</p>
-              {toast.headline && <p className="new-toast-headline">{toast.headline}</p>}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
   );
 }
