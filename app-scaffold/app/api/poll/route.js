@@ -143,28 +143,78 @@ function normalizeThemeName(s) {
   return (s || "").replace(/\s+/g, "");
 }
 
-// tier: "primary" | "secondary" — controls both the per-theme stock cap and
-// the reason text, so the frontend/ordering can tell them apart.
-function expandThemeMatches(themeNames, tier, cap, existingCodes) {
+// theme (normalized) -> Map(code -> {name, market, theme}) — built once at
+// module load, not per-article. Ground truth for validating Claude's
+// theme_stocks picks: a pick only counts if the code is actually
+// registered under that theme in our own database (same anti-hallucination
+// discipline as the full-universe direct matches in section A).
+const THEME_MEMBERSHIP = (() => {
+  const map = new Map();
+  for (const row of rawThemeData) {
+    const key = normalizeThemeName(row.theme);
+    if (!map.has(key)) map.set(key, new Map());
+    map.get(key).set(row.code, { name: row.name, market: row.market, theme: row.theme });
+  }
+  return map;
+})();
+
+// "테마명: code|name, code|name, ..." — one line per theme, given to Claude
+// as [테마별 소속 종목 목록] so it can pick individual companion stocks
+// within a matched theme instead of blindly getting the whole bucket
+// dumped on it (see theme_stocks in SYSTEM_PROMPT — many theme buckets mix
+// sub-industries that don't actually move together on the same news).
+function buildThemeMembershipBlock() {
+  const byTheme = new Map(); // display theme name -> ["code|name", ...]
+  for (const row of rawThemeData) {
+    if (!byTheme.has(row.theme)) byTheme.set(row.theme, []);
+    byTheme.get(row.theme).push(`${row.code}|${row.name}`);
+  }
+  return Array.from(byTheme.entries())
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([theme, entries]) => `${theme}: ${entries.join(", ")}`)
+    .join("\n");
+}
+
+// Validates and applies Claude's theme_stocks picks against THEME_MEMBERSHIP
+// (so a hallucinated code/theme pairing is silently dropped, never trusted),
+// enforces the existing per-theme caps, and tags each with the right tier
+// (primary vs secondary) based on which theme it names.
+function applyThemeStockPicks(themeStocks, primaryThemeName, secondaryThemeNames, existingCodes) {
+  const allowedThemes = new Set(
+    [primaryThemeName, ...(Array.isArray(secondaryThemeNames) ? secondaryThemeNames : [])]
+      .filter(Boolean)
+      .map(normalizeThemeName)
+  );
+  const primaryKey = normalizeThemeName(primaryThemeName);
+  const perThemeCount = new Map(); // normalized theme -> count used so far
   const added = [];
-  for (const themeName of themeNames || []) {
-    const target = normalizeThemeName(themeName);
-    let count = 0;
-    for (const row of rawThemeData) {
-      if (normalizeThemeName(row.theme) !== target) continue;
-      if (existingCodes.has(row.code)) continue;
-      if (count >= cap) break;
-      added.push({
-        code: row.code,
-        name: row.name,
-        market: row.market,
-        confidence: "theme",
-        tier,
-        reason: `'${row.theme}' 테마 동반 종목${tier === "primary" ? " (핵심 테마)" : ""}`,
-      });
-      existingCodes.add(row.code);
-      count++;
-    }
+
+  for (const pick of Array.isArray(themeStocks) ? themeStocks : []) {
+    const code = pick?.code;
+    const themeKey = normalizeThemeName(pick?.theme);
+    if (!code || !themeKey) continue;
+    if (existingCodes.has(code)) continue;
+    if (!allowedThemes.has(themeKey)) continue; // must be a theme Claude actually picked in B/C
+
+    const members = THEME_MEMBERSHIP.get(themeKey);
+    const info = members?.get(code);
+    if (!info) continue; // not actually registered under this theme — drop it, don't trust Claude's word alone
+
+    const tier = themeKey === primaryKey ? "primary" : "secondary";
+    const cap = tier === "primary" ? MAX_STOCKS_PER_PRIMARY_THEME : MAX_STOCKS_PER_SECONDARY_THEME;
+    const used = perThemeCount.get(themeKey) || 0;
+    if (used >= cap) continue;
+
+    added.push({
+      code,
+      name: info.name,
+      market: info.market,
+      confidence: "theme",
+      tier,
+      reason: `'${info.theme}' 테마 동반 종목${tier === "primary" ? " (핵심 테마)" : ""}`,
+    });
+    existingCodes.add(code);
+    perThemeCount.set(themeKey, used + 1);
   }
   return added;
 }
@@ -183,10 +233,11 @@ function extractJsonObject(prefilledText) {
 
 const SYSTEM_PROMPT = `너는 한국 주식 뉴스와 종목/테마를 연결하는 분석가야.
 
-너한테는 세 가지 목록이 주어져:
+너한테는 네 가지 목록이 주어져:
 1. [전체 상장 종목]: 코스피·코스닥에 상장된 전체 종목 (코드|이름|시장 형식)
 2. [테마 목록]: 우리가 관리하는 투자 테마 이름들
-3. [계열사-모회사 매핑]: 비상장(또는 우리 시스템에 코드가 없는) 자회사 이름 → 그 자회사를 소유한 상장 모회사
+3. [테마별 소속 종목 목록]: 각 테마에 미리 등록해둔 종목들 (테마명: 코드|이름, 코드|이름, ... 형식) — 이 목록은 사람이 미리 정리해둔 것이라 완벽하지 않아. 같은 테마 이름 안에 실제로는 서로 다른 사업을 하는 회사가 섞여 있는 경우가 있어(예: "수소차" 테마에 자동차 회사(현대차·기아)와 발전·선박용 연료전지 회사가 같이 등록돼 있던 적이 있었는데, 이 둘은 완전히 다른 산업이라 한쪽 뉴스가 다른 쪽 주가에 영향을 주지 않아). 그러니까 이 목록에 등록돼 있다는 사실 자체를 "관련 있다"는 증거로 그대로 믿지 말고, 너의 판단으로 한 번 더 걸러야 해 (자세한 건 아래 theme_stocks 설명 참고).
+4. [계열사-모회사 매핑]: 비상장(또는 우리 시스템에 코드가 없는) 자회사 이름 → 그 자회사를 소유한 상장 모회사
 
 뉴스 기사 하나가 주어지면, 네 가지를 판단해:
 
@@ -220,6 +271,12 @@ const SYSTEM_PROMPT = `너는 한국 주식 뉴스와 종목/테마를 연결하
 
 진짜 관련된 게 없으면 matches는 빈 배열, primary_theme은 null, secondary_themes는 빈 배열.
 
+**테마 동반 종목 선별 (theme_stocks)**: primary_theme·secondary_themes로 고른 각 테마에 대해, [테마별 소속 종목 목록]에서 그 테마 밑에 실제로 등록된 종목들을 찾아봐. 하지만 등록돼 있다고 전부 자동으로 넣지 마 — 그중에서 **이 구체적인 기사 내용과 진짜 같이 반응할 만한 종목만** 골라서 theme_stocks에 넣어. 등록된 목록에 없는 종목·코드는 절대 지어내지 마.
+
+판단 기준: 이 기사가 정확히 어느 하위 사업 영역 얘기인지 먼저 따져. 같은 테마 이름 안에 있어도 사업 성격이 다르면(위의 "수소차" 예시처럼 자동차 vs 발전용 연료전지) 관련 없는 쪽은 빼. 반대로 진짜 같은 사업 영역이라 이 뉴스에 함께 반응할 걸로 보이면 포함해. 애매하면 넣지 말고 빼는 쪽을 택해 — 이 목록은 "이 테마 소속 회사 전체 명단"이 아니라 "이 기사 때문에 같이 움직일 만한 회사"여야 해.
+
+theme_stocks 형식: [{"code":"336260","theme":"SOFC"}, ...]. code는 반드시 그 theme 아래 [테마별 소속 종목 목록]에 실제로 등록된 코드여야 하고, theme은 반드시 네가 고른 primary_theme 또는 secondary_themes 중 하나여야 해. 관련된 동반 종목이 하나도 없으면 빈 배열.
+
 **D. 악재 유형 판단 (negative_catalyst)**: 기사의 핵심 사건이, matches에 넣은 회사(주로 직접 언급된 그 회사 자신) 입장에서 아래의 "확정된 악재 유형" 목록 중 하나에 **명확하고 객관적으로** 해당하는 공시성 이벤트인지 판단해. 이건 "실적이 나쁘다", "주가가 떨어졌다" 같은 막연한 부정적 뉘앙스가 아니라, 기사 제목·요약에 사실관계가 명시적으로 나오는 구체적 기업행위/사건만 대상이야.
 
 허용된 유형 목록 (반드시 이 중 하나의 문자열 그대로 사용, 새로 만들어내지 마):
@@ -232,7 +289,7 @@ const SYSTEM_PROMPT = `너는 한국 주식 뉴스와 종목/테마를 연결하
 - 해당하는 게 없으면 negative_catalyst는 null.
 
 응답은 반드시 아래 JSON 객체 형식이어야 해:
-{"matches":[{"code":"005930","name":"삼성전자","market":"코스피","confidence":"confirmed","reason":"..."}],"primary_theme":"반도체","secondary_themes":[],"negative_catalyst":null}
+{"matches":[{"code":"005930","name":"삼성전자","market":"코스피","confidence":"confirmed","reason":"..."}],"primary_theme":"반도체","secondary_themes":[],"theme_stocks":[{"code":"000660","theme":"반도체"}],"negative_catalyst":null}
 
 negative_catalyst 예시: {"code":"338220","type":"유상증자"}
 
@@ -314,14 +371,18 @@ async function matchStocks(title, summary, universeCompanyList) {
   // only pay full price once per cache window — every other call within
   // that hour reads it back at 10% of the normal input price instead of
   // resending ~2,800 companies at full price every single time.
-  const staticContext = `${SYSTEM_PROMPT}\n\n[전체 상장 종목]\n${universeCompanyList}\n\n[테마 목록]\n${buildThemeList()}\n\n[계열사-모회사 매핑]\n${buildSubsidiaryPromptBlock()}`;
+  const staticContext = `${SYSTEM_PROMPT}\n\n[전체 상장 종목]\n${universeCompanyList}\n\n[테마 목록]\n${buildThemeList()}\n\n[테마별 소속 종목 목록]\n${buildThemeMembershipBlock()}\n\n[계열사-모회사 매핑]\n${buildSubsidiaryPromptBlock()}`;
 
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
     body: JSON.stringify({
       model: "claude-haiku-4-5-20251001",
-      max_tokens: 1536,
+      // Bumped from 1536: theme_stocks adds a per-code {code,theme} entry
+      // on top of everything matches/primary_theme/secondary_themes already
+      // needed — a bit more headroom avoids a truncated (unparseable) JSON
+      // response on articles that legitimately match several themes.
+      max_tokens: 2048,
       system: [
         {
           type: "text",
@@ -358,17 +419,18 @@ async function matchStocks(title, summary, universeCompanyList) {
     if (target) target.catalyst = catalyst.type;
   }
 
-  const primaryThemeMatches = parsed.primary_theme
-    ? expandThemeMatches([parsed.primary_theme], "primary", MAX_STOCKS_PER_PRIMARY_THEME, existingCodes)
-    : [];
-  const secondaryThemeMatches = expandThemeMatches(
+  // Claude's own per-article pick of which specific companion stocks within
+  // the matched theme(s) actually belong here — not a blind dump of the
+  // whole theme bucket. See applyThemeStockPicks for the validation/cap
+  // logic and the theme_stocks prompt section for why this exists.
+  const themeMatches = applyThemeStockPicks(
+    parsed.theme_stocks,
+    parsed.primary_theme,
     parsed.secondary_themes,
-    "secondary",
-    MAX_STOCKS_PER_SECONDARY_THEME,
     existingCodes
   );
 
-  return [...directMatches, ...primaryThemeMatches, ...secondaryThemeMatches];
+  return [...directMatches, ...themeMatches];
 }
 
 // Final ordering + cap. Tier order (direct → primary theme → secondary
