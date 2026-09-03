@@ -5,7 +5,15 @@
 // weekends/holidays — same "walk back to the last business day with data"
 // pattern used elsewhere), gold is close to real-time. Cached a few hours
 // since none of this needs to be second-by-second fresh.
+//
+// force-dynamic: without this, Next.js treats this route as static-eligible
+// (no `request` param, cacheable fetch options) and tries to call the
+// external FX/gold APIs once at BUILD time to prerender it. That build-time
+// call can fail in Cloudflare's build environment ("fetch failed"), which
+// fails the whole deploy. Forcing dynamic means it only ever runs per
+// request, same as every other API route in this app.
 export const dynamic = "force-dynamic";
+
 function toYmd(d) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -13,7 +21,6 @@ function toYmd(d) {
   return `${y}${m}${dd}`;
 }
 
-// Yields today, then each earlier business day (skips Sat/Sun).
 function* businessDaysFrom(from) {
   const d = new Date(from);
   while (true) {
@@ -77,12 +84,8 @@ export async function GET() {
     if (exim.data) {
       result.fxDate = exim.date;
       result.usd = parseRate(exim.data.find((r) => r.cur_unit === "USD"));
-      // JPY is quoted per 100 yen by convention (both by the bank and by
-      // Korean media) — displayed as-is, not divided down to per-1-yen.
       result.jpy = parseRate(exim.data.find((r) => r.cur_unit === "JPY(100)"));
     } else {
-      // Surface exactly what the last attempt returned, so a bad key vs an
-      // empty/holiday response are distinguishable instead of both being null.
       result.fxError = "7영업일 내에 환율 데이터를 찾지 못했습니다.";
       result.fxDebug = exim.lastAttempt;
     }
