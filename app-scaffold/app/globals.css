@@ -173,6 +173,11 @@ button, input { font-family: inherit; }
 .trending-panel { border-radius: 14px; border: 1px solid var(--border); background: var(--surface); padding: 18px; }
 .sidebar-stack { display: flex; flex-direction: column; gap: 16px; }
 .trending-panel-title { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-muted); margin: 0 0 14px; }
+.trending-panel-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 14px; }
+.trending-panel-header .trending-panel-title { margin: 0; }
+.range-toggle { display: inline-flex; border: 1px solid var(--border); border-radius: 999px; padding: 2px; gap: 2px; }
+.range-toggle-btn { font-size: 11px; font-weight: 600; color: var(--ink-muted); background: transparent; border: none; border-radius: 999px; padding: 4px 10px; cursor: pointer; line-height: 1.2; }
+.range-toggle-btn.active { color: var(--amber-tint-ink); background: var(--amber-tint); }
 .trending-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); }
 .trending-row:last-child { border-bottom: none; }
 .trending-row-name { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; }
