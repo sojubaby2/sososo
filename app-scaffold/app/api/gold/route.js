@@ -11,6 +11,12 @@
 // the actual response shape at https://gold-api.com/docs once deployed and
 // adjust the frontend's field access (currently assumes something like
 // `price`) if needed.
+//
+// force-dynamic: no `request` param + a cacheable fetch means Next.js would
+// otherwise try to call gold-api.com once at BUILD time to prerender this
+// route — if that build-time call fails (network hiccup in the CI
+// container), it fails the whole Cloudflare deploy. This makes it run only
+// per actual request instead, like the rest of this app's API routes.
 export const dynamic = "force-dynamic";
 
 export async function GET() {
