@@ -12,6 +12,12 @@
 // 1주일/1개월 두 기간을 동시에 계산해서 프론트(HOT 테마 패널의 토글)에서
 // 고르게 함.
 //
+// 전일 등락률(change1D)은 스냅샷을 새로 안 받아옴 — KRX가 최신 스냅샷
+// (recent.items)에 이미 "전일 대비 등락률"(fltRt)을 계산해서 넣어주기
+// 때문에 그냥 그 값을 그대로 씀. 이 값은 KRX 쪽에서 감자/병합 등이 있으면
+// 기준가를 다시 잡아서 계산하므로, 우리가 직접 두 종가를 빼서 만드는
+// 1주일/1개월 수치와 달리 상장주식수 필터가 따로 필요 없음.
+//
 // 상장주식수(lstgStCnt) 변동 종목 제외: KRX 종가는 감자·주식병합·유상증자·
 // 무상증자 같은 이벤트가 있어도 그 사실을 전혀 반영하지 않고 그냥 "그날의
 // 1주 가격"만 줌. 예를 들어 삼부토건은 2026년 6월 법원 회생계획 인가로
@@ -106,6 +112,34 @@ function computeChanges(recentPrices, pastPrices, recentShares, pastShares) {
   return changes;
 }
 
+// 최신 스냅샷에서 종목코드 -> 전일 대비 등락률(fltRt) 맵을 만듦. KRX가 직접
+// 계산해서 주는 값이라 별도 비교 로직이 필요 없음.
+function toDailyChangeMap(items) {
+  const map = {};
+  for (const it of items) {
+    if (!it.srtnCd) continue;
+    const pct = Number(it.fltRt);
+    if (Number.isFinite(pct)) map[it.srtnCd] = pct;
+  }
+  return map;
+}
+
+// 최신 스냅샷 전체(테마 등록 여부와 무관하게 시장 전체)에서 전일 등락률
+// 상위 종목을 뽑아 "전일 급등주" 랭킹을 만듦. 거래량(trqu)이 0인 종목(거래
+// 정지 등으로 그날 매매가 없었던 종목)은 제외.
+function topDailyMovers(items, count) {
+  return items
+    .filter((it) => it.srtnCd && it.itmsNm && Number.isFinite(Number(it.fltRt)) && Number(it.trqu) > 0)
+    .map((it) => ({
+      name: it.itmsNm,
+      code: it.srtnCd,
+      market: it.mrktCtg || null,
+      change: Number(it.fltRt),
+    }))
+    .sort((a, b) => b.change - a.change)
+    .slice(0, count);
+}
+
 // stockChanges(종목코드 -> 등락률)를 테마별로 집계.
 function aggregateByTheme(stockChanges) {
   const themeAgg = new Map();
@@ -150,18 +184,23 @@ export async function GET() {
   const weekShares = toSharesMap(week.items);
   const monthShares = toSharesMap(month.items);
 
+  const stockChanges1D = toDailyChangeMap(recent.items);
   const stockChanges1W = computeChanges(recentPrices, weekPrices, recentShares, weekShares);
   const stockChanges1M = computeChanges(recentPrices, monthPrices, recentShares, monthShares);
 
+  const themeAgg1D = aggregateByTheme(stockChanges1D);
   const themeAgg1W = aggregateByTheme(stockChanges1W);
   const themeAgg1M = aggregateByTheme(stockChanges1M);
 
-  const themeNames = new Set([...themeAgg1W.keys(), ...themeAgg1M.keys()]);
+  const themeNames = new Set([...themeAgg1D.keys(), ...themeAgg1W.keys(), ...themeAgg1M.keys()]);
   const themeChanges = Array.from(themeNames).map((theme) => {
+    const d = themeAgg1D.get(theme);
     const w = themeAgg1W.get(theme);
     const m = themeAgg1M.get(theme);
     return {
       theme,
+      change1D: d ? d.sum / d.count : null,
+      sampleSize1D: d ? d.count : 0,
       change1W: w ? w.sum / w.count : null,
       sampleSize1W: w ? w.count : 0,
       change1M: m ? m.sum / m.count : null,
@@ -169,14 +208,18 @@ export async function GET() {
     };
   });
 
+  const dailyMovers = topDailyMovers(recent.items, 20);
+
   return Response.json(
     {
       recentBasDt: recent.basDt,
       weekBasDt: week.basDt,
       monthBasDt: month.basDt,
       themeChanges,
+      stockChanges1D,
       stockChanges1W,
       stockChanges1M,
+      dailyMovers,
     },
     { headers: { "Cache-Control": "public, max-age=0, s-maxage=1800, stale-while-revalidate=3600" } }
   );
