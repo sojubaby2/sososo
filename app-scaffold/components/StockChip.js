@@ -1,15 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { TrendingUp, TrendingDown, Minus, Crown, AlertTriangle } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, AlertTriangle } from "lucide-react";
 
-// `change` is optional (themes page has it, news feed doesn't). `isLead`
-// marks the first/strongest match in a card — matches/poll route already
-// sorts direct-confirmed matches first and today's-strongest-movers first
-// within each tier, so index 0 is a reasonable "대장주" proxy. `catalyst`
+// `change` is optional (themes page has it, news feed doesn't). `catalyst`
 // is the (optional) confirmed negative-catalyst label for this specific
 // stock (e.g. "유상증자") — set by the poll route when Claude flags one.
-export default function StockChip({ name, code, market, change, isLead, catalyst }) {
+export default function StockChip({ name, code, market, change, catalyst }) {
   const [copied, setCopied] = useState(false);
   const hasChange = typeof change === "number";
   const isUp = hasChange && change > 0;
@@ -28,12 +25,7 @@ export default function StockChip({ name, code, market, change, isLead, catalyst
   }
 
   return (
-    <button type="button" onClick={handleClick} className={`chip ${isLead ? "chip-lead" : ""} ${catalyst ? "chip-bad" : ""}`}>
-      {isLead && (
-        <span className="lead-badge">
-          <Crown size={10} />대장주
-        </span>
-      )}
+    <button type="button" onClick={handleClick} className={`chip ${catalyst ? "chip-bad" : ""}`}>
       {catalyst && <AlertTriangle size={11} className="chip-bad-icon" title={`악재: ${catalyst}`} />}
       <span style={{ fontWeight: 500 }}>{name}</span>
       <span className="code">{code}</span>
