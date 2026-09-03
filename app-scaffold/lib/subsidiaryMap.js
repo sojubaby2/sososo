@@ -39,6 +39,12 @@ export const SUBSIDIARY_MAP = [
   // ---- 삼성그룹 ----
   { subsidiary: "하만", parentName: "삼성전자", parentCode: "005930", parentMarket: "코스피" },
 
+    // ---- CJ ENM그룹 ---- (티빙은 CJ ENM 단독 자회사가 아니라 CJ ENM이 최대주주로
+  // 참여하는 합작법인(약 48.85%)이지만, 뉴스에서 가장 밀접하게 다뤄지는 상장사가
+  // CJ ENM이라 여기로 연결. 스튜디오드래곤은 별개 회사이니 절대 연결하지 말 것 —
+  // SYSTEM_PROMPT의 계열사 혼동 주의 규칙 참고.
+  { subsidiary: "티빙", parentName: "CJ ENM", parentCode: "035760", parentMarket: "코스피" },
+
   // ---- 하림그룹 ----
   { subsidiary: "NS쇼핑", parentName: "하림지주", parentCode: "003380", parentMarket: "코스피" },
 
