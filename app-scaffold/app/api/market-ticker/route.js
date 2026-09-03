@@ -54,7 +54,13 @@ async function fetchExim(authkey, searchdate) {
       return { ok: false, status: res.status, parseError: true };
     }
   } catch (err) {
-    return { ok: false, timeout: err?.name === "AbortError" };
+    return {
+      ok: false,
+      timeout: err?.name === "AbortError",
+      errorName: err?.name || null,
+      errorMessage: err?.message || String(err),
+      errorCause: err?.cause?.message || err?.cause?.code || null,
+    };
   } finally {
     clearTimeout(timeout);
   }
