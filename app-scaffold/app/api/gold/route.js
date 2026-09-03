@@ -11,7 +11,9 @@
 // the actual response shape at https://gold-api.com/docs once deployed and
 // adjust the frontend's field access (currently assumes something like
 // `price`) if needed.
+export const dynamic = "force-dynamic";
 
+export async function GET() {
 export async function GET() {
   try {
     const res = await fetch("https://api.gold-api.com/price/XAU", {
