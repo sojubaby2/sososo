@@ -141,6 +141,77 @@ function HotThemePanel() {
   );
 }
 
+const DAILY_MOVER_COUNT = 6;
+const DAILY_THEME_COUNT = 6;
+
+// 전일(가장 최근 거래일) 하루짜리 등락률 랭킹 — HOT 테마 패널의 1주일/1개월
+// 수치와는 성격이 달라서(당일 변동성이라 노이즈가 큼) 별도 패널로 분리함.
+// 개별 종목 랭킹은 테마 등록 여부와 무관하게 시장 전체 대상.
+function DailyMoversPanel() {
+  const [movers, setMovers] = useState([]);
+  const [themes, setThemes] = useState([]);
+  const [state, setState] = useState("loading");
+
+  useEffect(() => {
+    fetch("/api/theme-momentum")
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.dailyMovers || !data.themeChanges) {
+          setState("error");
+          return;
+        }
+        setMovers(data.dailyMovers.slice(0, DAILY_MOVER_COUNT));
+        const topThemes = data.themeChanges
+          .filter((t) => typeof t.change1D === "number" && !isPoliticalTheme(t.theme))
+          .sort((a, b) => b.change1D - a.change1D)
+          .slice(0, DAILY_THEME_COUNT);
+        setThemes(topThemes);
+        setState("ready");
+      })
+      .catch(() => setState("error"));
+  }, []);
+
+  if (state === "error") return null;
+
+  return (
+    <aside className="trending-panel">
+      <h2 className="trending-panel-title">
+        <Flame size={12} style={{ color: "var(--up)" }} />
+        전일 급등주 · 급등테마
+      </h2>
+      {state === "loading" ? (
+        <p className="trending-empty">불러오는 중...</p>
+      ) : (
+        <>
+          <p className="mover-section-label">종목</p>
+          {movers.map((s) => (
+            <div key={s.code} className="trending-row">
+              <span className="trending-row-name">
+                {s.name}
+                <span className="trending-row-code">{s.code}</span>
+              </span>
+              <span className="mono up" style={{ fontSize: 13, fontWeight: 700 }}>
+                {s.change > 0 ? "+" : ""}
+                {s.change.toFixed(1)}%
+              </span>
+            </div>
+          ))}
+          <p className="mover-section-label">테마</p>
+          {themes.map((t) => (
+            <div key={t.theme} className="trending-row">
+              <span className="trending-row-name">{t.theme}</span>
+              <span className="mono up" style={{ fontSize: 13, fontWeight: 700 }}>
+                {t.change1D > 0 ? "+" : ""}
+                {t.change1D.toFixed(1)}%
+              </span>
+            </div>
+          ))}
+        </>
+      )}
+    </aside>
+  );
+}
+
 // Replaces the old scrolling top ticker — everything visible at once
 // instead of waiting for text to scroll by.
 function GlobalMarketPanel() {
@@ -411,6 +482,7 @@ export default function HomePage() {
 
           <div className="sidebar-stack">
             <GlobalMarketPanel />
+            <DailyMoversPanel />
             <HotThemePanel />
             <TrendingPanel rawItems={rawItems} activeCode={filterStock?.code} onSelect={setFilterStock} />
           </div>
