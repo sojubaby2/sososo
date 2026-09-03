@@ -295,4 +295,3 @@ button, input { font-family: inherit; }
 @media (prefers-reduced-motion: reduce) {
   .demo-reveal-fade, .demo-draw-line, .demo-fade-in, .demo-dot-pop, .demo-dot-flip, .demo-bar-grow { animation: none !important; opacity: 1; transform: none; stroke-dashoffset: 0; }
 }
-
