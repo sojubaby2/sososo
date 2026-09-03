@@ -14,7 +14,6 @@
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-export async function GET() {
   try {
     const res = await fetch("https://api.gold-api.com/price/XAU", {
       next: { revalidate: 300 }, // cache 5 min
