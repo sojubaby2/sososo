@@ -10,9 +10,11 @@
 
 import { getRedis } from "../../../lib/redis";
 
+// Without this, Next.js may try to statically prerender this route at
+// BUILD time (it takes no `request` param), which would mean calling Redis
+// during the Cloudflare build — fragile and pointless for a route that's
+// supposed to reflect live, constantly-changing feed data anyway.
 export const dynamic = "force-dynamic";
-
-export async function GET() {
 
 export async function GET() {
   const redis = getRedis();
@@ -23,7 +25,7 @@ export async function GET() {
     );
   }
 
-  const raw = await redis.lrange("feed", 0, 249); // ~5 "pages" worth
+  const raw = await redis.lrange("feed", 0, 249); // ~5 "페이지" 분량
   const items = raw
     .map((r) => {
       try {
