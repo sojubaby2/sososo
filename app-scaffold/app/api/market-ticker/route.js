@@ -19,6 +19,8 @@
 // request, same as every other API route in this app.
 export const dynamic = "force-dynamic";
 
+export const preferredRegion = "icn1";
+
 function toYmd(d) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
