@@ -10,13 +10,17 @@
 // 재배포해도 절대 지워지지 않는다고 Cloudflare 공식 문서에 명시되어
 // 있으므로, 한 번 성공하면 이후 배포에서는 계속 안전하게 유지됩니다.
 //
-// 그래서 아래 8개 이름은 Cloudflare 대시보드의 "Settings" ->
+// 그래서 아래 이름들은 Cloudflare 대시보드의 "Settings" ->
 // "Build variables and secrets"에도 등록되어 있어야 합니다
 // (Variables and Secrets, 즉 런타임 쪽이 아니라 빌드 쪽입니다).
 //
 // EXIM_API_KEY는 더 이상 안 씀 — market-ticker의 환율 출처를 수출입은행에서
 // Frankfurter(키 불필요)로 바꿨음(수출입은행 서버가 클라우드발 트래픽을
 // 막아서 Vercel/Cloudflare 둘 다에서 호출이 안 됐음).
+//
+// TELEGRAM_INGEST_SECRET: /api/telegram-ingest 인증용 — 오라클 VM에서
+// 도는 텔레그램 리스너(server/listener.py)가 이 값을 Authorization 헤더에
+// 담아 보내고, 서버는 이 값과 비교해서 요청을 인증합니다.
 
 import { execSync } from "node:child_process";
 import { writeFileSync, unlinkSync, existsSync } from "node:fs";
@@ -30,6 +34,7 @@ const NAMES = [
   "KV_REST_API_URL",
   "NAVER_CLIENT_ID",
   "NAVER_CLIENT_SECRET",
+  "TELEGRAM_INGEST_SECRET",
 ];
 
 const secrets = {};
