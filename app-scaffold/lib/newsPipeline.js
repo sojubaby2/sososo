@@ -37,40 +37,118 @@ function toBasDt(d) {
   return `${y}${m}${dd}`;
 }
 
-function* businessDaysBackFrom(from) {
-  const d = new Date(from);
-  while (true) {
-    d.setDate(d.getDate() - 1);
-    const day = d.getDay();
-    if (day !== 0 && day !== 6) yield toBasDt(d);
+// [2026-09-06 변경] 원래 공공데이터포털(apis.data.go.kr)의 KRX 시세 API를
+// 썼는데, 어느 시점부터 클라우드(Vercel) 서버가 보내는 요청을
+// apis.data.go.kr가 연결 단계에서부터 막기 시작했음(10초 Connect
+// Timeout, 응답 자체가 없음 — 예전에 수출입은행 API가 클라우드발
+// 트래픽을 막았던 것과 똑같은 증상). 그 결과 뉴스 매칭·테마 등락률 등
+// 시세가 필요한 기능이 전부 죽어있었음. 같은 환경에서 네이버 뉴스
+// API(NAVER_CLIENT_ID)는 계속 잘 되고 있었던 걸 근거로, 네이버 증권
+// (m.stock.naver.com)의 비공식 시세 API로 교체함.
+//
+// 공식 문서가 없는 API라 필드 이름이 바뀌거나 다를 수 있어서, 아래
+// normalizeNaverItem은 여러 후보 필드 이름을 다 시도하고, 그래도 하나도
+// 못 찾으면 원본 응답을 그대로 에러 로그에 남기도록 방어적으로 짜뒀음 —
+// 나중에 또 깨지면 로그만 보고 바로 원인(필드명 변경 등)을 알 수 있게.
+const NAVER_STOCK_LIST_URL = "https://m.stock.naver.com/api/domestic/market/stock/default";
+const NAVER_PAGE_SIZE = 100;
+// KOSPI 약 950개 + KOSDAQ 약 1700개 ≈ 2650개. 넉넉하게 40페이지(최대
+// 4000개)까지 돌되, 응답이 짧아지는 순간(마지막 페이지) 멈춤.
+const NAVER_MAX_PAGES = 40;
+
+function pickField(obj, candidates) {
+  for (const key of candidates) {
+    if (obj[key] !== undefined && obj[key] !== null && obj[key] !== "") return obj[key];
   }
+  return undefined;
 }
 
-async function fetchStockPage(serviceKey, basDt, numOfRows, pageNo) {
-  const qs = new URLSearchParams({ numOfRows, pageNo, resultType: "json", basDt });
-  const url = `https://apis.data.go.kr/1160100/service/GetStockSecuritiesInfoService/getStockPriceInfo?serviceKey=${serviceKey}&${qs.toString()}`;
-  const res = await fetch(url, { cache: "no-store" });
-  return res.json();
+function toNumber(v) {
+  if (v === undefined || v === null) return NaN;
+  const n = Number(String(v).replace(/,/g, ""));
+  return n;
 }
 
-// Returns { items: [{srtnCd,itmsNm,mrktCtg,clpr,fltRt,...}], basDt } or null.
+// 네이버 응답 한 항목(raw)을 { code, name, market, price, changePct }로
+// 정규화. 필드 이름이 관측된 여러 버전이 있어서 후보를 다 시도함.
+function normalizeNaverItem(raw) {
+  const code = pickField(raw, ["itemCode", "code", "symbolCode", "stockCode", "srtnCd"]);
+  const name = pickField(raw, ["stockName", "name", "itemName", "korName", "itmsNm"]);
+  const marketRaw = pickField(raw, ["stockExchangeType", "marketType", "stockEndType", "mrktCtg"]);
+  const priceRaw = pickField(raw, ["closePrice", "nowPrice", "currentPrice", "price", "clpr"]);
+  const changeRaw = pickField(raw, ["fluctuationsRatio", "changeRate", "risefallRate", "fltRt"]);
+
+  if (!code || !name) return null;
+
+  const marketVal = marketRaw && typeof marketRaw === "object" ? marketRaw.code : marketRaw;
+  const marketStr = String(marketVal || "").toUpperCase();
+  let market = "";
+  if (marketStr.includes("KOSDAQ")) market = "코스닥";
+  else if (marketStr.includes("KOSPI")) market = "코스피";
+  else market = marketStr || "";
+
+  return {
+    code: String(code),
+    name: String(name),
+    market,
+    price: toNumber(priceRaw),
+    changePct: toNumber(changeRaw),
+  };
+}
+
+async function fetchNaverStockPage(startIdx) {
+  const qs = new URLSearchParams({
+    tradeType: "KRX",
+    marketType: "ALL",
+    orderType: "name",
+    startIdx: String(startIdx),
+    pageSize: String(NAVER_PAGE_SIZE),
+  });
+  const url = `${NAVER_STOCK_LIST_URL}?${qs.toString()}`;
+  const res = await fetch(url, {
+    cache: "no-store",
+    headers: { "User-Agent": "Mozilla/5.0 (compatible; newsmeme-bot/1.0)" },
+  });
+  if (!res.ok) throw new Error(`네이버 시세 API 오류 (status ${res.status})`);
+  const data = await res.json();
+  // 관찰된 응답 모양이 여러 버전일 수 있어서 전부 대응.
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.stocks)) return data.stocks;
+  if (Array.isArray(data?.items)) return data.items;
+  if (Array.isArray(data?.result)) return data.result;
+  throw new Error(
+    "네이버 시세 API 응답 형식을 인식할 수 없습니다: " + JSON.stringify(data).slice(0, 500)
+  );
+}
+
+// Returns { items: [{code,name,market,price,changePct}], basDt } or null.
 export async function fetchAllStocksToday() {
-  const serviceKey = process.env.KRX_SERVICE_KEY;
-  if (!serviceKey) return null;
-  const gen = businessDaysBackFrom(new Date());
-  for (let i = 0; i < 5; i++) {
-    const basDt = gen.next().value;
-    const data = await fetchStockPage(serviceKey, basDt, "3000", "1");
-    const items = data?.response?.body?.items?.item ?? [];
-    if (items.length > 0) return { items, basDt };
+  const all = [];
+  let firstRawItem = null;
+  try {
+    for (let page = 0; page < NAVER_MAX_PAGES; page++) {
+      const raw = await fetchNaverStockPage(page * NAVER_PAGE_SIZE);
+      if (raw.length === 0) break;
+      if (!firstRawItem) firstRawItem = raw[0];
+      for (const r of raw) {
+        const norm = normalizeNaverItem(r);
+        if (norm) all.push(norm);
+      }
+      if (raw.length < NAVER_PAGE_SIZE) break; // 마지막 페이지
+    }
+  } catch (err) {
+    console.error("fetchAllStocksToday 실패:", err.message || err);
+    return null;
   }
-  return null;
-}
 
-function marketLabel(mrktCtg) {
-  if (mrktCtg === "KOSPI") return "코스피";
-  if (mrktCtg === "KOSDAQ") return "코스닥";
-  return mrktCtg || "";
+  if (all.length === 0) {
+    if (firstRawItem) {
+      console.error("네이버 시세 응답 필드 인식 실패, 원본 예시:", JSON.stringify(firstRawItem));
+    }
+    return null;
+  }
+
+  return { items: all, basDt: toBasDt(new Date()) };
 }
 
 // Builds the full-universe "code|name|market" list Claude picks direct
@@ -79,9 +157,9 @@ export function buildUniverseFromKrx(krxItems) {
   const lines = [];
   const priceMap = new Map();
   for (const it of krxItems) {
-    if (!it.srtnCd || !it.itmsNm) continue;
-    lines.push(`${it.srtnCd}|${it.itmsNm}|${marketLabel(it.mrktCtg)}`);
-    priceMap.set(it.srtnCd, { price: Number(it.clpr), change: Number(it.fltRt) });
+    if (!it.code || !it.name) continue;
+    lines.push(`${it.code}|${it.name}|${it.market || ""}`);
+    priceMap.set(it.code, { price: it.price, change: it.changePct });
   }
   return { companyList: lines.join("\n"), priceMap };
 }
