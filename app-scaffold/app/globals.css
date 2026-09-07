@@ -250,19 +250,35 @@ button, input { font-family: inherit; }
 
 .blog-list { display: flex; flex-direction: column; gap: 12px; }
 .blog-card {
-  display: block; border-radius: 14px; padding: 18px 20px; background: var(--surface);
+  display: flex; align-items: flex-start; gap: 16px;
+  border-radius: 14px; padding: 18px 20px; background: var(--surface);
   border: 1px solid var(--border); text-decoration: none; color: inherit;
   transition: box-shadow 180ms ease, border-color 180ms ease;
 }
 .blog-card:hover { border-color: var(--amber); box-shadow: 0 6px 20px rgba(20, 24, 31, 0.08); }
+.blog-card-body { min-width: 0; }
 .blog-card-meta { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-muted); margin-bottom: 8px; }
 .blog-card-title { font-family: var(--font-display); font-size: 17px; font-weight: 700; margin: 0 0 8px; }
 .blog-card-excerpt { font-size: 14px; line-height: 1.6; color: var(--ink-muted); margin: 0; }
 
 .blog-back-link { display: inline-block; font-size: 13px; color: var(--ink-muted); text-decoration: none; margin-bottom: 20px; }
 .blog-back-link:hover { color: var(--amber); }
+.blog-post-head { display: flex; align-items: center; gap: 18px; margin-bottom: 4px; }
+.blog-post-head h1 { margin: 0 0 8px; }
 .blog-post h2 { margin-top: 32px; }
 .blog-post p { font-size: 15px; }
+
+/* 칼럼 썸네일 아이콘(components/BlogThumbnail.js) */
+.blog-thumb { display: flex; align-items: center; justify-content: center; flex-shrink: 0; border-radius: 14px; }
+.blog-thumb-small { width: 56px; height: 56px; border-radius: 12px; }
+.blog-thumb-small svg { width: 30px; height: 30px; }
+.blog-thumb-large { width: 88px; height: 88px; border-radius: 18px; }
+.blog-thumb-large svg { width: 48px; height: 48px; }
+.blog-thumb-amber { background: var(--amber-tint); color: var(--amber-tint-ink); }
+.blog-thumb-green { background: var(--green-tint); color: var(--green-tint-ink); }
+.blog-thumb-bad { background: var(--bad-tint); color: var(--bad-tint-ink); }
+.blog-thumb-up { background: rgba(194, 59, 59, 0.12); color: var(--up); }
+.blog-thumb-down { background: rgba(46, 95, 163, 0.12); color: var(--down); }
 
 /* 차트 가이드 */
 .guide-intro { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 24px; }

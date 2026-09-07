@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Header from "../../components/Header";
+import BlogThumbnail from "../../components/BlogThumbnail";
 import { blogPosts } from "../../lib/blogPosts";
 
 export const metadata = {
@@ -22,13 +23,16 @@ export default function BlogListPage() {
         <div className="blog-list">
           {posts.map((post) => (
             <Link key={post.slug} href={`/blog/${post.slug}`} className="blog-card">
-              <div className="blog-card-meta">
-                <span>{post.date}</span>
-                <span>·</span>
-                <span>{post.readMinutes}분 읽기</span>
+              <BlogThumbnail slug={post.slug} size="small" />
+              <div className="blog-card-body">
+                <div className="blog-card-meta">
+                  <span>{post.date}</span>
+                  <span>·</span>
+                  <span>{post.readMinutes}분 읽기</span>
+                </div>
+                <h2 className="blog-card-title">{post.title}</h2>
+                <p className="blog-card-excerpt">{post.excerpt}</p>
               </div>
-              <h2 className="blog-card-title">{post.title}</h2>
-              <p className="blog-card-excerpt">{post.excerpt}</p>
             </Link>
           ))}
         </div>
