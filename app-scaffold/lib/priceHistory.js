@@ -1,9 +1,11 @@
 // lib/priceHistory.js
 //
 // Daily OHLC (시가/고가/저가/종가) history store for every KOSPI/KOSDAQ
-// stock, built on top of the same KRX daily-price API already used in
-// lib/newsPipeline.js (fetchAllStocksToday). This is the data layer the
-// new chart-pattern-recognition feature (lib/patternDetection.js,
+// stock, fetched from KRX(한국거래소) 정보데이터시스템(data.krx.co.kr) —
+// see the "2026-09-07 변경" comment further down for why this isn't the
+// same data source lib/newsPipeline.js uses (that one only needs today's
+// snapshot; this one needs real OHLC per historical day). This is the
+// data layer the new chart-pattern-recognition feature (lib/patternDetection.js,
 // app/api/patterns/route.js) reads from — pattern shapes like 쌍바닥
 // (double bottom) or 컵앤핸들 (cup and handle) need weeks/months of daily
 // closes per stock, which nothing in the existing codebase stored before
@@ -171,17 +173,70 @@ function* businessDaysBackFrom(fromBasDt) {
   }
 }
 
-async function fetchStockPage(serviceKey, basDt) {
-  const qs = new URLSearchParams({ numOfRows: "3000", pageNo: "1", resultType: "json", basDt });
-  const url = `https://apis.data.go.kr/1160100/service/GetStockSecuritiesInfoService/getStockPriceInfo?serviceKey=${serviceKey}&${qs.toString()}`;
-  const res = await fetch(url, { cache: "no-store" });
-  return res.json();
+// [2026-09-07 변경] 예전엔 공공데이터포털(apis.data.go.kr) KRX API를
+// serviceKey(KRX_SERVICE_KEY)로 호출했는데, 그 API가 클라우드(Vercel)
+// 서버 트래픽을 막기 시작해서 한국거래소(KRX) 정보데이터시스템
+// (data.krx.co.kr)으로 교체함 — app/api/theme-momentum/route.js,
+// app/api/stocks/route.js와 같은 데이터 출처. 더 이상 KRX_SERVICE_KEY가
+// 필요 없음. 이 API는 시가/고가/저가/종가(OHLC)를 그대로 주기 때문에,
+// 예전과 동일하게 진짜 OHLC 데이터를 저장할 수 있음(근사치가 아님).
+const KRX_JSON_URL = "https://data.krx.co.kr/comm/bldAttendant/getJsonData.cmd";
+const KRX_ALL_STOCKS_BLD = "dbms/MDC/STAT/standard/MDCSTAT01501";
+
+// KRX 홈페이지 자신이 표를 그릴 때 보내는 것과 똑같은 헤더(Referer,
+// X-Requested-With)를 안 보내면 KRX 쪽에서 요청을 거부함.
+async function fetchKrxDailyMarket(trdDd, mktId) {
+  const params = new URLSearchParams({ bld: KRX_ALL_STOCKS_BLD, mktId, trdDd });
+  const res = await fetch(KRX_JSON_URL, {
+    method: "POST",
+    headers: {
+      "User-Agent": "Mozilla/5.0 (compatible; newsmeme-bot/1.0)",
+      Referer: "https://data.krx.co.kr/contents/MDC/MDI/outerLoader/index.cmd",
+      "X-Requested-With": "XMLHttpRequest",
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: params.toString(),
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`KRX 데이터 요청 오류 (status ${res.status})`);
+  const data = await res.json();
+  return Array.isArray(data?.OutBlock_1) ? data.OutBlock_1 : [];
+}
+
+function parseKrxNum(v) {
+  if (v === undefined || v === null) return undefined;
+  const cleaned = String(v).replace(/,/g, "").trim();
+  if (cleaned === "" || cleaned === "-") return undefined;
+  return Number(cleaned);
+}
+
+// data.krx.co.kr 필드명 -> toHistoryRecords가 기대하는 예전 필드명
+// (srtnCd/itmsNm/mrktCtg/mkp/hipr/lopr/clpr)으로 변환.
+function normalizeKrxRow(row, marketLabel) {
+  if (!row?.ISU_SRT_CD || !row?.ISU_ABBRV) return null;
+  return {
+    srtnCd: row.ISU_SRT_CD,
+    itmsNm: row.ISU_ABBRV,
+    mrktCtg: marketLabel,
+    mkp: parseKrxNum(row.TDD_OPNPRC),
+    hipr: parseKrxNum(row.TDD_HGPRC),
+    lopr: parseKrxNum(row.TDD_LWPRC),
+    clpr: parseKrxNum(row.TDD_CLSPRC),
+  };
+}
+
+async function fetchStockPage(basDt) {
+  const [stk, ksq] = await Promise.all([
+    fetchKrxDailyMarket(basDt, "STK"),
+    fetchKrxDailyMarket(basDt, "KSQ"),
+  ]);
+  return [
+    ...stk.map((r) => normalizeKrxRow(r, "KOSPI")),
+    ...ksq.map((r) => normalizeKrxRow(r, "KOSDAQ")),
+  ].filter(Boolean);
 }
 
 export async function backfillHistory(redis, { maxNewDaysPerRun = 20, targetDays = HISTORY_LOOKBACK_DAYS } = {}) {
-  const serviceKey = process.env.KRX_SERVICE_KEY;
-  if (!serviceKey) return { error: "KRX_SERVICE_KEY 환경변수가 설정되지 않았습니다." };
-
   const currentTotal = await redis.zcard(DATES_INDEX_KEY);
   if (currentTotal >= targetDays) {
     return { done: true, added: 0, total: currentTotal, message: "이미 목표 일수만큼 쌓여 있습니다." };
@@ -201,13 +256,12 @@ export async function backfillHistory(redis, { maxNewDaysPerRun = 20, targetDays
     const already = await hasSnapshot(redis, basDt);
     if (already) continue; // shouldn't normally happen walking backward from the oldest, but stay idempotent
 
-    let data;
+    let items;
     try {
-      data = await fetchStockPage(serviceKey, basDt);
+      items = await fetchStockPage(basDt);
     } catch (err) {
       return { error: "KRX 호출 실패: " + String(err.message || err), added, total: currentTotal + added };
     }
-    const items = data?.response?.body?.items?.item ?? [];
     if (items.length === 0) continue; // weekend slipped through, or a public holiday — no data that day, skip
 
     const result = await storeDaySnapshot(redis, basDt, items);
@@ -224,23 +278,17 @@ export async function backfillHistory(redis, { maxNewDaysPerRun = 20, targetDays
 // cycles — just a zscore check — and only does a real fetch on the rare
 // cycle where that basDt isn't captured yet (KRX's daily settlement data
 // doesn't change intraday, so this fires roughly once per trading day, not
-// once a minute). A separate targeted fetch (not reused from
-// getCachedUniverse) because the cached universe payload only keeps
-// close+change for matching/sorting — this needs open/high/low too.
+// once a minute).
 export async function appendTodaysSnapshotIfMissing(redis, basDt) {
   const already = await hasSnapshot(redis, basDt);
   if (already) return { added: false };
 
-  const serviceKey = process.env.KRX_SERVICE_KEY;
-  if (!serviceKey) return { added: false, error: "KRX_SERVICE_KEY 환경변수가 없습니다." };
-
-  let data;
+  let items;
   try {
-    data = await fetchStockPage(serviceKey, basDt);
+    items = await fetchStockPage(basDt);
   } catch (err) {
     return { added: false, error: "KRX 호출 실패: " + String(err.message || err) };
   }
-  const items = data?.response?.body?.items?.item ?? [];
   if (items.length === 0) return { added: false };
 
   const result = await storeDaySnapshot(redis, basDt, items);

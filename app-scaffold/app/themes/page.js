@@ -126,7 +126,7 @@ export default function ThemesPage() {
 
         {loadState === "error" && (
           <p style={{ fontSize: 13, color: "var(--amber-tint-ink)", background: "var(--amber-tint)", padding: "8px 12px", borderRadius: 8, marginBottom: 16 }}>
-            시세 데이터를 불러오지 못했습니다. KRX_SERVICE_KEY 환경변수 설정을 확인해주세요. (테마·종목 목록은 정상 표시됩니다)
+            시세 데이터를 잠시 불러오지 못했습니다. 잠시 후 새로고침해주세요. (테마·종목 목록은 정상 표시됩니다)
           </p>
         )}
 

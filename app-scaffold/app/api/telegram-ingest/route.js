@@ -47,19 +47,29 @@ function splitMessageText(raw) {
   return { title: title || text.slice(0, 200), summary: text };
 }
 
-// Public-channel deep link, e.g. https://t.me/NEWSZZANG/12345 — Telethon
-// gives us the channel username and the message id, which is all a public
-// channel link needs (no invite hash required).
-function telegramLink(channel, messageId) {
-  if (!channel || !messageId) return null;
-  const handle = channel.replace(/^@/, "");
-  return `https://t.me/${handle}/${messageId}`;
+// 채널 메시지 본문에서 실제 기사 URL을 찾아냄(보통 헤드라인 뒤에
+// "https://www.hankyung.com/article/..." 처럼 붙어서 옴). 찾으면 그 URL을
+// "원문 기사 전체 보기" 링크로 씀.
+//
+// [2026-09-07 변경] 링크가 없는 메시지는 아예 게재하지 않도록 함(재성님
+// 요청) — 예전엔 링크가 없으면 텔레그램 메시지 자체로 대체 연결했는데,
+// 그러면 방문자가 "원문 기사 전체 보기"를 눌러도 실제 기사가 아니라
+// 텔레그램으로 가게 되니까, 아예 그런 메시지는 필터링 단계에서 걸러냄.
+// URL 뒤에 붙은 문장부호(마침표·괄호·따옴표 등)는 URL의 일부가 아닐
+// 확률이 높아서 잘라냄.
+function extractArticleUrl(rawText) {
+  const match = (rawText || "").match(/https?:\/\/[^\s<>"'\)]+/);
+  if (!match) return null;
+  return match[0].replace(/[),.!?"'”’]+$/g, "") || null;
 }
 
 export async function POST(request) {
   const ingestSecret = process.env.TELEGRAM_INGEST_SECRET;
   if (!ingestSecret) {
-    return Response.json({ error: "TELEGRAM_INGEST_SECRET 환경변수가 설정되지 않았습니다." }, { status: 500 });
+    return Response.json(
+      { error: "TELEGRAM_INGEST_SECRET 환경변수가 설정되지 않았습니다." },
+      { status: 500 }
+    );
   }
   const provided =
     request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ||
@@ -100,6 +110,12 @@ export async function POST(request) {
     return Response.json({ published: false, reason: "빈 메시지" });
   }
 
+  const articleUrl = extractArticleUrl(rawText);
+  if (!articleUrl) {
+    await redis.set(key, "1", { ex: SEEN_TTL_SECONDS });
+    return Response.json({ published: false, reason: "뉴스 링크 없음" });
+  }
+
   let passesFilter = false;
   try {
     passesFilter = await isMarketMovingHeadline(title, summary);
@@ -115,7 +131,7 @@ export async function POST(request) {
   const universe = await getCachedUniverse(redis);
   if (!universe) {
     return Response.json(
-      { error: "KRX_SERVICE_KEY 환경변수가 없거나 시세 데이터를 가져오지 못했습니다." },
+      { error: "시세 데이터를 가져오지 못했습니다 (네이버 시세 페이지 응답 오류)." },
       { status: 500 }
     );
   }
@@ -138,10 +154,14 @@ export async function POST(request) {
     redis,
     {
       id: key,
-      keyword: `텔레그램·${channel.replace(/^@/, "")}`,
+      // [2026-09-07 변경] "텔레그램·<채널명>"이었던 걸 "속보"로 통일함 —
+      // 채널이 사용자명을 못 가져온 경우 "텔레그램·-1001208429502"처럼
+      // 숫자 ID가 그대로 노출되는 문제가 있었고, 애초에 방문자 입장에서
+      // "텔레그램"이라는 내부 수집 경로가 굳이 드러날 필요도 없었음.
+      keyword: "속보",
       title,
       summary,
-      link: telegramLink(channel, messageId),
+      link: articleUrl,
       pubDate: date || new Date().toISOString(),
       matches,
       source: "telegram",
