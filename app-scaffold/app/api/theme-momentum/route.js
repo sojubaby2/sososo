@@ -27,6 +27,22 @@
 // +1500%대로 튀어 보이는 문제가 있었음. 상장주식수가 두 시점 사이에 크게
 // 달라진 종목은 애초에 "종가 비교"라는 계산 자체가 성립하지 않으므로,
 // 개별 종목의 등락률(stockChanges)과 테마 평균 양쪽 모두에서 제외함.
+//
+// [2026-09-07 변경] 시세 데이터 출처를 공공데이터포털(apis.data.go.kr)
+// 에서 한국거래소(KRX) 정보데이터시스템(data.krx.co.kr)으로 교체함.
+// apis.data.go.kr이 클라우드(Vercel) 서버 트래픽을 막기 시작해서 이 기능
+// 전체가 죽어있었음(lib/newsPipeline.js와 동일한 증상). data.krx.co.kr은
+// KRX 홈페이지 자체가 화면에 표를 그릴 때 쓰는 내부 API라, 이 API가 막히면
+// KRX 홈페이지 자체가 안 되는 셈이라 상대적으로 막힐 가능성이 낮을 걸로
+// 보임 — 다만 실제로 막히는지는 배포해서 확인하기 전엔 확신할 수 없음.
+// 혹시 이것도 막히면 최신 스냅샷(recent) 쪽에서 바로 에러가 날 테니 Vercel
+// Logs에서 바로 알 수 있음.
+//
+// 날짜(trdDd)별로 그 날 하루치 전 종목 시세를 한 번에 받아옴(KOSPI·KOSDAQ
+// 각각 한 번씩, 총 2번 호출) — 예전 apis.data.go.kr 응답과 필드 이름이
+// 달라서, normalizeKrxRow()로 예전 필드 이름(srtnCd/itmsNm/mrktCtg/clpr/
+// fltRt/lstgStCnt/trqu)에 맞춰 변환함. 그래서 이 밑의 계산 로직
+// (toPriceMap, computeChanges, aggregateByTheme 등)은 전혀 안 건드림.
 export const dynamic = "force-dynamic";
 
 import rawThemeData from "../../../lib/themeData.json";
@@ -52,19 +68,73 @@ function* businessDaysBackFrom(from) {
   }
 }
 
-async function fetchStockPage(serviceKey, basDt) {
-  const qs = new URLSearchParams({ numOfRows: "3000", pageNo: "1", resultType: "json", basDt });
-  const url = `https://apis.data.go.kr/1160100/service/GetStockSecuritiesInfoService/getStockPriceInfo?serviceKey=${serviceKey}&${qs.toString()}`;
-  const res = await fetch(url, { next: { revalidate: 21600 } }); // 6h cache — daily-granularity data
-  return res.json();
+const KRX_JSON_URL = "https://data.krx.co.kr/comm/bldAttendant/getJsonData.cmd";
+const KRX_ALL_STOCKS_BLD = "dbms/MDC/STAT/standard/MDCSTAT01501";
+
+// KRX 홈페이지 자신이 표를 그릴 때 보내는 것과 똑같은 헤더(Referer,
+// X-Requested-With)를 안 보내면 KRX 쪽에서 요청을 거부함.
+async function fetchKrxDailyMarket(trdDd, mktId) {
+  const params = new URLSearchParams({ bld: KRX_ALL_STOCKS_BLD, mktId, trdDd });
+  const res = await fetch(KRX_JSON_URL, {
+    method: "POST",
+    headers: {
+      "User-Agent": "Mozilla/5.0 (compatible; newsmeme-bot/1.0)",
+      Referer: "https://data.krx.co.kr/contents/MDC/MDI/outerLoader/index.cmd",
+      "X-Requested-With": "XMLHttpRequest",
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: params.toString(),
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`KRX 데이터 요청 오류 (status ${res.status})`);
+  const data = await res.json();
+  return Array.isArray(data?.OutBlock_1) ? data.OutBlock_1 : [];
 }
 
-async function fetchLatestAvailable(serviceKey, startFrom) {
+function parseKrxNum(v) {
+  if (v === undefined || v === null) return NaN;
+  const cleaned = String(v).replace(/,/g, "").trim();
+  if (cleaned === "" || cleaned === "-") return NaN;
+  return Number(cleaned);
+}
+
+// data.krx.co.kr 필드명 -> 예전 apis.data.go.kr 필드명으로 변환.
+function normalizeKrxRow(row, marketLabel) {
+  if (!row?.ISU_SRT_CD || !row?.ISU_ABBRV) return null;
+  return {
+    srtnCd: row.ISU_SRT_CD,
+    itmsNm: row.ISU_ABBRV,
+    mrktCtg: marketLabel,
+    clpr: parseKrxNum(row.TDD_CLSPRC),
+    fltRt: parseKrxNum(row.FLUC_RT),
+    lstgStCnt: parseKrxNum(row.LIST_SHRS),
+    trqu: parseKrxNum(row.ACC_TRDVOL),
+  };
+}
+
+async function fetchStockPage(trdDd) {
+  const [stk, ksq] = await Promise.all([
+    fetchKrxDailyMarket(trdDd, "STK"),
+    fetchKrxDailyMarket(trdDd, "KSQ"),
+  ]);
+  const items = [
+    ...stk.map((r) => normalizeKrxRow(r, "KOSPI")),
+    ...ksq.map((r) => normalizeKrxRow(r, "KOSDAQ")),
+  ].filter(Boolean);
+  return items;
+}
+
+async function fetchLatestAvailable(startFrom) {
   const gen = businessDaysBackFrom(startFrom);
   for (let i = 0; i < 6; i++) {
     const basDt = gen.next().value;
-    const data = await fetchStockPage(serviceKey, basDt);
-    const items = data?.response?.body?.items?.item ?? [];
+    let items;
+    try {
+      items = await fetchStockPage(basDt);
+    } catch (err) {
+      console.error(`theme-momentum: KRX 요청 실패 (${basDt}):`, err.message || err);
+      continue;
+    }
     if (items.length > 0) return { items, basDt };
   }
   return null;
@@ -155,11 +225,6 @@ function aggregateByTheme(stockChanges) {
 }
 
 export async function GET() {
-  const serviceKey = process.env.KRX_SERVICE_KEY;
-  if (!serviceKey) {
-    return Response.json({ error: "KRX_SERVICE_KEY 환경변수가 설정되지 않았습니다." }, { status: 500 });
-  }
-
   const now = new Date();
   const weekAgo = new Date(now);
   weekAgo.setDate(weekAgo.getDate() - 7);
@@ -167,12 +232,16 @@ export async function GET() {
   monthAgo.setDate(monthAgo.getDate() - 30);
 
   const [recent, week, month] = await Promise.all([
-    fetchLatestAvailable(serviceKey, now),
-    fetchLatestAvailable(serviceKey, weekAgo),
-    fetchLatestAvailable(serviceKey, monthAgo),
+    fetchLatestAvailable(now),
+    fetchLatestAvailable(weekAgo),
+    fetchLatestAvailable(monthAgo),
   ]);
 
   if (!recent || !week || !month) {
+    console.error(
+      "theme-momentum: 시세 데이터를 가져오지 못함 —",
+      JSON.stringify({ recent: !!recent, week: !!week, month: !!month })
+    );
     return Response.json({ error: "시세 데이터를 가져오지 못했습니다." }, { status: 502 });
   }
 
