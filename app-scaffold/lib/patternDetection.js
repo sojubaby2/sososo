@@ -699,9 +699,31 @@ export function trimAtLastDiscontinuity(series) {
   return startIndex > 0 ? series.slice(startIndex) : series;
 }
 
+// [2026-09-07 5차 수정 — 진짜진짜 원인] 아이큐어로 다시 확인해보니, 위
+// 4차 수정(하루 ±32% 불연속 트림)으로도 안 잡히는 경우가 있었음: 아이큐어는
+// 저장된 260일 전체가 시가=고가=저가=0(거래정지 placeholder)이다가, 딱
+// 오늘(재개일) 하루만 진짜 데이터가 있었음. 그런데 정지 중 "종가"로 찍힌
+// 기준가(2170)가 재개일 종가(2110)랑 겨우 2.7%밖에 차이 안 나서, ±32%
+// 불연속 기준을 안 넘어 트림이 아예 발동을 안 했음. 문제는 전고점돌파가
+// "고가"(h)로 이전 최고가를 계산하는데, 정지 기간 내내 h=0으로 찍혀있으니
+// prior 구간의 최고가가 그냥 0이 되어버려서 — 재개일에 어떤 가격이든
+// "0원보다는 높으니" 무조건 "전고점돌파"로 잡혀버렸던 것(52주 신저가도
+// 같은 이유로 됨: 저장된 종가들이 전부 2170으로 똑같다가 재개일 종가
+// 2110이 그보다 낮으니 "52주 신저가"로 잡힘 — 역시 가짜).
+// 근본 원인은 "거래정지 동안 찍힌 placeholder 행(hasNoRealTrade)을 마치
+// 진짜 시세인 것처럼 계산에 넣고 있었다"는 것 — 그래서 아예 그런 행들을
+// series에서 통째로 제거하고 시작하도록 함. 이러면 아이큐어처럼 진짜
+// 거래일이 딱 하루뿐인 종목은 n=1이 되어, 모든 패턴이 요구하는 최소 기간
+// (전고점돌파 20일, 52주 신고/신저가 60일 등)을 못 채워서 자연스럽게
+// 아무 패턴도 안 잡힘 — "판단할 진짜 데이터가 부족하다"가 맞는 결론.
+export function filterRealTradingDays(series) {
+  return series.filter((p) => !hasNoRealTrade(p));
+}
+
 // series: ascending [{date,o,h,l,c}, ...] for one stock. Returns matches
 // sorted by similarity desc — empty array if nothing cleared minSimilarity.
 export function detectPatternsForStock(series, { minSimilarity = 55 } = {}) {
+  series = filterRealTradingDays(series);
   series = trimAtLastDiscontinuity(series);
   const results = [];
   const n = series.length;

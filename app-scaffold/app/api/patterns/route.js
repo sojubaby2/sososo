@@ -52,7 +52,15 @@ export const maxDuration = 60;
 // 전고점돌파/52주 신고가로 잡혔음. lib/patternDetection.js에 하루 ±32%
 // 넘는 불연속 지점을 찾아 그 이전 데이터를 잘라내는 trimAtLastDiscontinuity를
 // 추가하면서 또 올림.
-const RESULTS_CACHE_KEY = "patterns:results:v7";
+// v7 -> v8: 아이큐어로 다시 확인해보니 v7로도 못 잡는 경우가 있었음 —
+// 저장된 기간 전체가 거래정지 placeholder(시가=고가=저가=0)였다가 딱
+// 하루만 진짜 거래가 있던 경우, 정지 중 "종가" 기준가가 재개일 종가와
+// 우연히 30% 이내로 가까우면 불연속 트림이 발동을 안 해서, placeholder의
+// 고가(=0)가 "이전 최고가"로 계산에 그대로 들어가 버렸음(0원보다는 항상
+// 높으니 무조건 전고점돌파로 잡힘). lib/patternDetection.js에
+// filterRealTradingDays를 추가해 placeholder 행을 아예 계산에서 빼도록
+// 하면서 또 올림.
+const RESULTS_CACHE_KEY = "patterns:results:v8";
 const RESULTS_CACHE_TTL_SECONDS = 60 * 30;
 
 export async function GET(request) {

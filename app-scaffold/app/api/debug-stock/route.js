@@ -14,7 +14,12 @@
 
 import { getRedis } from "../../../lib/redis";
 import { buildPriceSeriesForAllStocks } from "../../../lib/priceHistory";
-import { detectPatternsForStock, isLikelyInactive, trimAtLastDiscontinuity } from "../../../lib/patternDetection";
+import {
+  detectPatternsForStock,
+  isLikelyInactive,
+  trimAtLastDiscontinuity,
+  filterRealTradingDays,
+} from "../../../lib/patternDetection";
 
 // buildPriceSeriesForAllStocks()가 저장된 날짜 수만큼(최대 260개) Redis를
 // 순서대로 읽어오는 무거운 호출이라(=app/api/patterns/route.js와 동일한
@@ -60,7 +65,8 @@ export async function GET(request) {
     if (stock?.name && stock.name.includes(nameQuery)) {
       const series = Array.isArray(stock.series) ? stock.series : [];
       const lastEntry = series[series.length - 1];
-      const trimmed = trimAtLastDiscontinuity(series);
+      const filtered = filterRealTradingDays(series);
+      const trimmed = trimAtLastDiscontinuity(filtered);
 
       // 저장된 전체 구간에서 종가 최고/최저가 언제 찍혔는지 — "우리가 갖고
       // 있는 히스토리가 실제로 얼마나 오래전까지 닿아있는지", "그 안에
@@ -86,16 +92,21 @@ export async function GET(request) {
         // 저장된 전체 기간(오늘 기준 원본, 트림 전) 중 종가 최고/최저.
         fullSeriesMaxClose: maxClose,
         fullSeriesMinClose: minClose,
+        // 거래정지 placeholder(시가=고가=저가=0)를 뺀 "진짜 거래일" 수 —
+        // lib/patternDetection.js의 filterRealTradingDays 참고. 이게 짧으면
+        // 대부분 패턴이 최소 기간을 못 채워서 자연스럽게 안 잡힘(정상).
+        realTradingDaysCount: filtered.length,
         // 감자/액면병합 등으로 하루 만에 종가가 ±32% 넘게 뛴 지점이
-        // 있었는지 — 있었다면 그 이전 데이터는 패턴 분석에서 잘라내고
-        // 씀(lib/patternDetection.js의 trimAtLastDiscontinuity 참고).
-        discontinuityTrimmed: trimmed.length !== series.length,
+        // 있었는지(진짜 거래일 기준) — 있었다면 그 이전 데이터는 패턴
+        // 분석에서 잘라내고 씀(trimAtLastDiscontinuity 참고).
+        discontinuityTrimmed: trimmed.length !== filtered.length,
         trimmedSeriesLength: trimmed.length,
         trimmedSeriesStartDate: trimmed[0]?.date ?? null,
         last10Days: series.slice(-10),
         // minSimilarity: 0 — 필터링 없이 각 패턴의 "원점수"를 그대로 보기 위함
         // (실제 화면에는 55% 이상만 노출됨). detectPatternsForStock 내부에서
-        // 자체적으로 trimAtLastDiscontinuity를 적용한 뒤 계산함.
+        // 자체적으로 filterRealTradingDays + trimAtLastDiscontinuity를 적용한
+        // 뒤 계산함.
         rawPatternScores: detectPatternsForStock(series, { minSimilarity: 0 }).slice(0, 10),
       });
     }
