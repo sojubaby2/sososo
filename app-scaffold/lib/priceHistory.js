@@ -1,15 +1,17 @@
 // lib/priceHistory.js
 //
 // Daily OHLC (시가/고가/저가/종가) history store for every KOSPI/KOSDAQ
-// stock, fetched from KRX(한국거래소) 정보데이터시스템(data.krx.co.kr) —
-// see the "2026-09-07 변경" comment further down for why this isn't the
-// same data source lib/newsPipeline.js uses (that one only needs today's
-// snapshot; this one needs real OHLC per historical day). This is the
-// data layer the new chart-pattern-recognition feature (lib/patternDetection.js,
-// app/api/patterns/route.js) reads from — pattern shapes like 쌍바닥
-// (double bottom) or 컵앤핸들 (cup and handle) need weeks/months of daily
-// closes per stock, which nothing in the existing codebase stored before
-// (the poll pipeline only ever looked at *today's* snapshot).
+// stock, fetched from KRX 정식 Open API(openapi.krx.co.kr) — same 인증키
+// (KRX_OPENAPI_KEY)와 같은 두 서비스(유가증권/코스닥 일별매매정보)를
+// app/api/theme-momentum/route.js와 공유함. 자세한 교체 이력은 아래
+// "2026-09-07 변경 — 2차" 주석 참고 — 이 파일도 theme-momentum이 겪은 것과
+// 동일하게 비공식 KRX 내부 API가 클라우드 트래픽을 차단해서 공식 API로
+// 옮겨왔음. lib/newsPipeline.js와는 별개 출처인 이유: 그쪽은 "오늘" 스냅샷만
+// 필요하지만(네이버 금융 스크래핑), 이 파일은 날짜별 실제 OHLC가 필요함.
+// 이 데이터 레이어를 차트패턴 인식 기능(lib/patternDetection.js,
+// app/api/patterns/route.js)이 읽어감 — 쌍바닥, 컵앤핸들 같은 패턴은
+// 몇 주~몇 달치 일별 종가가 있어야 하는데, 기존 코드베이스엔 이런 걸 저장하는
+// 곳이 없었음(poll 파이프라인은 항상 "오늘" 스냅샷만 봤음).
 //
 // Storage design — "one Redis key per trading day", not "one key per
 // stock": each key (hist:day:<basDt>) holds every stock's OHLC for that
@@ -89,6 +91,12 @@ export async function storeDaySnapshot(redis, basDt, krxItems) {
 export async function hasSnapshot(redis, basDt) {
   const score = await redis.zscore(DATES_INDEX_KEY, basDt);
   return score !== null && score !== undefined;
+}
+
+// 지금까지 쌓인 일수(0~HISTORY_LOOKBACK_DAYS) — 프론트(패턴검색 페이지)에서
+// "히스토리 쌓는 중" 진행률을 보여주는 용도. zcard 한 번이라 가벼움.
+export async function getStoredDayCount(redis) {
+  return redis.zcard(DATES_INDEX_KEY);
 }
 
 // Most recent `limit` trading days we have stored, ascending (oldest
@@ -173,42 +181,59 @@ function* businessDaysBackFrom(fromBasDt) {
   }
 }
 
-// [2026-09-07 변경] 예전엔 공공데이터포털(apis.data.go.kr) KRX API를
-// serviceKey(KRX_SERVICE_KEY)로 호출했는데, 그 API가 클라우드(Vercel)
-// 서버 트래픽을 막기 시작해서 한국거래소(KRX) 정보데이터시스템
-// (data.krx.co.kr)으로 교체함 — app/api/theme-momentum/route.js,
-// app/api/stocks/route.js와 같은 데이터 출처. 더 이상 KRX_SERVICE_KEY가
-// 필요 없음. 이 API는 시가/고가/저가/종가(OHLC)를 그대로 주기 때문에,
-// 예전과 동일하게 진짜 OHLC 데이터를 저장할 수 있음(근사치가 아님).
-const KRX_JSON_URL = "https://data.krx.co.kr/comm/bldAttendant/getJsonData.cmd";
-const KRX_ALL_STOCKS_BLD = "dbms/MDC/STAT/standard/MDCSTAT01501";
+// [2026-09-07 변경 — 2차] 처음엔 공공데이터포털(apis.data.go.kr) KRX API를
+// serviceKey(KRX_SERVICE_KEY)로 호출하다가, 그 API가 클라우드(Vercel) 서버
+// 트래픽을 막기 시작해서 한국거래소(KRX) 정보데이터시스템(data.krx.co.kr)의
+// 비공식 내부 API(getJsonData.cmd)로 한 차례 교체했었음. 그런데 이것도
+// app/api/theme-momentum/route.js에서 겪은 것과 똑같은 문제로 막힘 — KRX가
+// pykrx 같은 비공식 라이브러리의 과도한 접속을 이유로 이 내부 API를 IP
+// 단위로 차단하는 정책을 운영 중이라(github.com/sharebook-kr/pykrx issue
+// #151), Vercel처럼 여러 사용자가 IP 대역을 공유하는 클라우드에서는
+// 나만 안 써도 막힐 수 있어서 근본적으로 불안정함. 그래서 theme-momentum과
+// 동일하게 KRX가 직접 운영하는 정식 Open API(openapi.krx.co.kr, "KRX Data
+// Marketplace")로 교체함 — 회원가입 → 인증키 발급 → "유가증권 일별매매정보"
+// (stk_bydd_trd)/"코스닥 일별매매정보"(ksq_bydd_trd) 서비스 개별 활용신청을
+// 거쳐야 하는 공식 경로라 비공식 스크래핑과 달리 차단될 위험이 없음. 인증키는
+// Vercel 환경변수 KRX_OPENAPI_KEY (theme-momentum과 같은 값을 그대로 재사용).
+const KRX_OPENAPI_BASE_URL = "https://data-dbg.krx.co.kr/svc/apis";
+const KRX_OPENAPI_ENDPOINT = {
+  STK: "sto/stk_bydd_trd", // 유가증권(코스피) 일별매매정보
+  KSQ: "sto/ksq_bydd_trd", // 코스닥 일별매매정보
+};
 
-// KRX 홈페이지 자신이 표를 그릴 때 보내는 것과 똑같은 헤더(Referer,
-// X-Requested-With)를 안 보내면 KRX 쪽에서 요청을 거부함.
-async function fetchKrxDailyMarket(trdDd, mktId) {
-  const params = new URLSearchParams({ bld: KRX_ALL_STOCKS_BLD, mktId, trdDd });
-  const res = await fetch(KRX_JSON_URL, {
-    method: "POST",
-    headers: {
-      // "newsmeme-bot/1.0"이라고 자기소개하는 User-Agent가 KRX 쪽에
-      // 자동화 프로그램으로 걸러졌을 가능성이 있어서, 실제 브라우저와
-      // 똑같은 User-Agent로 바꿈 (app/api/theme-momentum/route.js와 동일).
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
-      Accept: "application/json, text/javascript, */*; q=0.01",
-      Referer: "https://data.krx.co.kr/contents/MDC/MDI/outerLoader/index.cmd",
-      "X-Requested-With": "XMLHttpRequest",
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: params.toString(),
+// 인증키를 헤더(AUTH_KEY)와 쿼리 파라미터 둘 다에 실어 보냄(theme-momentum과
+// 동일한 이유 — 참고 자료마다 헤더/쿼리 중 어느 쪽을 요구하는지 달라서 둘 다
+// 보내는 게 안전함).
+async function fetchKrxOpenApi(mktId, basDt) {
+  const authKey = process.env.KRX_OPENAPI_KEY;
+  if (!authKey) {
+    throw new Error("KRX_OPENAPI_KEY 환경변수가 설정되지 않았습니다.");
+  }
+  const endpoint = KRX_OPENAPI_ENDPOINT[mktId];
+  const qs = new URLSearchParams({ basDd: basDt, AUTH_KEY: authKey });
+  const url = `${KRX_OPENAPI_BASE_URL}/${endpoint}?${qs.toString()}`;
+  const res = await fetch(url, {
+    headers: { AUTH_KEY: authKey },
     cache: "no-store",
   });
   if (!res.ok) {
     const bodyText = await res.text().catch(() => "");
-    throw new Error(`KRX 데이터 요청 오류 (status ${res.status}): ${bodyText.slice(0, 200)}`);
+    throw new Error(`KRX 정식 API 오류 (status ${res.status}): ${bodyText.slice(0, 300)}`);
   }
   const data = await res.json();
   return Array.isArray(data?.OutBlock_1) ? data.OutBlock_1 : [];
+}
+
+// data-dbg.krx.co.kr이 가끔 일시적으로 응답을 안 주는 경우를 대비해 한 번
+// 실패하면 짧게 쉬었다가 한 번만 더 시도함(theme-momentum과 동일 패턴).
+async function fetchKrxOpenApiWithRetry(mktId, basDt) {
+  try {
+    return await fetchKrxOpenApi(mktId, basDt);
+  } catch (err) {
+    console.error(`priceHistory: KRX 정식 API 요청 실패, 0.5초 후 1회 재시도 (${basDt}/${mktId}):`, err.message || err);
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    return fetchKrxOpenApi(mktId, basDt);
+  }
 }
 
 function parseKrxNum(v) {
@@ -218,25 +243,58 @@ function parseKrxNum(v) {
   return Number(cleaned);
 }
 
-// data.krx.co.kr 필드명 -> toHistoryRecords가 기대하는 예전 필드명
+// theme-momentum/route.js와 같은 이유로 필드명 후보를 여러 개 나열해두고
+// 있는 걸 골라 씀(공식 문서로 100% 확인은 못 했음 — 다만 theme-momentum에서
+// 이미 이 후보들로 정상 작동 확인함, 2026-09-07). 후보가 다 안 맞으면 콜드
+// 스타트당 한 번만 원본 행을 로그로 남김.
+const FIELD_CANDIDATES = {
+  code: ["ISU_SRT_CD", "ISU_CD", "SRTN_CD"],
+  name: ["ISU_ABBRV", "ISU_NM", "ISU_ABBRV_NM"],
+  open: ["TDD_OPNPRC", "OPNPRC"],
+  high: ["TDD_HGPRC", "HGPRC"],
+  low: ["TDD_LWPRC", "LWPRC"],
+  close: ["TDD_CLSPRC", "CLSPRC"],
+};
+
+function pickField(row, keys) {
+  for (const k of keys) {
+    if (row[k] !== undefined && row[k] !== null && row[k] !== "") return row[k];
+  }
+  return undefined;
+}
+
+let loggedFieldMismatchSample = false;
+
+// KRX 정식 Open API 응답 행 -> toHistoryRecords가 기대하는 예전 필드명
 // (srtnCd/itmsNm/mrktCtg/mkp/hipr/lopr/clpr)으로 변환.
 function normalizeKrxRow(row, marketLabel) {
-  if (!row?.ISU_SRT_CD || !row?.ISU_ABBRV) return null;
+  const code = pickField(row, FIELD_CANDIDATES.code);
+  const name = pickField(row, FIELD_CANDIDATES.name);
+  if (!code || !name) {
+    if (!loggedFieldMismatchSample) {
+      loggedFieldMismatchSample = true;
+      console.error(
+        "priceHistory: KRX 정식 API 응답에서 종목코드/종목명 필드를 못 찾음(필드명이 예상과 다를 수 있음). 원본 행 샘플:",
+        JSON.stringify(row)
+      );
+    }
+    return null;
+  }
   return {
-    srtnCd: row.ISU_SRT_CD,
-    itmsNm: row.ISU_ABBRV,
+    srtnCd: code,
+    itmsNm: name,
     mrktCtg: marketLabel,
-    mkp: parseKrxNum(row.TDD_OPNPRC),
-    hipr: parseKrxNum(row.TDD_HGPRC),
-    lopr: parseKrxNum(row.TDD_LWPRC),
-    clpr: parseKrxNum(row.TDD_CLSPRC),
+    mkp: parseKrxNum(pickField(row, FIELD_CANDIDATES.open)),
+    hipr: parseKrxNum(pickField(row, FIELD_CANDIDATES.high)),
+    lopr: parseKrxNum(pickField(row, FIELD_CANDIDATES.low)),
+    clpr: parseKrxNum(pickField(row, FIELD_CANDIDATES.close)),
   };
 }
 
 async function fetchStockPage(basDt) {
   const [stk, ksq] = await Promise.all([
-    fetchKrxDailyMarket(basDt, "STK"),
-    fetchKrxDailyMarket(basDt, "KSQ"),
+    fetchKrxOpenApiWithRetry("STK", basDt),
+    fetchKrxOpenApiWithRetry("KSQ", basDt),
   ]);
   return [
     ...stk.map((r) => normalizeKrxRow(r, "KOSPI")),

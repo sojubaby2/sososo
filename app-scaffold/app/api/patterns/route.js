@@ -11,7 +11,7 @@
 // "run the backfill first" message) if no history has been backfilled yet.
 
 import { getRedis } from "../../../lib/redis";
-import { buildPriceSeriesForAllStocks } from "../../../lib/priceHistory";
+import { buildPriceSeriesForAllStocks, getStoredDayCount, HISTORY_LOOKBACK_DAYS } from "../../../lib/priceHistory";
 import { scanAllStocksForPatterns, PATTERN_DEFS } from "../../../lib/patternDetection";
 
 export const maxDuration = 60;
@@ -40,17 +40,30 @@ export async function GET(request) {
     }
   }
 
+  // /patterns 페이지가 "히스토리 쌓는 중" 진행률을 보여줄 수 있게, 결과가
+  // 비어있는 경우든 아니든 항상 같이 내려줌.
+  const historyDays = await getStoredDayCount(redis).catch(() => 0);
+  const historyTarget = HISTORY_LOOKBACK_DAYS;
+
   const priceSeriesMap = await buildPriceSeriesForAllStocks(redis);
   if (priceSeriesMap.size === 0) {
     return Response.json({
-      error: "저장된 시세 히스토리가 아직 없습니다. /api/backfill-history를 먼저 실행해주세요.",
+      error: "저장된 시세 히스토리가 아직 없습니다. 30분마다 자동으로 조금씩 쌓이는 중이니 잠시 후 다시 확인해주세요.",
       patternDefs: PATTERN_DEFS,
       patterns: {},
+      historyDays,
+      historyTarget,
     });
   }
 
   const patterns = scanAllStocksForPatterns(priceSeriesMap, {});
-  const payload = { generatedAt: new Date().toISOString(), patternDefs: PATTERN_DEFS, patterns };
+  const payload = {
+    generatedAt: new Date().toISOString(),
+    patternDefs: PATTERN_DEFS,
+    patterns,
+    historyDays,
+    historyTarget,
+  };
 
   try {
     await redis.set(RESULTS_CACHE_KEY, payload, { ex: RESULTS_CACHE_TTL_SECONDS });

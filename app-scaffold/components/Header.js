@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Newspaper, LayoutGrid, BookOpen, Rocket, Landmark } from "lucide-react";
+import { Newspaper, LayoutGrid, BookOpen, Rocket, Landmark, Activity } from "lucide-react";
 
 export default function Header() {
   const pathname = usePathname();
@@ -22,6 +22,9 @@ export default function Header() {
           </Link>
           <Link href="/guide" className={`nav-btn ${pathname?.startsWith("/guide") ? "active" : ""}`}>
             <BookOpen size={15} />차트 가이드
+          </Link>
+          <Link href="/patterns" className={`nav-btn ${pathname?.startsWith("/patterns") ? "active" : ""}`}>
+            <Activity size={15} />패턴검색
           </Link>
           <Link href="/blog" className={`nav-btn ${pathname?.startsWith("/blog") ? "active" : ""}`}>
             <Landmark size={15} />칼럼
