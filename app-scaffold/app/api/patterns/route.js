@@ -32,7 +32,10 @@ export const maxDuration = 60;
 // 또 한 번 올림 — 이걸 안 올리면 예전 14개 패턴 결과만 담긴 캐시가 30분간
 // 계속 나가서, 새로 추가한 10개는 목록엔 보여도(patternDefs는 항상 최신)
 // 종목 수가 다 0으로만 보일 수 있음.
-const RESULTS_CACHE_KEY = "patterns:results:v3";
+// v3 -> v4: 거래정지 종목이 전고점돌파/52주 신고가에 계속 100%로 잡히던
+// 버그(lib/patternDetection.js — 최신 거래일 데이터 없는 종목 제외)를 고치면서,
+// 예전 버그가 낀 결과가 30분 캐시에 남아 계속 나가는 걸 막으려고 또 올림.
+const RESULTS_CACHE_KEY = "patterns:results:v4";
 const RESULTS_CACHE_TTL_SECONDS = 60 * 30;
 
 export async function GET(request) {

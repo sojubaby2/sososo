@@ -712,9 +712,27 @@ export function detectPatternsForStock(series, { minSimilarity = 55 } = {}) {
 export function scanAllStocksForPatterns(priceSeriesMap, { minSimilarity = 55, maxPerPattern = 20 } = {}) {
   const byPattern = new Map();
 
+  // [2026-09-07 발견된 버그] 거래정지·관리종목처럼 최근에 거래가 안 되는
+  // 종목은 series의 마지막 날짜가 다른 종목들보다 오래됨(정지되기 직전
+  // 날짜에서 그대로 멈춰 있음). 그런데 모든 패턴 판정은 "series의 제일
+  // 마지막 항목 = 오늘"이라고 가정하고 동작해서, 정지 직전에 우연히
+  // 급등해있던 상태가 "오늘 막 전고점을 돌파했다/52주 신고가다"로 영원히
+  // 고정되어 계속 잡히는 문제가 있었음(재성님이 캡처로 확인). 그래서 이
+  // 스캔에 실제로 참여한 종목들 중 가장 최신 날짜를 구해서, 그보다 데이터가
+  // 뒤처진(=최근 며칠 새 거래가 없었던) 종목은 아예 스캔에서 제외함.
+  let latestDate = null;
+  for (const stock of priceSeriesMap.values()) {
+    const series = stock?.series;
+    if (!Array.isArray(series) || series.length === 0) continue;
+    const d = series[series.length - 1]?.date;
+    if (d && (latestDate === null || d > latestDate)) latestDate = d;
+  }
+
   for (const [code, stock] of priceSeriesMap.entries()) {
     const series = stock?.series;
     if (!Array.isArray(series) || series.length < 10) continue;
+    // 최신 거래일 데이터가 없는(=거래정지 등으로 뒤처진) 종목은 제외.
+    if (latestDate !== null && series[series.length - 1]?.date !== latestDate) continue;
     const matches = detectPatternsForStock(series, { minSimilarity });
     for (const m of matches) {
       if (!byPattern.has(m.patternId)) byPattern.set(m.patternId, []);
