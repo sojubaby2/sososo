@@ -144,20 +144,36 @@ export async function getOldestStoredDate(redis) {
 // (series in ascending date order). This is the shape lib/patternDetection.js
 // consumes. Missing/corrupt day-keys are skipped rather than failing the
 // whole scan — a single bad day shouldn't take down every stock's history.
+//
+// [2026-09-07 성능 개선] 예전엔 날짜별로 하나씩 순서대로(for...await) Redis를
+// 읽었음 — 저장된 날짜 수(최대 260개)만큼 네트워크 왕복이 그대로 직렬로
+// 쌓여서, 캐시가 없는 첫 요청(예: app/api/debug-stock — 진단용으로 만들면서
+// 이 병목이 처음 드러남)이 몇십 초씩 걸리고 60초 제한을 넘겨 타임아웃(504)
+// 나는 걸 직접 확인함. 260개를 Promise.all로 한 번에 병렬 요청하도록 바꿔서,
+// 전체 소요 시간이 "그중 가장 느린 요청 1개" 수준으로 줄어들게 함 — 같은
+// 함수를 쓰는 app/api/patterns/route.js(?refresh=1일 때)도 같이 빨라짐.
 export async function buildPriceSeriesForAllStocks(redis, limit = HISTORY_LOOKBACK_DAYS) {
   const dates = await getStoredDatesAscending(redis, limit);
   const byCode = new Map();
 
-  for (const basDt of dates) {
-    let records;
-    try {
-      const raw = await redis.get(dayKey(basDt));
-      records = typeof raw === "string" ? JSON.parse(raw) : raw;
-    } catch {
-      continue;
-    }
-    if (!Array.isArray(records)) continue;
+  const dayResults = await Promise.all(
+    dates.map(async (basDt) => {
+      try {
+        const raw = await redis.get(dayKey(basDt));
+        const records = typeof raw === "string" ? JSON.parse(raw) : raw;
+        return Array.isArray(records) ? { basDt, records } : null;
+      } catch {
+        return null;
+      }
+    })
+  );
 
+  // dayResults는 dates와 같은 순서(오래된 날짜 -> 최신 날짜)를 그대로
+  // 유지함 — Promise.all은 완료 순서가 아니라 입력 배열 순서로 결과를
+  // 돌려주므로, 아래에서 series에 순서대로 push하기만 하면 됨.
+  for (const entry of dayResults) {
+    if (!entry) continue;
+    const { basDt, records } = entry;
     for (const r of records) {
       if (!r?.code) continue;
       if (!byCode.has(r.code)) byCode.set(r.code, { name: r.name, market: r.market, series: [] });
