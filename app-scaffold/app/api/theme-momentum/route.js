@@ -58,6 +58,14 @@
 // 넘어가야 함 — 회원가입이 필요한 절차라 재성님이 직접 신청해야 함.
 export const dynamic = "force-dynamic";
 
+// [2026-09-07 변경] 이 라우트에 maxDuration 설정이 아예 없었음 — Vercel
+// 기본 제한(플랜에 따라 보통 10초)에 걸려서 그동안 "recent"를 네이버 금융
+// 스크래핑(최대 70페이지 정도, 순차 요청이라 10초를 넘길 수 있음)으로
+// 바꾼 뒤에도 KRX 쪽 문제와 무관하게 타임아웃으로 502가 났을 가능성이 큼.
+// app/api/poll/route.js, app/api/telegram-ingest/route.js와 똑같이 60초로
+// 늘림.
+export const maxDuration = 60;
+
 import rawThemeData from "../../../lib/themeData.json";
 import { fetchAllStocksToday } from "../../../lib/newsPipeline";
 
