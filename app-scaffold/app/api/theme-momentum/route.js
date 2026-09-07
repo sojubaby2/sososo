@@ -12,11 +12,11 @@
 // 1주일/1개월 두 기간을 동시에 계산해서 프론트(HOT 테마 패널의 토글)에서
 // 고르게 함.
 //
-// 전일 등락률(change1D)은 스냅샷을 새로 안 받아옴 — KRX가 최신 스냅샷
-// (recent.items)에 이미 "전일 대비 등락률"(fltRt)을 계산해서 넣어주기
-// 때문에 그냥 그 값을 그대로 씀. 이 값은 KRX 쪽에서 감자/병합 등이 있으면
-// 기준가를 다시 잡아서 계산하므로, 우리가 직접 두 종가를 빼서 만드는
-// 1주일/1개월 수치와 달리 상장주식수 필터가 따로 필요 없음.
+// 전일 등락률(change1D)은 스냅샷을 새로 안 받아옴 — 최신 스냅샷(recent.items)에
+// 이미 "전일 대비 등락률"(fltRt)이 계산되어 들어있어서 그냥 그 값을 그대로
+// 씀. 이 값은 KRX 쪽에서 감자/병합 등이 있으면 기준가를 다시 잡아서
+// 계산하므로, 우리가 직접 두 종가를 빼서 만드는 1주일/1개월 수치와 달리
+// 상장주식수 필터가 따로 필요 없음.
 //
 // 상장주식수(lstgStCnt) 변동 종목 제외: KRX 종가는 감자·주식병합·유상증자·
 // 무상증자 같은 이벤트가 있어도 그 사실을 전혀 반영하지 않고 그냥 "그날의
@@ -28,46 +28,30 @@
 // 달라진 종목은 애초에 "종가 비교"라는 계산 자체가 성립하지 않으므로,
 // 개별 종목의 등락률(stockChanges)과 테마 평균 양쪽 모두에서 제외함.
 //
-// [2026-09-07 변경 1차] 시세 데이터 출처를 공공데이터포털(apis.data.go.kr)
-// 에서 한국거래소(KRX) 정보데이터시스템(data.krx.co.kr)으로 교체함.
-// apis.data.go.kr이 클라우드(Vercel) 서버 트래픽을 막기 시작해서 이 기능
-// 전체가 죽어있었음(lib/newsPipeline.js와 동일한 증상).
-//
-// [2026-09-07 변경 2차] data.krx.co.kr도 며칠 안 가서 전부 status 400으로
-// 막히기 시작함. 원인을 찾아보니, KRX가 pykrx 같은 "비공식 라이브러리"의
-// 과도한 접속을 이유로 이 내부 API(getJsonData.cmd)를 아예 IP 단위로
-// 차단하는 정책을 공식적으로 운영 중이었음(github.com/sharebook-kr/pykrx
-// issue #151에서 KRX 데이터사업부가 직접 확인한 내용 — "다수 이용자가
-// 비공식 사설 pykrx 라이브러리 등을 이용한 과도한 접속이 발생하여 향후에도
-// 지속적인 차단조치를 시행할 예정"). Vercel처럼 여러 사용자가 IP 대역을
-// 공유하는 클라우드에서는 나만 안 써도 다른 누군가의 트래픽 때문에 막힐 수
-// 있어서, 이 API에 계속 의존하는 건 근본적으로 불안정함.
-//
-// 그래서 "오늘 시세"(recent)는 lib/newsPipeline.js가 이미 안정적으로 쓰고
-// 있는 네이버 금융(finance.naver.com) 시가총액 페이지 스크래핑으로 다시
-// 교체함(fetchAllStocksToday) — 이건 국내 개인 투자자용 크롤링 도구들이
-// 오래 써온 페이지라 차단 위험이 상대적으로 낮음.
-//
-// "1주일 전/1개월 전" 과거 날짜 시세는 네이버의 이 페이지로는 못 가져옴
-// (항상 "오늘" 기준으로만 보여주는 페이지라서, 과거 날짜를 지정할 방법이
-// 없음). 그래서 일단은 data.krx.co.kr을 계속 시도는 하되(fetchLatestAvailable,
-// 재시도 포함) — 이미 있던 "부분 실패 허용" 로직 덕분에, 이게 막혀서
-// 실패해도 "오늘 등락률"까지 같이 죽지는 않고 1주일/1개월 칸만 "데이터
-// 없음"으로 비어서 나감. 이 부분을 완전히 안정적으로 고치려면 KRX 정식
-// Open API(openapi.krx.co.kr, 무료 가입+인증키 발급, 보통 1일 이내 승인)로
-// 넘어가야 함 — 회원가입이 필요한 절차라 재성님이 직접 신청해야 함.
+// [시세 데이터 출처 변경 이력]
+// 1차: 공공데이터포털(apis.data.go.kr)의 KRX 시세 API — 클라우드(Vercel)
+//      서버 트래픽을 막기 시작해서 죽음(ConnectTimeout).
+// 2차: data.krx.co.kr의 내부 API(getJsonData.cmd, KRX 홈페이지 자신이
+//      화면에 표를 그릴 때 쓰는 비공식 엔드포인트) — 처음엔 됐지만 며칠 안
+//      가서 전부 status 400으로 막힘. 원인: KRX가 pykrx 같은 "비공식
+//      라이브러리"의 과도한 접속을 이유로 이 내부 API를 IP 단위로 차단하는
+//      정책을 공식 운영 중이었음(github.com/sharebook-kr/pykrx issue #151
+//      에서 KRX 데이터사업부가 직접 확인). Vercel처럼 여러 사용자가 IP
+//      대역을 공유하는 클라우드에서는 나만 안 써도 남의 트래픽 때문에
+//      막힐 수 있어서 근본적으로 불안정함.
+// 3차(임시): "오늘 시세"만 네이버 금융 스크래핑으로 우회, "1주일/1개월"은
+//      계속 data.krx.co.kr 시도 — 부분적으로만 복구.
+// 4차(현재): KRX가 직접 운영하는 정식 Open API(openapi.krx.co.kr, "KRX
+//      Data Marketplace")로 완전히 교체. 회원가입 → 인증키 발급 →
+//      "유가증권 일별매매정보"(stk_bydd_trd)/"코스닥 일별매매정보"
+//      (ksq_bydd_trd) 서비스 개별 활용신청, 이렇게 3단계 승인을 거쳐야
+//      쓸 수 있는 공식 경로라 비공식 스크래핑과 달리 차단될 위험이 없고,
+//      무료 + 하루 10,000회 호출 한도로 우리 사용량(하루 수십~수백 회)엔
+//      넉넉함. 인증키는 Vercel 환경변수 KRX_OPENAPI_KEY로 설정.
 export const dynamic = "force-dynamic";
-
-// [2026-09-07 변경] 이 라우트에 maxDuration 설정이 아예 없었음 — Vercel
-// 기본 제한(플랜에 따라 보통 10초)에 걸려서 그동안 "recent"를 네이버 금융
-// 스크래핑(최대 70페이지 정도, 순차 요청이라 10초를 넘길 수 있음)으로
-// 바꾼 뒤에도 KRX 쪽 문제와 무관하게 타임아웃으로 502가 났을 가능성이 큼.
-// app/api/poll/route.js, app/api/telegram-ingest/route.js와 똑같이 60초로
-// 늘림.
 export const maxDuration = 60;
 
 import rawThemeData from "../../../lib/themeData.json";
-import { fetchAllStocksToday } from "../../../lib/newsPipeline";
 
 // 상장주식수가 두 시점 사이에 이 비율 이상 달라지면 감자/병합/증자 등으로
 // 보고, 가격 비교 대상에서 제외함. 상장주식수는 평소엔 거의 안 바뀌므로
@@ -90,52 +74,50 @@ function* businessDaysBackFrom(from) {
   }
 }
 
-const KRX_JSON_URL = "https://data.krx.co.kr/comm/bldAttendant/getJsonData.cmd";
-const KRX_ALL_STOCKS_BLD = "dbms/MDC/STAT/standard/MDCSTAT01501";
+// KRX 정식 Open API(공식 문서: openapi.krx.co.kr, 실제 호스트는
+// data-dbg.krx.co.kr). 인증키가 승인된 서비스만 호출 가능 —
+// "유가증권 일별매매정보"(sto/stk_bydd_trd)와 "코스닥 일별매매정보"
+// (sto/ksq_bydd_trd) 두 개를 마이페이지에서 개별로 활용신청해서 승인받아야
+// 함(2026-09-07 승인 완료).
+const KRX_OPENAPI_BASE_URL = "https://data-dbg.krx.co.kr/svc/apis";
+const KRX_OPENAPI_ENDPOINT = {
+  STK: "sto/stk_bydd_trd", // 유가증권(코스피) 일별매매정보
+  KSQ: "sto/ksq_bydd_trd", // 코스닥 일별매매정보
+};
 
-// KRX 홈페이지 자신이 표를 그릴 때 보내는 것과 똑같은 헤더(Referer,
-// X-Requested-With)를 안 보내면 KRX 쪽에서 요청을 거부함.
-async function fetchKrxDailyMarket(trdDd, mktId) {
-  const params = new URLSearchParams({ bld: KRX_ALL_STOCKS_BLD, mktId, trdDd });
-  const res = await fetch(KRX_JSON_URL, {
-    method: "POST",
-    headers: {
-      // [2026-09-07 변경] "newsmeme-bot/1.0"이라고 자기소개하는 User-Agent를
-      // 썼었는데, 이게 KRX 쪽에서 "이건 자동화 프로그램이다"라고 걸러내는
-      // 신호가 됐을 가능성이 높아서(status 400이 KRX 홈페이지가 사람이
-      // 직접 브라우저로 접속했을 때 쓰는 것과 똑같은 실제 브라우저
-      // User-Agent로 바꿈 — 다른 회사/공공기관 API에서도 자주 있는
-      // 패턴이라 우선 이걸로 시도해봄.
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
-      Accept: "application/json, text/javascript, */*; q=0.01",
-      Referer: "https://data.krx.co.kr/contents/MDC/MDI/outerLoader/index.cmd",
-      "X-Requested-With": "XMLHttpRequest",
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: params.toString(),
+// 인증키를 헤더(AUTH_KEY)와 쿼리 파라미터 둘 다에 실어 보냄 — 참고한
+// 자료마다 "헤더로 보낸다"는 곳과 "쿼리로 보낸다"는 곳이 서로 달라서,
+// 어느 쪽을 보는 서버든 확실히 인증되게 둘 다 보내는 게 안전함(안 쓰는
+// 쪽은 그냥 무시될 뿐이라 부작용 없음).
+async function fetchKrxOpenApi(mktId, trdDd) {
+  const authKey = process.env.KRX_OPENAPI_KEY;
+  if (!authKey) {
+    throw new Error("KRX_OPENAPI_KEY 환경변수가 설정되지 않았습니다.");
+  }
+  const endpoint = KRX_OPENAPI_ENDPOINT[mktId];
+  const qs = new URLSearchParams({ basDd: trdDd, AUTH_KEY: authKey });
+  const url = `${KRX_OPENAPI_BASE_URL}/${endpoint}?${qs.toString()}`;
+  const res = await fetch(url, {
+    headers: { AUTH_KEY: authKey },
     cache: "no-store",
   });
   if (!res.ok) {
-    // 응답 본문에 KRX 쪽이 왜 거부했는지 힌트가 들어있는 경우가 많아서,
-    // 다음에 또 실패하면 바로 원인을 알 수 있게 앞부분만 같이 남김.
     const bodyText = await res.text().catch(() => "");
-    throw new Error(`KRX 데이터 요청 오류 (status ${res.status}): ${bodyText.slice(0, 200)}`);
+    throw new Error(`KRX 정식 API 오류 (status ${res.status}): ${bodyText.slice(0, 300)}`);
   }
   const data = await res.json();
   return Array.isArray(data?.OutBlock_1) ? data.OutBlock_1 : [];
 }
 
-// data.krx.co.kr이 가끔 일시적으로 응답을 안 주는 경우가 있어서, 한 번
-// 실패하면 짧게 쉬었다가 한 번만 더 시도함 — 매 시도마다 계속 재시도하면
-// 오히려 더 막힐 수 있어서 딱 1회만.
-async function fetchKrxDailyMarketWithRetry(trdDd, mktId) {
+// data-dbg.krx.co.kr이 가끔 일시적으로 응답을 안 주는 경우를 대비해 한 번
+// 실패하면 짧게 쉬었다가 한 번만 더 시도함.
+async function fetchKrxOpenApiWithRetry(mktId, trdDd) {
   try {
-    return await fetchKrxDailyMarket(trdDd, mktId);
+    return await fetchKrxOpenApi(mktId, trdDd);
   } catch (err) {
-    console.error(`theme-momentum: KRX 요청 실패, 0.5초 후 1회 재시도 (${trdDd}/${mktId}):`, err.message || err);
+    console.error(`theme-momentum: KRX 정식 API 요청 실패, 0.5초 후 1회 재시도 (${trdDd}/${mktId}):`, err.message || err);
     await new Promise((resolve) => setTimeout(resolve, 500));
-    return fetchKrxDailyMarket(trdDd, mktId);
+    return fetchKrxOpenApi(mktId, trdDd);
   }
 }
 
@@ -146,61 +128,65 @@ function parseKrxNum(v) {
   return Number(cleaned);
 }
 
-// data.krx.co.kr 필드명 -> 예전 apis.data.go.kr 필드명으로 변환.
-function normalizeKrxRow(row, marketLabel) {
-  if (!row?.ISU_SRT_CD || !row?.ISU_ABBRV) return null;
+// KRX 정식 Open API의 실제 필드 이름이 정확히 뭔지 문서로 100% 확인은 못
+// 했음(공개된 라이브러리 소스 기준 추정 — 예전에 쓰던 data.krx.co.kr 내부
+// API와 같은 조직이 만든 거라 필드명이 비슷할 걸로 예상되는 이름들을 후보로
+// 나열해두고, 있는 걸 골라 씀). 혹시 이 후보들이 다 안 맞으면 마지막에
+// 원본 행을 로그로 남겨서 다음에 바로 고칠 수 있게 해둠.
+const FIELD_CANDIDATES = {
+  code: ["ISU_SRT_CD", "ISU_CD", "SRTN_CD"],
+  name: ["ISU_ABBRV", "ISU_NM", "ISU_ABBRV_NM"],
+  close: ["TDD_CLSPRC", "CLSPRC"],
+  fluctRate: ["FLUC_RT", "FLUC_RATE"],
+  shares: ["LIST_SHRS", "LIST_SHRS_QTY"],
+  volume: ["ACC_TRDVOL", "TRDVOL"],
+};
+
+function pickField(row, keys) {
+  for (const k of keys) {
+    if (row[k] !== undefined && row[k] !== null && row[k] !== "") return row[k];
+  }
+  return undefined;
+}
+
+// 필드명이 예상과 달라서 파싱이 계속 실패하는 걸 조용히 넘기지 않고, 콜드
+// 스타트당 한 번만 원본 행을 로그로 남김(스팸 방지).
+let loggedFieldMismatchSample = false;
+
+function normalizeOpenApiRow(row, marketLabel) {
+  const code = pickField(row, FIELD_CANDIDATES.code);
+  const name = pickField(row, FIELD_CANDIDATES.name);
+  if (!code || !name) {
+    if (!loggedFieldMismatchSample) {
+      loggedFieldMismatchSample = true;
+      console.error(
+        "theme-momentum: KRX 정식 API 응답에서 종목코드/종목명 필드를 못 찾음(필드명이 예상과 다를 수 있음). 원본 행 샘플:",
+        JSON.stringify(row)
+      );
+    }
+    return null;
+  }
   return {
-    srtnCd: row.ISU_SRT_CD,
-    itmsNm: row.ISU_ABBRV,
+    srtnCd: code,
+    itmsNm: name,
     mrktCtg: marketLabel,
-    clpr: parseKrxNum(row.TDD_CLSPRC),
-    fltRt: parseKrxNum(row.FLUC_RT),
-    lstgStCnt: parseKrxNum(row.LIST_SHRS),
-    trqu: parseKrxNum(row.ACC_TRDVOL),
+    clpr: parseKrxNum(pickField(row, FIELD_CANDIDATES.close)),
+    fltRt: parseKrxNum(pickField(row, FIELD_CANDIDATES.fluctRate)),
+    lstgStCnt: parseKrxNum(pickField(row, FIELD_CANDIDATES.shares)),
+    trqu: parseKrxNum(pickField(row, FIELD_CANDIDATES.volume)),
   };
 }
 
 async function fetchStockPage(trdDd) {
   const [stk, ksq] = await Promise.all([
-    fetchKrxDailyMarketWithRetry(trdDd, "STK"),
-    fetchKrxDailyMarketWithRetry(trdDd, "KSQ"),
+    fetchKrxOpenApiWithRetry("STK", trdDd),
+    fetchKrxOpenApiWithRetry("KSQ", trdDd),
   ]);
   const items = [
-    ...stk.map((r) => normalizeKrxRow(r, "KOSPI")),
-    ...ksq.map((r) => normalizeKrxRow(r, "KOSDAQ")),
+    ...stk.map((r) => normalizeOpenApiRow(r, "KOSPI")),
+    ...ksq.map((r) => normalizeOpenApiRow(r, "KOSDAQ")),
   ].filter(Boolean);
   return items;
-}
-
-// 네이버 금융 스크래핑 결과({code,name,market,price,changePct,shares,volume},
-// lib/newsPipeline.js의 fetchAllStocksToday가 주는 모양) -> 이 파일 아래
-// 계산 로직이 기대하는 필드 이름(srtnCd/itmsNm/mrktCtg/clpr/fltRt/
-// lstgStCnt/trqu)으로 변환. "오늘 시세"(recent) 전용.
-function normalizeNaverRow(row) {
-  if (!row?.code || !row?.name) return null;
-  return {
-    srtnCd: row.code,
-    itmsNm: row.name,
-    mrktCtg: row.market === "코스피" ? "KOSPI" : row.market === "코스닥" ? "KOSDAQ" : row.market,
-    clpr: row.price,
-    fltRt: row.changePct,
-    lstgStCnt: row.shares,
-    trqu: row.volume,
-  };
-}
-
-function toBasDtToday() {
-  return toBasDt(new Date());
-}
-
-// "오늘 시세"는 항상 네이버 금융에서 가져옴(lib/newsPipeline.js와 동일한
-// 안정적인 소스) — KRX 내부 API처럼 IP 차단당할 위험이 낮음.
-async function fetchRecentSnapshot() {
-  const naver = await fetchAllStocksToday();
-  if (!naver) return null;
-  const items = naver.items.map(normalizeNaverRow).filter(Boolean);
-  if (items.length === 0) return null;
-  return { items, basDt: naver.basDt || toBasDtToday() };
 }
 
 async function fetchLatestAvailable(startFrom) {
@@ -211,7 +197,7 @@ async function fetchLatestAvailable(startFrom) {
     try {
       items = await fetchStockPage(basDt);
     } catch (err) {
-      console.error(`theme-momentum: KRX 요청 실패 (${basDt}):`, err.message || err);
+      console.error(`theme-momentum: KRX 정식 API 요청 실패 (${basDt}):`, err.message || err);
       continue;
     }
     if (items.length > 0) return { items, basDt };
@@ -310,10 +296,9 @@ export async function GET() {
   const monthAgo = new Date(now);
   monthAgo.setDate(monthAgo.getDate() - 30);
 
-  // recent(오늘 시세)는 네이버 금융에서, week/month(과거 시세)는
-  // data.krx.co.kr에서 — 서로 다른 소스라 하나가 막혀도 나머지는 안 죽음.
+  // recent/week/month 셋 다 이제 같은 소스(KRX 정식 Open API)에서 가져옴.
   const [recent, week, month] = await Promise.all([
-    fetchRecentSnapshot(),
+    fetchLatestAvailable(now),
     fetchLatestAvailable(weekAgo),
     fetchLatestAvailable(monthAgo),
   ]);
@@ -322,11 +307,8 @@ export async function GET() {
   // 실패. 하지만 week나 month만 실패한 경우엔 — 예를 들어 KRX 쪽 일시적
   // 오류로 한쪽만 못 받아온 경우 — 굳이 화면 전체를 에러로 띄우지 않고,
   // 받아온 만큼만(예: 1일치만) 보여주고 나머지는 "데이터 없음"으로 둠.
-  // [2026-09-07 변경] 예전엔 셋 중 하나라도 실패하면 무조건 502를 반환해서
-  // week/month 쪽 일시적 오류 하나로 테마 페이지 전체가 에러 배너만 뜨는
-  // 문제가 있었음 — 이렇게 부분 실패를 허용하도록 고침.
   if (!recent) {
-    console.error("theme-momentum: 최신 시세를 가져오지 못함 (네이버 금융 응답 오류)");
+    console.error("theme-momentum: 최신 시세를 가져오지 못함 (KRX 정식 API 응답 오류)");
     return Response.json({ error: "시세 데이터를 가져오지 못했습니다." }, { status: 502 });
   }
   if (!week) console.error("theme-momentum: 1주일 전 시세를 가져오지 못함 — 1주일 등락률은 비어서 나감");
