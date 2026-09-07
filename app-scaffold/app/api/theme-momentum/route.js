@@ -28,24 +28,38 @@
 // 달라진 종목은 애초에 "종가 비교"라는 계산 자체가 성립하지 않으므로,
 // 개별 종목의 등락률(stockChanges)과 테마 평균 양쪽 모두에서 제외함.
 //
-// [2026-09-07 변경] 시세 데이터 출처를 공공데이터포털(apis.data.go.kr)
+// [2026-09-07 변경 1차] 시세 데이터 출처를 공공데이터포털(apis.data.go.kr)
 // 에서 한국거래소(KRX) 정보데이터시스템(data.krx.co.kr)으로 교체함.
 // apis.data.go.kr이 클라우드(Vercel) 서버 트래픽을 막기 시작해서 이 기능
-// 전체가 죽어있었음(lib/newsPipeline.js와 동일한 증상). data.krx.co.kr은
-// KRX 홈페이지 자체가 화면에 표를 그릴 때 쓰는 내부 API라, 이 API가 막히면
-// KRX 홈페이지 자체가 안 되는 셈이라 상대적으로 막힐 가능성이 낮을 걸로
-// 보임 — 다만 실제로 막히는지는 배포해서 확인하기 전엔 확신할 수 없음.
-// 혹시 이것도 막히면 최신 스냅샷(recent) 쪽에서 바로 에러가 날 테니 Vercel
-// Logs에서 바로 알 수 있음.
+// 전체가 죽어있었음(lib/newsPipeline.js와 동일한 증상).
 //
-// 날짜(trdDd)별로 그 날 하루치 전 종목 시세를 한 번에 받아옴(KOSPI·KOSDAQ
-// 각각 한 번씩, 총 2번 호출) — 예전 apis.data.go.kr 응답과 필드 이름이
-// 달라서, normalizeKrxRow()로 예전 필드 이름(srtnCd/itmsNm/mrktCtg/clpr/
-// fltRt/lstgStCnt/trqu)에 맞춰 변환함. 그래서 이 밑의 계산 로직
-// (toPriceMap, computeChanges, aggregateByTheme 등)은 전혀 안 건드림.
+// [2026-09-07 변경 2차] data.krx.co.kr도 며칠 안 가서 전부 status 400으로
+// 막히기 시작함. 원인을 찾아보니, KRX가 pykrx 같은 "비공식 라이브러리"의
+// 과도한 접속을 이유로 이 내부 API(getJsonData.cmd)를 아예 IP 단위로
+// 차단하는 정책을 공식적으로 운영 중이었음(github.com/sharebook-kr/pykrx
+// issue #151에서 KRX 데이터사업부가 직접 확인한 내용 — "다수 이용자가
+// 비공식 사설 pykrx 라이브러리 등을 이용한 과도한 접속이 발생하여 향후에도
+// 지속적인 차단조치를 시행할 예정"). Vercel처럼 여러 사용자가 IP 대역을
+// 공유하는 클라우드에서는 나만 안 써도 다른 누군가의 트래픽 때문에 막힐 수
+// 있어서, 이 API에 계속 의존하는 건 근본적으로 불안정함.
+//
+// 그래서 "오늘 시세"(recent)는 lib/newsPipeline.js가 이미 안정적으로 쓰고
+// 있는 네이버 금융(finance.naver.com) 시가총액 페이지 스크래핑으로 다시
+// 교체함(fetchAllStocksToday) — 이건 국내 개인 투자자용 크롤링 도구들이
+// 오래 써온 페이지라 차단 위험이 상대적으로 낮음.
+//
+// "1주일 전/1개월 전" 과거 날짜 시세는 네이버의 이 페이지로는 못 가져옴
+// (항상 "오늘" 기준으로만 보여주는 페이지라서, 과거 날짜를 지정할 방법이
+// 없음). 그래서 일단은 data.krx.co.kr을 계속 시도는 하되(fetchLatestAvailable,
+// 재시도 포함) — 이미 있던 "부분 실패 허용" 로직 덕분에, 이게 막혀서
+// 실패해도 "오늘 등락률"까지 같이 죽지는 않고 1주일/1개월 칸만 "데이터
+// 없음"으로 비어서 나감. 이 부분을 완전히 안정적으로 고치려면 KRX 정식
+// Open API(openapi.krx.co.kr, 무료 가입+인증키 발급, 보통 1일 이내 승인)로
+// 넘어가야 함 — 회원가입이 필요한 절차라 재성님이 직접 신청해야 함.
 export const dynamic = "force-dynamic";
 
 import rawThemeData from "../../../lib/themeData.json";
+import { fetchAllStocksToday } from "../../../lib/newsPipeline";
 
 // 상장주식수가 두 시점 사이에 이 비율 이상 달라지면 감자/병합/증자 등으로
 // 보고, 가격 비교 대상에서 제외함. 상장주식수는 평소엔 거의 안 바뀌므로
@@ -148,6 +162,37 @@ async function fetchStockPage(trdDd) {
     ...ksq.map((r) => normalizeKrxRow(r, "KOSDAQ")),
   ].filter(Boolean);
   return items;
+}
+
+// 네이버 금융 스크래핑 결과({code,name,market,price,changePct,shares,volume},
+// lib/newsPipeline.js의 fetchAllStocksToday가 주는 모양) -> 이 파일 아래
+// 계산 로직이 기대하는 필드 이름(srtnCd/itmsNm/mrktCtg/clpr/fltRt/
+// lstgStCnt/trqu)으로 변환. "오늘 시세"(recent) 전용.
+function normalizeNaverRow(row) {
+  if (!row?.code || !row?.name) return null;
+  return {
+    srtnCd: row.code,
+    itmsNm: row.name,
+    mrktCtg: row.market === "코스피" ? "KOSPI" : row.market === "코스닥" ? "KOSDAQ" : row.market,
+    clpr: row.price,
+    fltRt: row.changePct,
+    lstgStCnt: row.shares,
+    trqu: row.volume,
+  };
+}
+
+function toBasDtToday() {
+  return toBasDt(new Date());
+}
+
+// "오늘 시세"는 항상 네이버 금융에서 가져옴(lib/newsPipeline.js와 동일한
+// 안정적인 소스) — KRX 내부 API처럼 IP 차단당할 위험이 낮음.
+async function fetchRecentSnapshot() {
+  const naver = await fetchAllStocksToday();
+  if (!naver) return null;
+  const items = naver.items.map(normalizeNaverRow).filter(Boolean);
+  if (items.length === 0) return null;
+  return { items, basDt: naver.basDt || toBasDtToday() };
 }
 
 async function fetchLatestAvailable(startFrom) {
@@ -257,8 +302,10 @@ export async function GET() {
   const monthAgo = new Date(now);
   monthAgo.setDate(monthAgo.getDate() - 30);
 
+  // recent(오늘 시세)는 네이버 금융에서, week/month(과거 시세)는
+  // data.krx.co.kr에서 — 서로 다른 소스라 하나가 막혀도 나머지는 안 죽음.
   const [recent, week, month] = await Promise.all([
-    fetchLatestAvailable(now),
+    fetchRecentSnapshot(),
     fetchLatestAvailable(weekAgo),
     fetchLatestAvailable(monthAgo),
   ]);
@@ -271,7 +318,7 @@ export async function GET() {
   // week/month 쪽 일시적 오류 하나로 테마 페이지 전체가 에러 배너만 뜨는
   // 문제가 있었음 — 이렇게 부분 실패를 허용하도록 고침.
   if (!recent) {
-    console.error("theme-momentum: 최신 시세를 가져오지 못함");
+    console.error("theme-momentum: 최신 시세를 가져오지 못함 (네이버 금융 응답 오류)");
     return Response.json({ error: "시세 데이터를 가져오지 못했습니다." }, { status: 502 });
   }
   if (!week) console.error("theme-momentum: 1주일 전 시세를 가져오지 못함 — 1주일 등락률은 비어서 나감");

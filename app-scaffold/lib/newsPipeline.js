@@ -101,8 +101,13 @@ function parseMarketSumHtml(html) {
     const changeNumMatch = (textCells[4] || "").match(/([\d.]+)%/);
     let changePct = changeNumMatch ? Number(changeNumMatch[1]) : NaN;
     if (Number.isFinite(changePct) && /(-|−)/.test(rawCells[4] || "")) changePct = -changePct;
+    // 상장주식수(7번째 컬럼)·거래량(9번째 컬럼)도 같은 표에 이미 들어있어서
+    // 같이 뽑아둠 — app/api/theme-momentum/route.js에서 "거래정지 종목
+    // 제외"(거래량>0)와 "감자/병합 종목 제외"(상장주식수 비교) 필터에 씀.
+    const shares = Number((textCells[7] || "").replace(/,/g, ""));
+    const volume = Number((textCells[9] || "").replace(/,/g, ""));
 
-    results.push({ code, name, price, changePct });
+    results.push({ code, name, price, changePct, shares, volume });
   }
   return { results, sampleRow };
 }
