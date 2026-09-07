@@ -46,7 +46,13 @@ export const maxDuration = 60;
 // 며칠 종가가 동일한가" 체크가 그 점프 시점을 걸치면 못 잡았음.
 // isLikelyInactive()에 "오늘 시가=고가=저가=0"이면 바로 제외하는 훨씬
 // 직접적인 신호를 추가하면서 또 올림.
-const RESULTS_CACHE_KEY = "patterns:results:v6";
+// v6 -> v7: 이번엔 완전히 다른 원인(미스터블루/아이큐어/지엘팜텍/사조동아원/
+// 온타이드로 확인) — 감자·액면병합으로 종가 기준 자체가 바뀐 종목은
+// 여전히 거래 중인데도 시리즈 안에 "다른 잣대"의 숫자가 섞여서 가짜
+// 전고점돌파/52주 신고가로 잡혔음. lib/patternDetection.js에 하루 ±32%
+// 넘는 불연속 지점을 찾아 그 이전 데이터를 잘라내는 trimAtLastDiscontinuity를
+// 추가하면서 또 올림.
+const RESULTS_CACHE_KEY = "patterns:results:v7";
 const RESULTS_CACHE_TTL_SECONDS = 60 * 30;
 
 export async function GET(request) {

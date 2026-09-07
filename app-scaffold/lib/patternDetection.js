@@ -665,9 +665,44 @@ export const PATTERN_DEFS = [
   { id: "three_black_crows", label: "흑삼병", category: "캔들형", window: 3 },
 ];
 
+// [2026-09-07 4차 수정] 재성님이 보내주신 미스터블루/아이큐어/지엘팜텍/
+// 사조동아원/온타이드 사례를 진단해보니, 이번엔 "여전히 거래정지 상태"가
+// 아니라 다른 종류의 데이터 불연속 문제였음 — 관리종목 회피를 위한
+// 액면병합(주식병합)·감자 등을 겪은 종목은, 그 시점을 기준으로 이전 종가는
+// 옛 주식 수 기준, 이후 종가는 새 주식 수 기준으로 찍혀서, 같은 시리즈
+// 안에 "서로 다른 잣대로 잰" 숫자가 섞이게 됨(재성님이 스크린샷으로 보여준
+// MTS 차트는 이걸 "수정주가"로 보정해서 보여주지만, 우리가 KRX에서 받는
+// 원본 데이터는 그런 보정이 없음).
+//
+// 그런데 한국 증시는 하루 가격제한폭이 ±30%로 정해져 있어서, 정상적인
+// 거래로는 하루 만에 종가가 그보다 더 벌어질 수가 없음 — 그래서 하루
+// 만에 30%를 훌쩍 넘게 움직인 지점이 있다면, 그건 거의 확실히 액면병합·
+// 감자·거래재개 같은 "기준이 바뀐 지점"이라고 봐도 됨. 그 지점 이전
+// 데이터는 지금 기준과 비교가 안 되는 다른 잣대의 숫자이므로, 패턴
+// 분석에서는 아예 잘라내고 그 이후 데이터만 씀 — 전고점돌파·52주 신고가처럼
+// "과거 대비 지금이 높은가"를 보는 패턴일수록 이 불연속에 특히 취약해서
+// 효과가 큼. 기준이 바뀐 직후라 남은 데이터가 적으면, 그만큼 필요한
+// 기간이 안 채워진 패턴은 자연스럽게 안 잡힘 — 이게 맞는 동작임(비교할
+// "과거"가 아직 없으니까 안 잡히는 게 정상).
+const DISCONTINUITY_JUMP_RATIO = 0.32; // 국내 가격제한폭(±30%)보다 살짝 여유를 둠
+
+export function trimAtLastDiscontinuity(series) {
+  let startIndex = 0;
+  for (let i = 1; i < series.length; i++) {
+    const prevClose = series[i - 1].c;
+    const curClose = series[i].c;
+    if (!prevClose || !curClose) continue;
+    if (Math.abs(curClose - prevClose) / prevClose > DISCONTINUITY_JUMP_RATIO) {
+      startIndex = i; // 이 지점부터 다시 시작 — 이전 구간은 버림
+    }
+  }
+  return startIndex > 0 ? series.slice(startIndex) : series;
+}
+
 // series: ascending [{date,o,h,l,c}, ...] for one stock. Returns matches
 // sorted by similarity desc — empty array if nothing cleared minSimilarity.
 export function detectPatternsForStock(series, { minSimilarity = 55 } = {}) {
+  series = trimAtLastDiscontinuity(series);
   const results = [];
   const n = series.length;
   const closes = series.map((p) => p.c);

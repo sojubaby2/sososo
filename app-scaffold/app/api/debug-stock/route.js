@@ -14,7 +14,7 @@
 
 import { getRedis } from "../../../lib/redis";
 import { buildPriceSeriesForAllStocks } from "../../../lib/priceHistory";
-import { detectPatternsForStock, isLikelyInactive } from "../../../lib/patternDetection";
+import { detectPatternsForStock, isLikelyInactive, trimAtLastDiscontinuity } from "../../../lib/patternDetection";
 
 // buildPriceSeriesForAllStocks()가 저장된 날짜 수만큼(최대 260개) Redis를
 // 순서대로 읽어오는 무거운 호출이라(=app/api/patterns/route.js와 동일한
@@ -60,18 +60,42 @@ export async function GET(request) {
     if (stock?.name && stock.name.includes(nameQuery)) {
       const series = Array.isArray(stock.series) ? stock.series : [];
       const lastEntry = series[series.length - 1];
+      const trimmed = trimAtLastDiscontinuity(series);
+
+      // 저장된 전체 구간에서 종가 최고/최저가 언제 찍혔는지 — "우리가 갖고
+      // 있는 히스토리가 실제로 얼마나 오래전까지 닿아있는지", "그 안에
+      // 정말 더 높은 종가가 있었는지"를 직접 확인하기 위함.
+      let maxClose = null;
+      let minClose = null;
+      for (const p of series) {
+        if (typeof p.c !== "number") continue;
+        if (!maxClose || p.c > maxClose.c) maxClose = { date: p.date, c: p.c };
+        if (!minClose || p.c < minClose.c) minClose = { date: p.date, c: p.c };
+      }
+
       matches.push({
         code,
         name: stock.name,
         market: stock.market,
         totalStoredDays: series.length,
+        oldestStoredDate: series[0]?.date ?? null,
         latestOverallDate: latestDate,
         thisStockLastDate: lastEntry?.date ?? null,
         excludedByDateCheck: latestDate !== null && lastEntry?.date !== latestDate,
         excludedByInactivityCheck: isLikelyInactive(series),
+        // 저장된 전체 기간(오늘 기준 원본, 트림 전) 중 종가 최고/최저.
+        fullSeriesMaxClose: maxClose,
+        fullSeriesMinClose: minClose,
+        // 감자/액면병합 등으로 하루 만에 종가가 ±32% 넘게 뛴 지점이
+        // 있었는지 — 있었다면 그 이전 데이터는 패턴 분석에서 잘라내고
+        // 씀(lib/patternDetection.js의 trimAtLastDiscontinuity 참고).
+        discontinuityTrimmed: trimmed.length !== series.length,
+        trimmedSeriesLength: trimmed.length,
+        trimmedSeriesStartDate: trimmed[0]?.date ?? null,
         last10Days: series.slice(-10),
         // minSimilarity: 0 — 필터링 없이 각 패턴의 "원점수"를 그대로 보기 위함
-        // (실제 화면에는 55% 이상만 노출됨).
+        // (실제 화면에는 55% 이상만 노출됨). detectPatternsForStock 내부에서
+        // 자체적으로 trimAtLastDiscontinuity를 적용한 뒤 계산함.
         rawPatternScores: detectPatternsForStock(series, { minSimilarity: 0 }).slice(0, 10),
       });
     }
