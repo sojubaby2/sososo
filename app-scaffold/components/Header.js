@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Newspaper, LayoutGrid, BookOpen, Rocket } from "lucide-react";
+import { Newspaper, LayoutGrid, BookOpen, Rocket, Landmark } from "lucide-react";
 
 export default function Header() {
   const pathname = usePathname();
@@ -22,6 +22,9 @@ export default function Header() {
           </Link>
           <Link href="/guide" className={`nav-btn ${pathname?.startsWith("/guide") ? "active" : ""}`}>
             <BookOpen size={15} />차트 가이드
+          </Link>
+          <Link href="/blog" className={`nav-btn ${pathname?.startsWith("/blog") ? "active" : ""}`}>
+            <Landmark size={15} />칼럼
           </Link>
           {/* IPO schedule link: points to DART's own official page instead of scraping a private site. */}
           <a href="https://dart.fss.or.kr/dsac008/main.do" target="_blank" rel="noopener noreferrer" className="nav-btn">
