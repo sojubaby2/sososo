@@ -37,114 +37,110 @@ function toBasDt(d) {
   return `${y}${m}${dd}`;
 }
 
-// [2026-09-06 변경] 원래 공공데이터포털(apis.data.go.kr)의 KRX 시세 API를
-// 썼는데, 어느 시점부터 클라우드(Vercel) 서버가 보내는 요청을
-// apis.data.go.kr가 연결 단계에서부터 막기 시작했음(10초 Connect
-// Timeout, 응답 자체가 없음 — 예전에 수출입은행 API가 클라우드발
-// 트래픽을 막았던 것과 똑같은 증상). 그 결과 뉴스 매칭·테마 등락률 등
-// 시세가 필요한 기능이 전부 죽어있었음. 같은 환경에서 네이버 뉴스
-// API(NAVER_CLIENT_ID)는 계속 잘 되고 있었던 걸 근거로, 네이버 증권
-// (m.stock.naver.com)의 비공식 시세 API로 교체함.
+// [2026-09-06/07 변경 내역]
+// 1차: 공공데이터포털(apis.data.go.kr)의 KRX 시세 API를 썼는데, 어느
+//      시점부터 클라우드(Vercel) 서버가 보내는 요청을 연결 단계에서부터
+//      막기 시작했음(10초 Connect Timeout — 예전에 수출입은행 API가
+//      클라우드발 트래픽을 막았던 것과 똑같은 증상). 뉴스 매칭·테마
+//      등락률 등 시세가 필요한 기능이 전부 죽어있었음.
+// 2차: m.stock.naver.com의 비공식 JSON API로 교체 시도 → 404 (그 사이
+//      네이버 앱 쪽 API 구조가 바뀐 것으로 보임).
+// 3차(현재): 네이버 금융(finance.naver.com)의 "시가총액" 페이지
+//      (sise_market_sum.naver)를 직접 파싱. 이 페이지는 2010년대부터
+//      국내 개인 투자자용 크롤링 도구들이 계속 사용해온 오래되고 안정적인
+//      페이지라, 구조가 바뀔 위험이 상대적으로 적음. 파싱 라이브러리 설치
+//      없이 정규식으로 표를 직접 읽음.
 //
-// 공식 문서가 없는 API라 필드 이름이 바뀌거나 다를 수 있어서, 아래
-// normalizeNaverItem은 여러 후보 필드 이름을 다 시도하고, 그래도 하나도
-// 못 찾으면 원본 응답을 그대로 에러 로그에 남기도록 방어적으로 짜뒀음 —
-// 나중에 또 깨지면 로그만 보고 바로 원인(필드명 변경 등)을 알 수 있게.
-const NAVER_STOCK_LIST_URL = "https://m.stock.naver.com/api/domestic/market/stock/default";
-const NAVER_PAGE_SIZE = 100;
-// KOSPI 약 950개 + KOSDAQ 약 1700개 ≈ 2650개. 넉넉하게 40페이지(최대
-// 4000개)까지 돌되, 응답이 짧아지는 순간(마지막 페이지) 멈춤.
-const NAVER_MAX_PAGES = 40;
+// 그래도 혹시 이 페이지 구조도 나중에 바뀌면 바로 알 수 있도록, 종목을
+// 하나도 못 찾으면 원본 HTML에서 뽑아낸 샘플 행을 에러 로그에 남기게
+// 해뒀음 — 다음에 또 깨지면 로그만 보고 바로 원인을 알 수 있게.
+const NAVER_MARKET_SUM_URL = "https://finance.naver.com/sise/sise_market_sum.naver";
+// 넉넉하게 잡은 상한 — KOSPI/KOSDAQ 각각 실제로는 20~35페이지 정도면 끝남
+// (한 페이지 50종목 기준). 빈 페이지가 나오는 순간 그 자리에서 멈춤.
+const NAVER_MAX_PAGES_PER_MARKET = 50;
 
-function pickField(obj, candidates) {
-  for (const key of candidates) {
-    if (obj[key] !== undefined && obj[key] !== null && obj[key] !== "") return obj[key];
-  }
-  return undefined;
-}
-
-function toNumber(v) {
-  if (v === undefined || v === null) return NaN;
-  const n = Number(String(v).replace(/,/g, ""));
-  return n;
-}
-
-// 네이버 응답 한 항목(raw)을 { code, name, market, price, changePct }로
-// 정규화. 필드 이름이 관측된 여러 버전이 있어서 후보를 다 시도함.
-function normalizeNaverItem(raw) {
-  const code = pickField(raw, ["itemCode", "code", "symbolCode", "stockCode", "srtnCd"]);
-  const name = pickField(raw, ["stockName", "name", "itemName", "korName", "itmsNm"]);
-  const marketRaw = pickField(raw, ["stockExchangeType", "marketType", "stockEndType", "mrktCtg"]);
-  const priceRaw = pickField(raw, ["closePrice", "nowPrice", "currentPrice", "price", "clpr"]);
-  const changeRaw = pickField(raw, ["fluctuationsRatio", "changeRate", "risefallRate", "fltRt"]);
-
-  if (!code || !name) return null;
-
-  const marketVal = marketRaw && typeof marketRaw === "object" ? marketRaw.code : marketRaw;
-  const marketStr = String(marketVal || "").toUpperCase();
-  let market = "";
-  if (marketStr.includes("KOSDAQ")) market = "코스닥";
-  else if (marketStr.includes("KOSPI")) market = "코스피";
-  else market = marketStr || "";
-
-  return {
-    code: String(code),
-    name: String(name),
-    market,
-    price: toNumber(priceRaw),
-    changePct: toNumber(changeRaw),
-  };
-}
-
-async function fetchNaverStockPage(startIdx) {
-  const qs = new URLSearchParams({
-    tradeType: "KRX",
-    marketType: "ALL",
-    orderType: "name",
-    startIdx: String(startIdx),
-    pageSize: String(NAVER_PAGE_SIZE),
-  });
-  const url = `${NAVER_STOCK_LIST_URL}?${qs.toString()}`;
+async function fetchNaverMarketSumPage(sosok, page) {
+  const qs = new URLSearchParams({ sosok: String(sosok), page: String(page) });
+  const url = `${NAVER_MARKET_SUM_URL}?${qs.toString()}`;
   const res = await fetch(url, {
     cache: "no-store",
     headers: { "User-Agent": "Mozilla/5.0 (compatible; newsmeme-bot/1.0)" },
   });
-  if (!res.ok) throw new Error(`네이버 시세 API 오류 (status ${res.status})`);
-  const data = await res.json();
-  // 관찰된 응답 모양이 여러 버전일 수 있어서 전부 대응.
-  if (Array.isArray(data)) return data;
-  if (Array.isArray(data?.stocks)) return data.stocks;
-  if (Array.isArray(data?.items)) return data.items;
-  if (Array.isArray(data?.result)) return data.result;
-  throw new Error(
-    "네이버 시세 API 응답 형식을 인식할 수 없습니다: " + JSON.stringify(data).slice(0, 500)
-  );
+  if (!res.ok) throw new Error(`네이버 시세 페이지 오류 (status ${res.status})`);
+  const buf = await res.arrayBuffer();
+  // 이 구형 네이버 금융 페이지는 EUC-KR 인코딩이라, 그냥 text()로 읽으면
+  // 한글이 깨져서 TextDecoder로 직접 변환해줘야 함.
+  return new TextDecoder("euc-kr").decode(buf);
+}
+
+// 표 컬럼 순서(오랫동안 안 바뀐 것으로 알려짐): N, 종목명(링크에 종목코드
+// 포함), 현재가, 전일비, 등락률, 액면가, 시가총액, 상장주식수, 외국인비율,
+// 거래량, PER, ROE. 구분선 행은 <td>가 1개뿐이라 자동으로 걸러짐.
+function parseMarketSumHtml(html) {
+  const rowChunks = html.split(/<tr[\s>]/i).slice(1);
+  const results = [];
+  let sampleRow = null;
+
+  for (const chunk of rowChunks) {
+    const cellMatches = [...chunk.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)];
+    if (cellMatches.length < 10) continue; // 데이터 행이 아님(구분선 등)
+
+    const rawCells = cellMatches.map((m) => m[1]);
+    const textCells = rawCells.map((c) =>
+      c.replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim()
+    );
+
+    const codeMatch = rawCells[1]?.match(/code=(\d{6})/);
+    const name = textCells[1];
+    if (!codeMatch || !name) continue;
+    const code = codeMatch[1];
+
+    if (!sampleRow) sampleRow = { code, name, cells: textCells.slice(0, 6) };
+
+    const price = Number((textCells[2] || "").replace(/,/g, ""));
+    const changeNumMatch = (textCells[4] || "").match(/([\d.]+)%/);
+    let changePct = changeNumMatch ? Number(changeNumMatch[1]) : NaN;
+    if (Number.isFinite(changePct) && /(-|−)/.test(rawCells[4] || "")) changePct = -changePct;
+
+    results.push({ code, name, price, changePct });
+  }
+  return { results, sampleRow };
+}
+
+async function fetchAllStocksTodayForMarket(sosok, marketLabel) {
+  const all = [];
+  let sampleRow = null;
+  for (let page = 1; page <= NAVER_MAX_PAGES_PER_MARKET; page++) {
+    let html;
+    try {
+      html = await fetchNaverMarketSumPage(sosok, page);
+    } catch (err) {
+      console.error(`fetchAllStocksToday(${marketLabel}) 페이지 ${page} 요청 실패:`, err.message || err);
+      break;
+    }
+    const parsed = parseMarketSumHtml(html);
+    if (!sampleRow && parsed.sampleRow) sampleRow = parsed.sampleRow;
+    if (parsed.results.length === 0) break; // 마지막 페이지
+    for (const r of parsed.results) all.push({ ...r, market: marketLabel });
+    if (parsed.results.length < 40) break; // 한 페이지 50종목 기준, 마지막 페이지로 판단
+  }
+  return { all, sampleRow };
 }
 
 // Returns { items: [{code,name,market,price,changePct}], basDt } or null.
 export async function fetchAllStocksToday() {
-  const all = [];
-  let firstRawItem = null;
-  try {
-    for (let page = 0; page < NAVER_MAX_PAGES; page++) {
-      const raw = await fetchNaverStockPage(page * NAVER_PAGE_SIZE);
-      if (raw.length === 0) break;
-      if (!firstRawItem) firstRawItem = raw[0];
-      for (const r of raw) {
-        const norm = normalizeNaverItem(r);
-        if (norm) all.push(norm);
-      }
-      if (raw.length < NAVER_PAGE_SIZE) break; // 마지막 페이지
-    }
-  } catch (err) {
-    console.error("fetchAllStocksToday 실패:", err.message || err);
-    return null;
-  }
+  const [kospi, kosdaq] = await Promise.all([
+    fetchAllStocksTodayForMarket(0, "코스피"),
+    fetchAllStocksTodayForMarket(1, "코스닥"),
+  ]);
+  const all = [...kospi.all, ...kosdaq.all];
 
   if (all.length === 0) {
-    if (firstRawItem) {
-      console.error("네이버 시세 응답 필드 인식 실패, 원본 예시:", JSON.stringify(firstRawItem));
-    }
+    const sample = kospi.sampleRow || kosdaq.sampleRow;
+    console.error(
+      "네이버 시세 페이지 파싱 실패 — 종목을 하나도 못 찾음. 샘플 행:",
+      sample ? JSON.stringify(sample) : "(샘플 행도 없음 — 페이지 구조 자체가 다른 것으로 보임)"
+    );
     return null;
   }
 
