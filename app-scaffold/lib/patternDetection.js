@@ -478,6 +478,16 @@ function detectThreeBlackCrows(series, minSimilarity) {
 // and how long that prior high had stood.
 // ---------------------------------------------------------------------------
 
+// [2026-09-07 6차 수정, 이후 재성님 확인 후 되돌림] 한때 "전고점"이 너무
+// 최근에 세워진 경우(예: 며칠 전)는 안 잡히게 최소 보유일수 게이트를
+// 넣었었는데, 재성님이 직접 예시로 설명해주신 정의는 그게 아니었음 —
+// "직전까지의 모든 값 중 최고치를 새로 넘어서는 매 순간"이 다 전고점돌파고,
+// 그 전고점이 바로 며칠 전에 세워진 것이었어도 상관없음(예: 20일째 26,000원
+// 돌파, 25일째 27,000원 돌파, 30일째 28,000원 돌파 — 20↔25는 5일,
+// 25↔30은 2일 간격이지만 전부 각각의 돌파로 인정). 그래서 그 게이트는
+// 빼고 원래대로(직전 전체 기간 중 최고가를 오늘 종가가 넘으면 돌파)
+// 되돌림 — daysSincePriorHigh는 점수(오래 버틴 고점일수록 더 의미
+// 있다는 가중치)에만 계속 반영하고, 통과 여부 자체는 안 막음.
 function detectBreakout(series, minSimilarity) {
   const n = series.length;
   if (n < 20) return null; // want at least some real history before calling anything a "breakout"
@@ -525,12 +535,22 @@ const FIFTY_TWO_WEEK_WINDOW = 252; // 52주 ≈ 252거래일
 const FIFTY_TWO_WEEK_MIN_DAYS = 60; // "52주" 판정이 의미 있으려면 최소 이 정도는 쌓여있어야 함
 const FIFTY_TWO_WEEK_TOLERANCE = 0.02; // 신고가 대비 2% 이내면 "신고가권"으로 인정
 
+// [2026-09-07 7차 수정] 코리안리로 확인됨 — "52주 신고가"를 종가(c) 기준
+// 최고가와 비교하고 있었는데, 실제 MTS/증권사 화면에서 말하는 "52주
+// 신고가"는 그 기간 중 하루라도 찍은 최고가(고가, h) 기준임. 코리안리는
+// 6월에 장중 17,560원까지 찍은 적이 있어서(그날 종가는 그보다 훨씬
+// 낮았을 것) 진짜 52주 최고가는 17,560원인데, 종가만 비교하다 보니 그
+// 스파이크가 잡히지 않고 최근 종가 상승분(15,470원)이 "역대 최고 종가"로
+// 오인되어 52주 신고가로 잘못 잡혔음. 전고점돌파(detectBreakout)는 원래도
+// 고가(h) 기준으로 이미 맞게 짜여 있었어서, 여기도 똑같이 고가 기준으로
+// 맞춤 — "현재가(종가)가 지난 52주 동안의 장중 최고가에 얼마나 가까운가"로
+// 봐야 진짜 스크리너 정의에 맞음.
 function detect52WeekHigh(series, minSimilarity) {
   const n = series.length;
   if (n < FIFTY_TWO_WEEK_MIN_DAYS) return null;
   const win = series.slice(Math.max(0, n - FIFTY_TWO_WEEK_WINDOW));
   const today = win[win.length - 1];
-  const windowHigh = Math.max(...win.map((p) => p.c));
+  const windowHigh = Math.max(...win.map((p) => p.h));
   if (windowHigh <= 0 || today.c < windowHigh * (1 - FIFTY_TWO_WEEK_TOLERANCE)) return null;
 
   const belowPct = ((windowHigh - today.c) / windowHigh) * 100;
@@ -550,13 +570,14 @@ function detect52WeekHigh(series, minSimilarity) {
 }
 
 // 52주 신고가를 뒤집은 것 — 52주 신저가. 로직·톨러런스 전부 동일하고
-// 최고가 대신 최저가 기준으로 비교함.
+// 최고가 대신 최저가 기준으로 비교함. (마찬가지로 종가가 아니라 저가(l)
+// 기준으로 맞춤 — 위 detect52WeekHigh 주석 참고.)
 function detect52WeekLow(series, minSimilarity) {
   const n = series.length;
   if (n < FIFTY_TWO_WEEK_MIN_DAYS) return null;
   const win = series.slice(Math.max(0, n - FIFTY_TWO_WEEK_WINDOW));
   const today = win[win.length - 1];
-  const windowLow = Math.min(...win.map((p) => p.c));
+  const windowLow = Math.min(...win.map((p) => p.l));
   if (windowLow <= 0 || today.c > windowLow * (1 + FIFTY_TWO_WEEK_TOLERANCE)) return null;
 
   const abovePct = ((today.c - windowLow) / windowLow) * 100;
