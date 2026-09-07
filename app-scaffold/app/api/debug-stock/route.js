@@ -16,7 +16,11 @@ import { getRedis } from "../../../lib/redis";
 import { buildPriceSeriesForAllStocks } from "../../../lib/priceHistory";
 import { detectPatternsForStock, isLikelyInactive } from "../../../lib/patternDetection";
 
-export const maxDuration = 30;
+// buildPriceSeriesForAllStocks()가 저장된 날짜 수만큼(최대 260개) Redis를
+// 순서대로 읽어오는 무거운 호출이라(=app/api/patterns/route.js와 동일한
+// 병목), maxDuration을 짧게(30초) 잡았더니 타임아웃(504)이 났음. 그
+// 라우트와 똑같이 60초로 맞춤(Vercel Hobby 플랜에서 쓸 수 있는 최대치).
+export const maxDuration = 60;
 
 export async function GET(request) {
   const cronSecret = process.env.CRON_SECRET;
