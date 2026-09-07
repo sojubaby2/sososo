@@ -10,7 +10,6 @@ import { isPoliticalTheme } from "../lib/themeData";
 
 const HOT_THEME_COUNT = 8;
 const FEED_POLL_MS = 10000; // check for new articles every 10s
-const TRENDING_STOCK_COUNT = 14;
 const ALERT_KEYWORDS = ["공급계약", "특허", "FDA", "무상증자", "단독", "세계 최초", "국내 최초", "인수", "합병", "수주", "유상증자"];
 
 // Short beep via Web Audio — no audio file to host/fetch. Browsers block
@@ -251,58 +250,6 @@ function GlobalMarketPanel() {
   );
 }
 
-function TrendingPanel({ rawItems, activeCode, onSelect }) {
-  const trending = useMemo(() => {
-    const seen = new Map();
-    for (const item of rawItems) {
-      for (const m of item.matches) {
-        if (seen.has(m.code)) continue;
-        seen.set(m.code, { name: m.name, code: m.code, market: m.market });
-        if (seen.size >= TRENDING_STOCK_COUNT) break;
-      }
-      if (seen.size >= TRENDING_STOCK_COUNT) break;
-    }
-    return Array.from(seen.values());
-  }, [rawItems]);
-
-  return (
-    <aside className="trending-panel">
-      <h2 className="trending-panel-title">
-        <Flame size={12} style={{ color: "var(--up)" }} />
-        실시간 언급 종목
-      </h2>
-      {trending.length === 0 ? (
-        <p className="trending-empty">아직 매칭된 종목이 없어요.</p>
-      ) : (
-        trending.map((s) => {
-          const isActive = activeCode === s.code;
-          return (
-            <button
-              type="button"
-              key={s.code}
-              className="trending-row"
-              onClick={() => onSelect(isActive ? null : s)}
-              style={{
-                display: "flex",
-                width: "100%",
-                background: isActive ? "var(--amber-tint)" : "transparent",
-                border: "none",
-                cursor: "pointer",
-                textAlign: "left",
-                borderRadius: 6,
-              }}
-              title={`'${s.name}' 관련 뉴스만 보기`}
-            >
-              <span className="trending-row-name">{s.name}</span>
-              <span className="trending-row-code">{s.code}</span>
-            </button>
-          );
-        })
-      )}
-    </aside>
-  );
-}
-
 function InstallHintBanner() {
   const [dismissed, setDismissed] = useState(true); // hidden until localStorage check to avoid a flash
   useEffect(() => {
@@ -330,7 +277,6 @@ export default function HomePage() {
   const [newIds, setNewIds] = useState(new Set());
   const [toast, setToast] = useState(null); // { count, headline } | null
   const [soundEnabled, setSoundEnabled] = useState(false);
-  const [filterStock, setFilterStock] = useState(null); // { code, name } | null
   const knownIdsRef = useRef(new Set());
   const toastTimerRef = useRef(null);
   const newIdsTimerRef = useRef(null);
@@ -398,10 +344,6 @@ export default function HomePage() {
   }, []);
 
   const items = useMemo(() => rawItems.map(toCardShape), [rawItems]);
-  const displayedItems = useMemo(() => {
-    if (!filterStock) return items;
-    return items.filter((it) => it.stocks.some((s) => s.code === filterStock.code));
-  }, [items, filterStock]);
 
   return (
     <div>
@@ -441,42 +383,8 @@ export default function HomePage() {
               </p>
             )}
 
-            {filterStock && (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 8,
-                  fontSize: 13,
-                  color: "var(--amber-tint-ink)",
-                  background: "var(--amber-tint)",
-                  padding: "8px 12px",
-                  borderRadius: 8,
-                  marginBottom: 12,
-                }}
-              >
-                <span>
-                  <strong>{filterStock.name}</strong>({filterStock.code}) 관련 뉴스만 보는 중
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setFilterStock(null)}
-                  style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", fontSize: 13, fontWeight: 600 }}
-                >
-                  필터 해제 ✕
-                </button>
-              </div>
-            )}
-
-            {loadState === "ready" && items.length > 0 && filterStock && displayedItems.length === 0 && (
-              <p style={{ fontSize: 14, color: "var(--ink-muted)", padding: "24px 0" }}>
-                최근 수집된 뉴스 중 "{filterStock.name}" 관련 기사가 아직 없어요.
-              </p>
-            )}
-
             <div className="news-list">
-              {displayedItems.map((n) => <NewsCard key={n.id} n={n} isNew={newIds.has(n.id)} />)}
+              {items.map((n) => <NewsCard key={n.id} n={n} isNew={newIds.has(n.id)} />)}
             </div>
           </div>
 
@@ -484,7 +392,6 @@ export default function HomePage() {
             <GlobalMarketPanel />
             <DailyMoversPanel />
             <HotThemePanel />
-            <TrendingPanel rawItems={rawItems} activeCode={filterStock?.code} onSelect={setFilterStock} />
           </div>
         </div>
       </main>
