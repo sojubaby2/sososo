@@ -211,9 +211,28 @@ button, input { font-family: inherit; }
 
 .theme-list { border-radius: 12px; border: 1px solid var(--border); background: var(--surface); overflow: hidden; }
 .theme-item { width: 100%; text-align: left; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border: none; background: transparent; border-left: 3px solid transparent; border-bottom: 1px solid var(--border); cursor: pointer; font-size: 14px; }
-.theme-item:last-child { border-bottom: none; }
+.theme-item:last-of-type { border-bottom: none; }
 .theme-item.active { background: #f6f3ea; border-left-color: var(--amber); }
 .theme-item-name { display: flex; align-items: center; gap: 6px; font-weight: 500; }
+
+/* 모바일 전용 테마 드롭다운(app/themes/page.js) — 767px 이하에서만 눌린
+   테마 바로 아래에 펼쳐짐. 데스크톱은 오른쪽 .theme-detail-desktop 패널을
+   그대로 씀. */
+.theme-item-accordion { display: none; }
+.theme-item-accordion:last-child { border-bottom: none; }
+@media (max-width: 767px) {
+  .theme-item-accordion.open {
+    display: block;
+    padding: 4px 12px 18px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+  }
+  .theme-item-accordion .theme-heading { padding: 10px 4px 0; }
+  .theme-item-accordion .stock-table { font-size: 13px; }
+  .theme-item-accordion .stock-table th,
+  .theme-item-accordion .stock-table td { padding: 9px 10px; }
+  .theme-detail-desktop { display: none; }
+}
 
 .theme-heading { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
 .theme-heading h2 { font-family: var(--font-display); font-size: 20px; font-weight: 700; margin: 0; }

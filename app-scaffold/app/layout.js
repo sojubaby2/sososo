@@ -31,7 +31,14 @@ export const metadata = {
   },
 };
 
+// [2026-09-07 변경] width/initialScale이 빠져 있었음 — themeColor만 지정된
+// viewport export가 Next.js의 기본 "width=device-width, initial-scale=1"
+// 메타 태그를 밀어내면서, 모바일에서 실제 화면 폭 기준으로 반응형 CSS(작은
+// 화면용 @media 규칙들)가 제대로 안 먹히고 화면 비율이 깨지는 원인이었음.
+// 명시적으로 다시 넣어줌.
 export const viewport = {
+  width: "device-width",
+  initialScale: 1,
   themeColor: "#c6862b",
 };
 

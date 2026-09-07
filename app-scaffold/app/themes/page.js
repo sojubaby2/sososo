@@ -4,7 +4,7 @@
 // prerendered at build time — see the matching note in app/page.js.
 export const dynamic = "force-dynamic";
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { Search, ShieldAlert, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import Header from "../../components/Header";
 import { getThemesGrouped, isPoliticalTheme } from "../../lib/themeData";
@@ -68,6 +68,57 @@ export default function ThemesPage() {
 
   const selectedGroup = THEMES.find((t) => t.theme === selected) ?? THEMES[0];
 
+  // 종목 테이블 하나를 데스크톱 오른쪽 패널과 모바일 인라인 드롭다운
+  // 양쪽에서 그대로 재사용하기 위한 렌더 함수.
+  function renderThemeDetail(group, stocks) {
+    return (
+      <>
+        <div className="theme-heading">
+          <h2>{group.theme}</h2>
+          <span className="text-xs" style={{ color: "var(--ink-muted)", fontSize: 12 }}>{rangeLabel} 누적 등락률 기준</span>
+          {isPoliticalTheme(group.theme) && (
+            <span className="political-tag">
+              <ShieldAlert size={12} />정치테마주 — 사업 실적과 무관한 인맥 기반 편입, 투자 주의
+            </span>
+          )}
+        </div>
+
+        <table className="stock-table">
+          <thead>
+            <tr>
+              <th>종목명</th>
+              <th>코드</th>
+              <th>시장</th>
+              <th>{rangeLabel} 등락률</th>
+            </tr>
+          </thead>
+          <tbody>
+            {stocks.map((s) => (
+              <tr key={s.code}>
+                <td style={{ fontWeight: 500 }}>{s.name}</td>
+                <td className="mono" style={{ color: "var(--ink-muted)" }}>{s.code}</td>
+                <td><span className="market-tag">{s.market}</span></td>
+                <td><ChangeTag value={stockChangeMap[s.code]} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </>
+    );
+  }
+
+  function sortStocksFor(group) {
+    return [...group.stocks].sort((a, b) => {
+      const ca = stockChangeMap[a.code];
+      const cb = stockChangeMap[b.code];
+      const na = typeof ca === "number", nb = typeof cb === "number";
+      if (!na && !nb) return 0;
+      if (!na) return 1;
+      if (!nb) return -1;
+      return cb - ca;
+    });
+  }
+
   // Hottest themes (highest change in the selected range) float to the top.
   const sortedThemes = useMemo(() => {
     return [...filteredThemes].sort((a, b) => {
@@ -83,19 +134,9 @@ export default function ThemesPage() {
 
   // Within the selected theme, sort stocks by the same range's change — this
   // is what stands in for a "대장주" leaderboard now that we don't show a
-  // same-day price/change (which looked live but wasn't).
-  const sortedStocks = useMemo(() => {
-    if (!selectedGroup) return [];
-    return [...selectedGroup.stocks].sort((a, b) => {
-      const ca = stockChangeMap[a.code];
-      const cb = stockChangeMap[b.code];
-      const na = typeof ca === "number", nb = typeof cb === "number";
-      if (!na && !nb) return 0;
-      if (!na) return 1;
-      if (!nb) return -1;
-      return cb - ca;
-    });
-  }, [selectedGroup, stockChangeMap]);
+  // same-day price/change (which looked live but wasn't). sortStocksFor is
+  // the same sort, reused for whichever theme's accordion is open on mobile.
+  const sortedStocks = useMemo(() => (selectedGroup ? sortStocksFor(selectedGroup) : []), [selectedGroup, stockChangeMap]);
 
   return (
     <div>
@@ -134,57 +175,36 @@ export default function ThemesPage() {
           <aside>
             <h2 className="section-title">전체 테마 ({sortedThemes.length}) · 🔥 {rangeLabel} 등락률 높은 순</h2>
             <div className="theme-list">
-              {sortedThemes.map((t) => (
-                <button
-                  key={t.theme}
-                  onClick={() => setSelected(t.theme)}
-                  className={`theme-item ${selected === t.theme ? "active" : ""}`}
-                >
-                  <span className="theme-item-name">
-                    {isPoliticalTheme(t.theme) && <ShieldAlert size={14} style={{ color: "var(--amber)" }} />}
-                    {t.theme}
-                  </span>
-                  <ChangeTag value={themeChangeMap[t.theme]} />
-                </button>
-              ))}
+              {sortedThemes.map((t) => {
+                const isActive = selected === t.theme;
+                return (
+                  <Fragment key={t.theme}>
+                    <button
+                      onClick={() => setSelected(t.theme)}
+                      className={`theme-item ${isActive ? "active" : ""}`}
+                    >
+                      <span className="theme-item-name">
+                        {isPoliticalTheme(t.theme) && <ShieldAlert size={14} style={{ color: "var(--amber)" }} />}
+                        {t.theme}
+                      </span>
+                      <ChangeTag value={themeChangeMap[t.theme]} />
+                    </button>
+                    {/* 모바일 전용 인라인 드롭다운 — 데스크톱(768px 이상)에서는 CSS로 숨기고
+                        오른쪽 <section> 패널을 대신 씀. 화면 폭과 상관없이 항상 렌더는 되지만
+                        .open 클래스가 있어도 768px 이상에서는 globals.css가 display:none 처리함. */}
+                    {isActive && (
+                      <div className="theme-item-accordion open">
+                        {renderThemeDetail(t, sortStocksFor(t))}
+                      </div>
+                    )}
+                  </Fragment>
+                );
+              })}
             </div>
           </aside>
 
-          <section>
-            {selectedGroup && (
-              <>
-                <div className="theme-heading">
-                  <h2>{selectedGroup.theme}</h2>
-                  <span className="text-xs" style={{ color: "var(--ink-muted)", fontSize: 12 }}>{rangeLabel} 누적 등락률 기준</span>
-                  {isPoliticalTheme(selectedGroup.theme) && (
-                    <span className="political-tag">
-                      <ShieldAlert size={12} />정치테마주 — 사업 실적과 무관한 인맥 기반 편입, 투자 주의
-                    </span>
-                  )}
-                </div>
-
-                <table className="stock-table">
-                  <thead>
-                    <tr>
-                      <th>종목명</th>
-                      <th>코드</th>
-                      <th>시장</th>
-                      <th>{rangeLabel} 등락률</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sortedStocks.map((s) => (
-                      <tr key={s.code}>
-                        <td style={{ fontWeight: 500 }}>{s.name}</td>
-                        <td className="mono" style={{ color: "var(--ink-muted)" }}>{s.code}</td>
-                        <td><span className="market-tag">{s.market}</span></td>
-                        <td><ChangeTag value={stockChangeMap[s.code]} /></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </>
-            )}
+          <section className="theme-detail-desktop">
+            {selectedGroup && renderThemeDetail(selectedGroup, sortedStocks)}
           </section>
         </div>
       </main>
