@@ -39,8 +39,19 @@ export const maxDuration = 60;
 // first line as a pseudo-headline and the whole message as the summary, so
 // the same filter/match prompts built for [뉴스 제목]/[뉴스 요약] still get
 // a sensible split to work with.
+// 채널 운영자가 헤드라인 맨 앞에 이모지(✅, 🚨 등)를 붙이는 경우가 많은데,
+// 그게 그대로 제목·본문에 노출되는 게 지저분해 보인다는 재성님 피드백을
+// 반영 — 문장 맨 앞에 붙은 이모지(+ 그 뒤 공백)만 제거함. 문장 중간에
+// 있는 이모지는 안 건드림(요청받은 범위가 "제목/본문 앞"이라서).
+// ️(variation selector: 이모지를 "그림체"로 표시하라는 보이지 않는
+// 표시)와 ‍(zero-width joiner: 여러 이모지를 하나로 합칠 때 씀)도
+// 이모지 뒤에 안 보이게 자주 붙어있어서 같이 제거해야 완전히 지워짐.
+function stripLeadingEmoji(text) {
+  return (text || "").replace(/^[\p{Extended_Pictographic}\p{Emoji_Presentation}\uFE0F\u200D\s]+/u, "");
+}
+
 function splitMessageText(raw) {
-  const text = (raw || "").trim();
+  const text = stripLeadingEmoji((raw || "").trim()).trim();
   if (!text) return { title: "", summary: "" };
   const firstBreak = text.indexOf("\n");
   const title = (firstBreak === -1 ? text : text.slice(0, firstBreak)).trim().slice(0, 200);
