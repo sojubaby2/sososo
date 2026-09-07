@@ -78,7 +78,7 @@ export async function storeDaySnapshot(redis, basDt, krxItems) {
   const total = await redis.zcard(DATES_INDEX_KEY);
   if (total > HISTORY_LOOKBACK_DAYS) {
     const excess = total - HISTORY_LOOKBACK_DAYS;
-    const oldest = await redis.zrange(DATES_INDEX_KEY, 0, excess - 1);
+    const oldest = (await redis.zrange(DATES_INDEX_KEY, 0, excess - 1)).map(toBasDtString);
     if (oldest.length > 0) {
       await Promise.all(oldest.map((d) => redis.del(dayKey(d))));
       await redis.zrem(DATES_INDEX_KEY, ...oldest);
@@ -99,6 +99,20 @@ export async function getStoredDayCount(redis) {
   return redis.zcard(DATES_INDEX_KEY);
 }
 
+// [2026-09-07 발견된 버그] Upstash Redis 클라이언트가 zrange로 읽어온 값이
+// "20260906"처럼 숫자로만 이뤄진 문자열이면, 이게 유효한 JSON 숫자라서
+// 자동으로 실제 숫자(Number)로 역직렬화해버림 — 저장할 때는 분명히 문자열
+// "20260906"으로 zadd 했는데(위 storeDaySnapshot), 읽어올 땐 20260906(숫자)
+// 로 돌아옴. 그 결과 businessDaysBackFrom()의 fromBasDt.slice(0,4) 같은
+// 문자열 메서드 호출이 "숫자에는 slice가 없다(e.slice is not a function)"는
+// 에러로 죽으면서, 자동 백필(backfillHistory)이 매번 조용히 실패하고
+// 있었음 — 패턴검색 히스토리가 "1/260일"에서 전혀 안 늘어난 근본 원인.
+// 그래서 Redis에서 날짜를 읽어오는 지점마다 String()으로 다시 문자열로
+// 강제 변환해줌.
+function toBasDtString(v) {
+  return v === null || v === undefined ? v : String(v);
+}
+
 // Most recent `limit` trading days we have stored, ascending (oldest
 // first) — the order every consumer (pattern detection, chart rendering)
 // actually wants a time series in.
@@ -106,12 +120,13 @@ export async function getStoredDatesAscending(redis, limit = HISTORY_LOOKBACK_DA
   const total = await redis.zcard(DATES_INDEX_KEY);
   if (!total) return [];
   const start = Math.max(0, total - limit);
-  return redis.zrange(DATES_INDEX_KEY, start, total - 1);
+  const dates = await redis.zrange(DATES_INDEX_KEY, start, total - 1);
+  return dates.map(toBasDtString);
 }
 
 export async function getOldestStoredDate(redis) {
   const oldest = await redis.zrange(DATES_INDEX_KEY, 0, 0);
-  return oldest[0] || null;
+  return oldest[0] !== undefined ? toBasDtString(oldest[0]) : null;
 }
 
 // Reads every stored day-snapshot in [oldest..newest] (ascending) and
@@ -166,13 +181,16 @@ function toBasDt(d) {
 }
 
 function* businessDaysBackFrom(fromBasDt) {
-  // fromBasDt is a "YYYYMMDD" string — walk backward one calendar day at a
-  // time, yielding only Mon-Fri (actual public holidays are handled by the
-  // caller simply getting an empty `items` back from KRX for that date and
-  // moving on, same as fetchAllStocksToday's existing retry logic).
-  const y = Number(fromBasDt.slice(0, 4));
-  const m = Number(fromBasDt.slice(4, 6)) - 1;
-  const dd = Number(fromBasDt.slice(6, 8));
+  // fromBasDt is meant to be a "YYYYMMDD" string — walk backward one
+  // calendar day at a time, yielding only Mon-Fri (actual public holidays
+  // are handled by the caller simply getting an empty `items` back from KRX
+  // for that date and moving on, same as fetchAllStocksToday's existing
+  // retry logic). Defensive String() here too (see toBasDtString above) —
+  // this generator is exactly where the "숫자로 역직렬화된 날짜"버그가 죽었음.
+  const s = String(fromBasDt);
+  const y = Number(s.slice(0, 4));
+  const m = Number(s.slice(4, 6)) - 1;
+  const dd = Number(s.slice(6, 8));
   const d = new Date(y, m, dd);
   while (true) {
     d.setDate(d.getDate() - 1);
