@@ -1,7 +1,7 @@
 // GET /api/patterns
 //
 // Reads the stored price history (lib/priceHistory.js) and scans every
-// stock against the 14 chart patterns in lib/patternDetection.js, keyed
+// stock against the 24 chart patterns in lib/patternDetection.js, keyed
 // by pattern id -> ranked list of {code, name, similarity, ...}. The
 // (expensive, ~2,800-stock) scan itself is cached in Redis for 30 minutes
 // — history only actually changes once a day, so rescanning on every
@@ -27,7 +27,12 @@ export const maxDuration = 60;
 
 // v1 -> v2: 위 변경(구조 변경)으로 예전 캐시 값의 모양이 안 맞을 수 있어서
 // 키를 올려 예전 캐시를 무시하도록 함.
-const RESULTS_CACHE_KEY = "patterns:results:v2";
+// v2 -> v3: 패턴을 14개에서 24개로 늘리면서(천정형·하락형 카테고리 추가)
+// scanAllStocksForPatterns()가 반환하는 patterns 객체의 키 구성이 달라져서
+// 또 한 번 올림 — 이걸 안 올리면 예전 14개 패턴 결과만 담긴 캐시가 30분간
+// 계속 나가서, 새로 추가한 10개는 목록엔 보여도(patternDefs는 항상 최신)
+// 종목 수가 다 0으로만 보일 수 있음.
+const RESULTS_CACHE_KEY = "patterns:results:v3";
 const RESULTS_CACHE_TTL_SECONDS = 60 * 30;
 
 export async function GET(request) {

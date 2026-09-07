@@ -2,12 +2,14 @@
 //
 // Chart-pattern recognition over the daily OHLC history built by
 // lib/priceHistory.js. Given one stock's ascending {date,o,h,l,c}[]
-// series, scores it against 14 pattern types and returns a similarity %
+// series, scores it against 24 pattern types and returns a similarity %
 // (0-100) for each one it plausibly matches — modeled on the "패턴 검색"
 // screener 재성 showed as a reference. This is a v1 heuristic
-// implementation: shape-based patterns use template-correlation matching,
-// trend patterns use linear-regression fits on highs/lows, and a couple
-// (적삼병, 전고점돌파) use direct rule checks instead of a curve template.
+// implementation: shape-based patterns use template-correlation matching
+// (바닥형 and its 천정형 상단 반전 패턴 모두), trend patterns use
+// linear-regression fits on highs/lows, and several (적삼병/흑삼병,
+// 전고점돌파, 골든크로스/데드크로스 등) use direct rule checks instead of a
+// curve template.
 // It has NOT been visually calibrated against real KOSPI/KOSDAQ charts yet
 // (no price history existed to test against when this was written) — once
 // real data is flowing through lib/priceHistory.js, expect to come back
@@ -161,6 +163,65 @@ const SHAPE_TEMPLATES = [
   },
 ];
 
+// nTroughTemplate을 위아래로 뒤집은 버전 — 바닥(trough) 대신 봉우리(peak)를
+// 쌓고, 끝에서 위로 살짝 올라가는 대신 아래로 꺾이게 함(천정을 찍고
+// 무너지는 하락반전). correlation()은 절대값(기준선 0 vs 1)이 아니라
+// 오르내리는 "모양"만 비교하므로 nTroughTemplate과 똑같은 방식으로 실제
+// 종가 구간과 대조해서 쓸 수 있음.
+function nPeakTemplate(n, peaks, { endDrop = 0.12 } = {}) {
+  const y = new Array(n);
+  for (let i = 0; i < n; i++) {
+    const t = i / (n - 1);
+    let v = 0;
+    for (const pk of peaks) {
+      const w = pk.width ?? 0.1;
+      v += pk.height * Math.exp(-((t - pk.pos) ** 2) / (2 * w * w));
+    }
+    if (t > 0.85) v -= endDrop * ((t - 0.85) / 0.15);
+    y[i] = v;
+  }
+  return y;
+}
+
+// 천정형(top reversal) — 바닥형 5개 중 3개(쌍바닥/삼중바닥/역헤드앤숄더)의
+// 정반대 모양. 컵앤핸들·U자바닥은 상단 반전 쪽에 자연스럽게 대응되는
+// 유명 패턴이 없어서(이론상 "역컵앤핸들" 같은 게 있긴 하지만 잘 안 씀)
+// 제외함.
+SHAPE_TEMPLATES.push(
+  {
+    id: "double_top",
+    label: "쌍봉",
+    window: 40,
+    template: (n) =>
+      nPeakTemplate(n, [
+        { pos: 0.28, height: 0.8, width: 0.09 },
+        { pos: 0.72, height: 0.8, width: 0.09 },
+      ]),
+  },
+  {
+    id: "triple_top",
+    label: "삼중천정",
+    window: 55,
+    template: (n) =>
+      nPeakTemplate(n, [
+        { pos: 0.18, height: 0.65, width: 0.08 },
+        { pos: 0.5, height: 0.7, width: 0.08 },
+        { pos: 0.82, height: 0.65, width: 0.08 },
+      ]),
+  },
+  {
+    id: "head_shoulders_top",
+    label: "헤드앤숄더",
+    window: 55,
+    template: (n) =>
+      nPeakTemplate(n, [
+        { pos: 0.2, height: 0.5, width: 0.08 }, // left shoulder
+        { pos: 0.5, height: 0.85, width: 0.09 }, // head — highest
+        { pos: 0.8, height: 0.5, width: 0.08 }, // right shoulder
+      ]),
+  }
+);
+
 // ---------------------------------------------------------------------------
 // Trend/channel patterns (추세형) — not a fixed shape, so these fit lines to
 // the window's highs/lows/closes and score based on slope + how tightly
@@ -231,6 +292,42 @@ function detectTrendPatterns(series, minSimilarity) {
     const similarity = Math.round(((flatScore + rangeScore) / 2) * 100);
     if (similarity >= minSimilarity) {
       results.push({ patternId: "box_range", label: "박스권", similarity, window: TREND_WINDOW, asOfDate });
+    }
+  }
+
+  // 하락채널: 상승채널을 뒤집은 것 — 뚜렷한 하락 추세 + 그 추세선 주변으로
+  // 좁게 움직임.
+  if (totalRisePct < -12 && residualPct < 8) {
+    const trendScore = Math.min(1, Math.abs(totalRisePct) / 30);
+    const tightnessScore = Math.min(1, Math.max(0, (8 - residualPct) / 8));
+    const similarity = Math.round(((trendScore + tightnessScore) / 2) * 100);
+    if (similarity >= minSimilarity) {
+      results.push({ patternId: "falling_channel", label: "하락채널", similarity, window: TREND_WINDOW, asOfDate });
+    }
+  }
+
+  // 하락삼각형: 상승삼각형을 뒤집은 것 — 지지선(저가)은 평평한데 저항선(고가)은
+  // 계속 낮아지면서 범위가 좁아짐. 지지선마저 뚫리면 하락 돌파로 이어지는
+  // 대표적인 하락 지속형 패턴.
+  if (Math.abs(lowSlopePct) < 5 && highSlopePct < -8 && narrowed > 0.25) {
+    const flatScore = Math.min(1, Math.max(0, (5 - Math.abs(lowSlopePct)) / 5));
+    const declineScore = Math.min(1, Math.abs(highSlopePct) / 20);
+    const narrowScore = Math.min(1, narrowed);
+    const similarity = Math.round(((flatScore + declineScore + narrowScore) / 3) * 100);
+    if (similarity >= minSimilarity) {
+      results.push({ patternId: "descending_triangle", label: "하락삼각형", similarity, window: TREND_WINDOW, asOfDate });
+    }
+  }
+
+  // 상승쐐기: 하락쐐기를 뒤집은 것 — 겉보기엔 고가/저가 둘 다 오르고 있지만
+  // 저가가 고가보다 더 가파르게 올라오면서(=지지선이 저항선을 따라잡으며)
+  // 범위가 좁아짐. 이름과 달리 대표적인 하락 반전 신호로 꼽히는 패턴.
+  if (lowSlopePct > 5 && highSlopePct > 0 && lowSlopePct > highSlopePct && narrowed > 0.2) {
+    const riseScore = Math.min(1, lowSlopePct / 20);
+    const convergeScore = Math.min(1, narrowed);
+    const similarity = Math.round(((riseScore + convergeScore) / 2) * 100);
+    if (similarity >= minSimilarity) {
+      results.push({ patternId: "rising_wedge", label: "상승쐐기", similarity, window: TREND_WINDOW, asOfDate });
     }
   }
 
@@ -342,6 +439,36 @@ function detectThreeWhiteSoldiers(series, minSimilarity) {
   return { patternId: "three_white_soldiers", label: "적삼병", similarity, window: 3, asOfDate: d3.date };
 }
 
+// 흑삼병 — 적삼병의 정반대: 3거래일 연속 종가가 낮아지고, 몸통이 그날의
+// 저가 쪽에 가깝게 강한 음봉으로 이어짐.
+function detectThreeBlackCrows(series, minSimilarity) {
+  const n = series.length;
+  if (n < 3) return null;
+  const [d1, d2, d3] = series.slice(n - 3);
+  if (!(d2.c < d1.c && d3.c < d2.c)) return null; // hard gate: 3 consecutive lower closes
+
+  const bodyStrength = (day) => {
+    const range = day.h - day.l;
+    if (range <= 0) return 0;
+    return (day.h - day.c) / range; // close near the day's low = strong bearish body, small lower wick
+  };
+  const avgStrength = (bodyStrength(d1) + bodyStrength(d2) + bodyStrength(d3)) / 3;
+
+  const opensInPriorRange = (prev, cur) => {
+    const hi = Math.max(prev.o, prev.c);
+    const lo = Math.min(prev.o, prev.c) * 0.98; // small tolerance for a modest gap-down open
+    return cur.o <= hi && cur.o >= lo;
+  };
+  const opensLookReasonable = opensInPriorRange(d1, d2) && opensInPriorRange(d2, d3);
+
+  const bodyScore = Math.min(1, avgStrength);
+  const opensScore = opensLookReasonable ? 1 : 0.4;
+  const similarity = Math.round(bodyScore * 70 + opensScore * 30);
+  if (similarity < minSimilarity) return null;
+
+  return { patternId: "three_black_crows", label: "흑삼병", similarity, window: 3, asOfDate: d3.date };
+}
+
 // ---------------------------------------------------------------------------
 // Breakout pattern (돌파형) — 전고점돌파: today's close clears the highest
 // high seen anywhere earlier in the stored history (up to
@@ -422,6 +549,89 @@ function detect52WeekHigh(series, minSimilarity) {
   };
 }
 
+// 52주 신고가를 뒤집은 것 — 52주 신저가. 로직·톨러런스 전부 동일하고
+// 최고가 대신 최저가 기준으로 비교함.
+function detect52WeekLow(series, minSimilarity) {
+  const n = series.length;
+  if (n < FIFTY_TWO_WEEK_MIN_DAYS) return null;
+  const win = series.slice(Math.max(0, n - FIFTY_TWO_WEEK_WINDOW));
+  const today = win[win.length - 1];
+  const windowLow = Math.min(...win.map((p) => p.c));
+  if (windowLow <= 0 || today.c > windowLow * (1 + FIFTY_TWO_WEEK_TOLERANCE)) return null;
+
+  const abovePct = ((today.c - windowLow) / windowLow) * 100;
+  const closeness = 1 - Math.min(1, abovePct / (FIFTY_TWO_WEEK_TOLERANCE * 100)); // 1 = 정확히 신저가
+  const coverageScore = Math.min(1, win.length / FIFTY_TWO_WEEK_WINDOW);
+  const similarity = Math.min(100, Math.round(55 + closeness * 30 + coverageScore * 15));
+  if (similarity < minSimilarity) return null;
+
+  return {
+    patternId: "fifty_two_week_low",
+    label: "52주 신저가",
+    similarity,
+    window: win.length,
+    asOfDate: today.date,
+    detail: { windowLow: Math.round(windowLow), abovePriorLowPct: Math.round(abovePct * 10) / 10 },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 이동평균 교차(이평선형) — 골든크로스/데드크로스: 단기(20일) 이동평균이
+// 장기(60일) 이동평균을 뚫고 올라가면(골든크로스)/내려가면(데드크로스)
+// 잡히는, 국내 개인투자자들에게 가장 익숙한 추세전환 시그널 중 하나.
+// 다른 패턴들과 달리 "어제는 아니었는데 오늘 막 교차했다"는 시점 자체를
+// 잡는 이벤트형 판정이라, 매일 다시 평가함(전고점돌파와 비슷한 성격).
+// ---------------------------------------------------------------------------
+
+const MA_SHORT_PERIOD = 20;
+const MA_LONG_PERIOD = 60;
+
+// closes[endIndexExclusive - period .. endIndexExclusive - 1]의 단순 평균.
+function sma(closes, period, endIndexExclusive) {
+  const start = endIndexExclusive - period;
+  if (start < 0) return null;
+  let sum = 0;
+  for (let i = start; i < endIndexExclusive; i++) sum += closes[i];
+  return sum / period;
+}
+
+function detectMovingAverageCross(series, minSimilarity) {
+  const n = series.length;
+  if (n < MA_LONG_PERIOD + 1) return null; // 오늘·어제 둘 다 60일선을 계산할 수 있어야 함
+  const closes = series.map((p) => p.c);
+
+  const shortToday = sma(closes, MA_SHORT_PERIOD, n);
+  const longToday = sma(closes, MA_LONG_PERIOD, n);
+  const shortYesterday = sma(closes, MA_SHORT_PERIOD, n - 1);
+  const longYesterday = sma(closes, MA_LONG_PERIOD, n - 1);
+  if ([shortToday, longToday, shortYesterday, longYesterday].some((v) => v === null)) return null;
+
+  const crossedUp = shortYesterday <= longYesterday && shortToday > longToday;
+  const crossedDown = shortYesterday >= longYesterday && shortToday < longToday;
+  if (!crossedUp && !crossedDown) return null;
+
+  const gapPct = longToday > 0 ? Math.abs((shortToday - longToday) / longToday) * 100 : 0;
+  const magnitudeScore = Math.min(1, gapPct / 2); // 2%+ 괴리면 만점
+
+  // 장기이평 자체의 기울기로 "진짜 추세 전환"에 가까운지 가중치를 살짝 더 줌
+  // (막 교차했는데 장기선이 여전히 반대 방향이면 다소 억지스러운 교차일 수 있음)
+  const longWindow = closes.slice(n - MA_LONG_PERIOD);
+  const longReg = linreg(longWindow);
+  const longTrendPct = longToday > 0 ? ((longReg.slope * (MA_LONG_PERIOD - 1)) / longToday) * 100 : 0;
+  const trendScore = crossedUp
+    ? Math.min(1, Math.max(0, longTrendPct) / 10)
+    : Math.min(1, Math.max(0, -longTrendPct) / 10);
+
+  const similarity = Math.min(100, Math.round(55 + magnitudeScore * 25 + trendScore * 20));
+  if (similarity < minSimilarity) return null;
+
+  const asOfDate = series[n - 1].date;
+  const detail = { gapPct: Math.round(gapPct * 10) / 10, shortPeriod: MA_SHORT_PERIOD, longPeriod: MA_LONG_PERIOD };
+  return crossedUp
+    ? { patternId: "golden_cross", label: "골든크로스", similarity, window: MA_LONG_PERIOD, asOfDate, detail }
+    : { patternId: "dead_cross", label: "데드크로스", similarity, window: MA_LONG_PERIOD, asOfDate, detail };
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -431,18 +641,28 @@ function detect52WeekHigh(series, minSimilarity) {
 export const PATTERN_DEFS = [
   { id: "breakout_prior_high", label: "전고점돌파", category: "돌파형", window: null },
   { id: "fifty_two_week_high", label: "52주 신고가", category: "돌파형", window: FIFTY_TWO_WEEK_WINDOW },
+  { id: "golden_cross", label: "골든크로스", category: "돌파형", window: MA_LONG_PERIOD },
   { id: "double_bottom", label: "쌍바닥", category: "바닥형", window: 40 },
   { id: "triple_bottom", label: "삼중바닥", category: "바닥형", window: 55 },
   { id: "cup_and_handle", label: "컵앤핸들", category: "바닥형", window: 80 },
   { id: "u_bottom", label: "U자바닥", category: "바닥형", window: 35 },
   { id: "inverse_head_shoulders", label: "역헤드앤숄더", category: "바닥형", window: 55 },
+  { id: "double_top", label: "쌍봉", category: "천정형", window: 40 },
+  { id: "triple_top", label: "삼중천정", category: "천정형", window: 55 },
+  { id: "head_shoulders_top", label: "헤드앤숄더", category: "천정형", window: 55 },
   { id: "rising_channel", label: "상승채널", category: "추세형", window: TREND_WINDOW },
   { id: "ascending_triangle", label: "상승삼각형", category: "추세형", window: TREND_WINDOW },
   { id: "falling_wedge", label: "하락쐐기", category: "추세형", window: TREND_WINDOW },
   { id: "box_range", label: "박스권", category: "추세형", window: TREND_WINDOW },
+  { id: "falling_channel", label: "하락채널", category: "하락형", window: TREND_WINDOW },
+  { id: "descending_triangle", label: "하락삼각형", category: "하락형", window: TREND_WINDOW },
+  { id: "rising_wedge", label: "상승쐐기", category: "하락형", window: TREND_WINDOW },
+  { id: "dead_cross", label: "데드크로스", category: "하락형", window: MA_LONG_PERIOD },
+  { id: "fifty_two_week_low", label: "52주 신저가", category: "하락형", window: FIFTY_TWO_WEEK_WINDOW },
   { id: "pullback", label: "눌림목", category: "조정형", window: 30 },
   { id: "flag", label: "깃발", category: "조정형", window: 15 },
   { id: "three_white_soldiers", label: "적삼병", category: "캔들형", window: 3 },
+  { id: "three_black_crows", label: "흑삼병", category: "캔들형", window: 3 },
 ];
 
 // series: ascending [{date,o,h,l,c}, ...] for one stock. Returns matches
@@ -474,8 +694,11 @@ export function detectPatternsForStock(series, { minSimilarity = 55 } = {}) {
     detectPullback(series, minSimilarity),
     detectFlag(series, minSimilarity),
     detectThreeWhiteSoldiers(series, minSimilarity),
+    detectThreeBlackCrows(series, minSimilarity),
     detectBreakout(series, minSimilarity),
     detect52WeekHigh(series, minSimilarity),
+    detect52WeekLow(series, minSimilarity),
+    detectMovingAverageCross(series, minSimilarity),
   ];
   for (const e of extras) if (e) results.push(e);
 

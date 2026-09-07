@@ -9,8 +9,9 @@ import { Search, Info } from "lucide-react";
 import Header from "../../components/Header";
 
 // lib/patternDetection.js의 PATTERN_DEFS와 category 값이 일치해야 함.
-// 돌파형(전고점돌파/52주 신고가)을 재성님 요청으로 맨 위에 배치.
-const CATEGORY_ORDER = ["돌파형", "바닥형", "추세형", "조정형", "캔들형"];
+// 돌파형(전고점돌파/52주 신고가/골든크로스)을 재성님 요청으로 맨 위에 배치.
+// 천정형·하락형은 각각 바닥형·상승 계열 패턴들의 반대(하락 반전/지속) 버전.
+const CATEGORY_ORDER = ["돌파형", "바닥형", "천정형", "추세형", "하락형", "조정형", "캔들형"];
 
 function SimilarityBar({ value }) {
   return (
@@ -89,7 +90,7 @@ export default function PatternsPage() {
         <div className="theme-heading" style={{ marginBottom: 8 }}>
           <h2>패턴검색</h2>
           <span className="text-xs" style={{ color: "var(--ink-muted)", fontSize: 12 }}>
-            최근 시세 흐름을 14가지 차트 패턴과 비교해 유사도가 높은 종목을 찾아드립니다
+            최근 시세 흐름을 24가지 차트 패턴과 비교해 유사도가 높은 종목을 찾아드립니다
           </span>
         </div>
 
