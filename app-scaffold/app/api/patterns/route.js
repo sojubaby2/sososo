@@ -40,7 +40,13 @@ export const maxDuration = 60;
 // — 날짜만 봐선 못 걸러짐). lib/patternDetection.js에 "최근 며칠간 실제
 // 가격 변동이 있었는가"를 직접 보는 필터(isLikelyInactive)를 추가하면서,
 // 예전(여전히 버그 낀) 캐시 결과가 30분 더 나가는 걸 막으려고 또 올림.
-const RESULTS_CACHE_KEY = "patterns:results:v5";
+// v5 -> v6: v5의 가정도 틀렸었음이 확인됨 — 거래정지일은 시가·고가·저가가
+// 전부 0으로 오고 종가만 기준가로 채워지는데, 이 기준가가 실거래 없이도
+// 하루 만에 크게 뛸 수 있어서(삼부토건·에스아이리소스로 직접 확인) "최근
+// 며칠 종가가 동일한가" 체크가 그 점프 시점을 걸치면 못 잡았음.
+// isLikelyInactive()에 "오늘 시가=고가=저가=0"이면 바로 제외하는 훨씬
+// 직접적인 신호를 추가하면서 또 올림.
+const RESULTS_CACHE_KEY = "patterns:results:v6";
 const RESULTS_CACHE_TTL_SECONDS = 60 * 30;
 
 export async function GET(request) {
