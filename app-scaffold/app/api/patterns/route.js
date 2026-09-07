@@ -1,14 +1,23 @@
 // GET /api/patterns
 //
 // Reads the stored price history (lib/priceHistory.js) and scans every
-// stock against the 13 chart patterns in lib/patternDetection.js, keyed
-// by pattern id -> ranked list of {code, name, similarity, ...}. Cached
-// in Redis for 30 minutes (history only actually changes once a day, so
-// rescanning ~2,800 stocks on every single page load is wasted work) —
-// pass ?refresh=1 to force a fresh scan.
+// stock against the 14 chart patterns in lib/patternDetection.js, keyed
+// by pattern id -> ranked list of {code, name, similarity, ...}. The
+// (expensive, ~2,800-stock) scan itself is cached in Redis for 30 minutes
+// — history only actually changes once a day, so rescanning on every
+// single page load is wasted work — pass ?refresh=1 to force a fresh scan.
 //
 // Returns { error } (still 200, so the frontend can show a friendly
 // "run the backfill first" message) if no history has been backfilled yet.
+//
+// [2026-09-07 변경] patternDefs/historyDays를 예전엔 위 30분 캐시 안에
+// scan 결과랑 같이 통째로 저장했었는데, 그러면 캐시가 살아있는 동안엔
+// (1) lib/patternDetection.js에 새 패턴을 추가해도 최대 30분간 목록에
+//안 보이고, (2) 자동 백필로 히스토리가 계속 쌓이고 있어도 진행률
+// (historyDays)이 캐시가 만료될 때까지 그 시점 숫자에 멈춰 보이는 문제가
+// 있었음 (52주 신고가 패턴을 추가했는데 화면에 안 뜨는 문제로 발견됨).
+// 그래서 이 둘은 캐시 히트/미스와 상관없이 매 요청마다 새로 계산해서
+// 내려주고, 정말 무거운 scanAllStocksForPatterns 결과만 캐시함.
 
 import { getRedis } from "../../../lib/redis";
 import { buildPriceSeriesForAllStocks, getStoredDayCount, HISTORY_LOOKBACK_DAYS } from "../../../lib/priceHistory";
@@ -16,7 +25,9 @@ import { scanAllStocksForPatterns, PATTERN_DEFS } from "../../../lib/patternDete
 
 export const maxDuration = 60;
 
-const RESULTS_CACHE_KEY = "patterns:results:v1";
+// v1 -> v2: 위 변경(구조 변경)으로 예전 캐시 값의 모양이 안 맞을 수 있어서
+// 키를 올려 예전 캐시를 무시하도록 함.
+const RESULTS_CACHE_KEY = "patterns:results:v2";
 const RESULTS_CACHE_TTL_SECONDS = 60 * 30;
 
 export async function GET(request) {
@@ -28,22 +39,25 @@ export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const force = searchParams.get("refresh") === "1";
 
+  // /patterns 페이지가 "히스토리 쌓는 중" 진행률을 보여줄 수 있게, 항상
+  // 최신 값으로 계산함 (아래 scan 결과 캐시와는 별개 — 캐시 적중 여부와
+  // 무관하게 매번 새로 구함).
+  const historyDays = await getStoredDayCount(redis).catch(() => 0);
+  const historyTarget = HISTORY_LOOKBACK_DAYS;
+
   if (!force) {
     try {
       const cached = await redis.get(RESULTS_CACHE_KEY);
       if (cached) {
         const data = typeof cached === "string" ? JSON.parse(cached) : cached;
-        if (data?.patterns) return Response.json(data);
+        if (data?.patterns) {
+          return Response.json({ ...data, patternDefs: PATTERN_DEFS, historyDays, historyTarget });
+        }
       }
     } catch {
       // corrupt/unreadable cache entry — fall through to a fresh scan
     }
   }
-
-  // /patterns 페이지가 "히스토리 쌓는 중" 진행률을 보여줄 수 있게, 결과가
-  // 비어있는 경우든 아니든 항상 같이 내려줌.
-  const historyDays = await getStoredDayCount(redis).catch(() => 0);
-  const historyTarget = HISTORY_LOOKBACK_DAYS;
 
   const priceSeriesMap = await buildPriceSeriesForAllStocks(redis);
   if (priceSeriesMap.size === 0) {
