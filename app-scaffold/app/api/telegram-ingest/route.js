@@ -1,10 +1,5 @@
 // POST /api/telegram-ingest
 //
-// [임시 진단 모드] TELEGRAM_INGEST_SECRET이 계속 "설정되지 않음"으로 나오는
-// 문제를 확인하기 위해, 에러 응답에 현재 서버가 실제로 갖고 있는 환경변수
-// "이름" 목록을 잠깐 같이 내려주도록 했습니다 (값은 절대 노출 안 함).
-// 원인 확인되면 이 부분은 다시 원래대로 되돌릴 거예요.
-//
 // Receives one Telegram channel message at a time, pushed in real time by
 // the listener script (Telethon userbot) running on the Oracle Cloud VM —
 // see server/listener.py in this package. Runs it through the exact same
@@ -72,15 +67,7 @@ export async function POST(request) {
   const ingestSecret = process.env.TELEGRAM_INGEST_SECRET;
   if (!ingestSecret) {
     return Response.json(
-<<<<<<< HEAD
       { error: "TELEGRAM_INGEST_SECRET 환경변수가 설정되지 않았습니다." },
-=======
-      {
-        error: "TELEGRAM_INGEST_SECRET 환경변수가 설정되지 않았습니다.",
-        // 임시 진단용 — 값은 절대 안 보여주고 "이름"만 나열합니다.
-        debugEnvKeys: Object.keys(process.env).sort(),
-      },
->>>>>>> b9a0958e6246007596add5f05766c79116507042
       { status: 500 }
     );
   }

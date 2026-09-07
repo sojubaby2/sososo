@@ -91,7 +91,6 @@ async function fetchKrxDailyMarket(trdDd, mktId) {
   return Array.isArray(data?.OutBlock_1) ? data.OutBlock_1 : [];
 }
 
-<<<<<<< HEAD
 // data.krx.co.kr이 가끔 일시적으로 응답을 안 주는 경우가 있어서, 한 번
 // 실패하면 짧게 쉬었다가 한 번만 더 시도함 — 매 시도마다 계속 재시도하면
 // 오히려 더 막힐 수 있어서 딱 1회만.
@@ -105,8 +104,6 @@ async function fetchKrxDailyMarketWithRetry(trdDd, mktId) {
   }
 }
 
-=======
->>>>>>> b9a0958e6246007596add5f05766c79116507042
 function parseKrxNum(v) {
   if (v === undefined || v === null) return NaN;
   const cleaned = String(v).replace(/,/g, "").trim();
@@ -130,13 +127,8 @@ function normalizeKrxRow(row, marketLabel) {
 
 async function fetchStockPage(trdDd) {
   const [stk, ksq] = await Promise.all([
-<<<<<<< HEAD
     fetchKrxDailyMarketWithRetry(trdDd, "STK"),
     fetchKrxDailyMarketWithRetry(trdDd, "KSQ"),
-=======
-    fetchKrxDailyMarket(trdDd, "STK"),
-    fetchKrxDailyMarket(trdDd, "KSQ"),
->>>>>>> b9a0958e6246007596add5f05766c79116507042
   ]);
   const items = [
     ...stk.map((r) => normalizeKrxRow(r, "KOSPI")),
@@ -258,7 +250,6 @@ export async function GET() {
     fetchLatestAvailable(monthAgo),
   ]);
 
-<<<<<<< HEAD
   // recent(오늘 기준 최신 시세)가 없으면 아무것도 계산할 수 없으니 진짜
   // 실패. 하지만 week나 month만 실패한 경우엔 — 예를 들어 KRX 쪽 일시적
   // 오류로 한쪽만 못 받아온 경우 — 굳이 화면 전체를 에러로 띄우지 않고,
@@ -268,13 +259,6 @@ export async function GET() {
   // 문제가 있었음 — 이렇게 부분 실패를 허용하도록 고침.
   if (!recent) {
     console.error("theme-momentum: 최신 시세를 가져오지 못함");
-=======
-  if (!recent || !week || !month) {
-    console.error(
-      "theme-momentum: 시세 데이터를 가져오지 못함 —",
-      JSON.stringify({ recent: !!recent, week: !!week, month: !!month })
-    );
->>>>>>> b9a0958e6246007596add5f05766c79116507042
     return Response.json({ error: "시세 데이터를 가져오지 못했습니다." }, { status: 502 });
   }
   if (!week) console.error("theme-momentum: 1주일 전 시세를 가져오지 못함 — 1주일 등락률은 비어서 나감");
