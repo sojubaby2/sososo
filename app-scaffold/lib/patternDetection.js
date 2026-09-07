@@ -746,7 +746,7 @@ const INACTIVITY_LOOKBACK_DAYS = 5;
 //     5일치가 아직 안 쌓인 종목(신규 상장 등)을 위해, 더 짧게 최근
 //     3거래일 동안 하루 중 가격도 전혀 안 움직였으면(시가=고가=저가=
 //     종가) 이것만으로도 즉시 걸러내는 보조 신호도 같이 둠.
-function isLikelyInactive(series) {
+export function isLikelyInactive(series) {
   const n = series.length;
   if (n < 3) return false;
 
