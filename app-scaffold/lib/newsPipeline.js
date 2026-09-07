@@ -37,40 +37,114 @@ function toBasDt(d) {
   return `${y}${m}${dd}`;
 }
 
-function* businessDaysBackFrom(from) {
-  const d = new Date(from);
-  while (true) {
-    d.setDate(d.getDate() - 1);
-    const day = d.getDay();
-    if (day !== 0 && day !== 6) yield toBasDt(d);
+// [2026-09-06/07 변경 내역]
+// 1차: 공공데이터포털(apis.data.go.kr)의 KRX 시세 API를 썼는데, 어느
+//      시점부터 클라우드(Vercel) 서버가 보내는 요청을 연결 단계에서부터
+//      막기 시작했음(10초 Connect Timeout — 예전에 수출입은행 API가
+//      클라우드발 트래픽을 막았던 것과 똑같은 증상). 뉴스 매칭·테마
+//      등락률 등 시세가 필요한 기능이 전부 죽어있었음.
+// 2차: m.stock.naver.com의 비공식 JSON API로 교체 시도 → 404 (그 사이
+//      네이버 앱 쪽 API 구조가 바뀐 것으로 보임).
+// 3차(현재): 네이버 금융(finance.naver.com)의 "시가총액" 페이지
+//      (sise_market_sum.naver)를 직접 파싱. 이 페이지는 2010년대부터
+//      국내 개인 투자자용 크롤링 도구들이 계속 사용해온 오래되고 안정적인
+//      페이지라, 구조가 바뀔 위험이 상대적으로 적음. 파싱 라이브러리 설치
+//      없이 정규식으로 표를 직접 읽음.
+//
+// 그래도 혹시 이 페이지 구조도 나중에 바뀌면 바로 알 수 있도록, 종목을
+// 하나도 못 찾으면 원본 HTML에서 뽑아낸 샘플 행을 에러 로그에 남기게
+// 해뒀음 — 다음에 또 깨지면 로그만 보고 바로 원인을 알 수 있게.
+const NAVER_MARKET_SUM_URL = "https://finance.naver.com/sise/sise_market_sum.naver";
+// 넉넉하게 잡은 상한 — KOSPI/KOSDAQ 각각 실제로는 20~35페이지 정도면 끝남
+// (한 페이지 50종목 기준). 빈 페이지가 나오는 순간 그 자리에서 멈춤.
+const NAVER_MAX_PAGES_PER_MARKET = 50;
+
+async function fetchNaverMarketSumPage(sosok, page) {
+  const qs = new URLSearchParams({ sosok: String(sosok), page: String(page) });
+  const url = `${NAVER_MARKET_SUM_URL}?${qs.toString()}`;
+  const res = await fetch(url, {
+    cache: "no-store",
+    headers: { "User-Agent": "Mozilla/5.0 (compatible; newsmeme-bot/1.0)" },
+  });
+  if (!res.ok) throw new Error(`네이버 시세 페이지 오류 (status ${res.status})`);
+  const buf = await res.arrayBuffer();
+  // 이 구형 네이버 금융 페이지는 EUC-KR 인코딩이라, 그냥 text()로 읽으면
+  // 한글이 깨져서 TextDecoder로 직접 변환해줘야 함.
+  return new TextDecoder("euc-kr").decode(buf);
+}
+
+// 표 컬럼 순서(오랫동안 안 바뀐 것으로 알려짐): N, 종목명(링크에 종목코드
+// 포함), 현재가, 전일비, 등락률, 액면가, 시가총액, 상장주식수, 외국인비율,
+// 거래량, PER, ROE. 구분선 행은 <td>가 1개뿐이라 자동으로 걸러짐.
+function parseMarketSumHtml(html) {
+  const rowChunks = html.split(/<tr[\s>]/i).slice(1);
+  const results = [];
+  let sampleRow = null;
+
+  for (const chunk of rowChunks) {
+    const cellMatches = [...chunk.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)];
+    if (cellMatches.length < 10) continue; // 데이터 행이 아님(구분선 등)
+
+    const rawCells = cellMatches.map((m) => m[1]);
+    const textCells = rawCells.map((c) =>
+      c.replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim()
+    );
+
+    const codeMatch = rawCells[1]?.match(/code=(\d{6})/);
+    const name = textCells[1];
+    if (!codeMatch || !name) continue;
+    const code = codeMatch[1];
+
+    if (!sampleRow) sampleRow = { code, name, cells: textCells.slice(0, 6) };
+
+    const price = Number((textCells[2] || "").replace(/,/g, ""));
+    const changeNumMatch = (textCells[4] || "").match(/([\d.]+)%/);
+    let changePct = changeNumMatch ? Number(changeNumMatch[1]) : NaN;
+    if (Number.isFinite(changePct) && /(-|−)/.test(rawCells[4] || "")) changePct = -changePct;
+
+    results.push({ code, name, price, changePct });
   }
+  return { results, sampleRow };
 }
 
-async function fetchStockPage(serviceKey, basDt, numOfRows, pageNo) {
-  const qs = new URLSearchParams({ numOfRows, pageNo, resultType: "json", basDt });
-  const url = `https://apis.data.go.kr/1160100/service/GetStockSecuritiesInfoService/getStockPriceInfo?serviceKey=${serviceKey}&${qs.toString()}`;
-  const res = await fetch(url, { cache: "no-store" });
-  return res.json();
+async function fetchAllStocksTodayForMarket(sosok, marketLabel) {
+  const all = [];
+  let sampleRow = null;
+  for (let page = 1; page <= NAVER_MAX_PAGES_PER_MARKET; page++) {
+    let html;
+    try {
+      html = await fetchNaverMarketSumPage(sosok, page);
+    } catch (err) {
+      console.error(`fetchAllStocksToday(${marketLabel}) 페이지 ${page} 요청 실패:`, err.message || err);
+      break;
+    }
+    const parsed = parseMarketSumHtml(html);
+    if (!sampleRow && parsed.sampleRow) sampleRow = parsed.sampleRow;
+    if (parsed.results.length === 0) break; // 마지막 페이지
+    for (const r of parsed.results) all.push({ ...r, market: marketLabel });
+    if (parsed.results.length < 40) break; // 한 페이지 50종목 기준, 마지막 페이지로 판단
+  }
+  return { all, sampleRow };
 }
 
-// Returns { items: [{srtnCd,itmsNm,mrktCtg,clpr,fltRt,...}], basDt } or null.
+// Returns { items: [{code,name,market,price,changePct}], basDt } or null.
 export async function fetchAllStocksToday() {
-  const serviceKey = process.env.KRX_SERVICE_KEY;
-  if (!serviceKey) return null;
-  const gen = businessDaysBackFrom(new Date());
-  for (let i = 0; i < 5; i++) {
-    const basDt = gen.next().value;
-    const data = await fetchStockPage(serviceKey, basDt, "3000", "1");
-    const items = data?.response?.body?.items?.item ?? [];
-    if (items.length > 0) return { items, basDt };
-  }
-  return null;
-}
+  const [kospi, kosdaq] = await Promise.all([
+    fetchAllStocksTodayForMarket(0, "코스피"),
+    fetchAllStocksTodayForMarket(1, "코스닥"),
+  ]);
+  const all = [...kospi.all, ...kosdaq.all];
 
-function marketLabel(mrktCtg) {
-  if (mrktCtg === "KOSPI") return "코스피";
-  if (mrktCtg === "KOSDAQ") return "코스닥";
-  return mrktCtg || "";
+  if (all.length === 0) {
+    const sample = kospi.sampleRow || kosdaq.sampleRow;
+    console.error(
+      "네이버 시세 페이지 파싱 실패 — 종목을 하나도 못 찾음. 샘플 행:",
+      sample ? JSON.stringify(sample) : "(샘플 행도 없음 — 페이지 구조 자체가 다른 것으로 보임)"
+    );
+    return null;
+  }
+
+  return { items: all, basDt: toBasDt(new Date()) };
 }
 
 // Builds the full-universe "code|name|market" list Claude picks direct
@@ -79,9 +153,9 @@ export function buildUniverseFromKrx(krxItems) {
   const lines = [];
   const priceMap = new Map();
   for (const it of krxItems) {
-    if (!it.srtnCd || !it.itmsNm) continue;
-    lines.push(`${it.srtnCd}|${it.itmsNm}|${marketLabel(it.mrktCtg)}`);
-    priceMap.set(it.srtnCd, { price: Number(it.clpr), change: Number(it.fltRt) });
+    if (!it.code || !it.name) continue;
+    lines.push(`${it.code}|${it.name}|${it.market || ""}`);
+    priceMap.set(it.code, { price: it.price, change: it.changePct });
   }
   return { companyList: lines.join("\n"), priceMap };
 }
