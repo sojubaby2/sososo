@@ -2,7 +2,7 @@
 //
 // Chart-pattern recognition over the daily OHLC history built by
 // lib/priceHistory.js. Given one stock's ascending {date,o,h,l,c}[]
-// series, scores it against 13 pattern types and returns a similarity %
+// series, scores it against 14 pattern types and returns a similarity %
 // (0-100) for each one it plausibly matches — modeled on the "패턴 검색"
 // screener 재성 showed as a reference. This is a v1 heuristic
 // implementation: shape-based patterns use template-correlation matching,
@@ -385,12 +385,52 @@ function detectBreakout(series, minSimilarity) {
 }
 
 // ---------------------------------------------------------------------------
+// 52-week-high state pattern (돌파형) — 52주 신고가: 전고점돌파와 다른 점은,
+// 전고점돌파는 "오늘 처음 이전 고점을 뚫은 그 순간"에만 잡히는 1회성
+// 이벤트인 반면, 이건 "최근 52주(약 252거래일) 안에서 지금 고점권에 머물러
+// 있는가"를 매일 다시 판정하는 상태값이라, 뚫은 당일이 지나도 그 근처에서
+// 계속 움직이는 동안은 계속 리스트에 남아있음. 윈도우도 전고점돌파처럼
+// "쌓인 히스토리 전체"가 아니라 딱 252거래일로 고정해서, 흔히 말하는
+// "52주 신고가" 스크리너 정의에 더 가깝게 맞춤.
+// ---------------------------------------------------------------------------
+
+const FIFTY_TWO_WEEK_WINDOW = 252; // 52주 ≈ 252거래일
+const FIFTY_TWO_WEEK_MIN_DAYS = 60; // "52주" 판정이 의미 있으려면 최소 이 정도는 쌓여있어야 함
+const FIFTY_TWO_WEEK_TOLERANCE = 0.02; // 신고가 대비 2% 이내면 "신고가권"으로 인정
+
+function detect52WeekHigh(series, minSimilarity) {
+  const n = series.length;
+  if (n < FIFTY_TWO_WEEK_MIN_DAYS) return null;
+  const win = series.slice(Math.max(0, n - FIFTY_TWO_WEEK_WINDOW));
+  const today = win[win.length - 1];
+  const windowHigh = Math.max(...win.map((p) => p.c));
+  if (windowHigh <= 0 || today.c < windowHigh * (1 - FIFTY_TWO_WEEK_TOLERANCE)) return null;
+
+  const belowPct = ((windowHigh - today.c) / windowHigh) * 100;
+  const closeness = 1 - Math.min(1, belowPct / (FIFTY_TWO_WEEK_TOLERANCE * 100)); // 1 = 정확히 신고가
+  const coverageScore = Math.min(1, win.length / FIFTY_TWO_WEEK_WINDOW); // 실제 데이터가 52주에 가까울수록 신뢰도↑
+  const similarity = Math.min(100, Math.round(55 + closeness * 30 + coverageScore * 15));
+  if (similarity < minSimilarity) return null;
+
+  return {
+    patternId: "fifty_two_week_high",
+    label: "52주 신고가",
+    similarity,
+    window: win.length,
+    asOfDate: today.date,
+    detail: { windowHigh: Math.round(windowHigh), belowHighPct: Math.round(belowPct * 10) / 10 },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
 // Static metadata for every pattern this module can detect — useful for a
 // frontend filter dropdown / legend even before any results come back.
 export const PATTERN_DEFS = [
+  { id: "breakout_prior_high", label: "전고점돌파", category: "돌파형", window: null },
+  { id: "fifty_two_week_high", label: "52주 신고가", category: "돌파형", window: FIFTY_TWO_WEEK_WINDOW },
   { id: "double_bottom", label: "쌍바닥", category: "바닥형", window: 40 },
   { id: "triple_bottom", label: "삼중바닥", category: "바닥형", window: 55 },
   { id: "cup_and_handle", label: "컵앤핸들", category: "바닥형", window: 80 },
@@ -403,7 +443,6 @@ export const PATTERN_DEFS = [
   { id: "pullback", label: "눌림목", category: "조정형", window: 30 },
   { id: "flag", label: "깃발", category: "조정형", window: 15 },
   { id: "three_white_soldiers", label: "적삼병", category: "캔들형", window: 3 },
-  { id: "breakout_prior_high", label: "전고점돌파", category: "돌파형", window: null },
 ];
 
 // series: ascending [{date,o,h,l,c}, ...] for one stock. Returns matches
@@ -436,6 +475,7 @@ export function detectPatternsForStock(series, { minSimilarity = 55 } = {}) {
     detectFlag(series, minSimilarity),
     detectThreeWhiteSoldiers(series, minSimilarity),
     detectBreakout(series, minSimilarity),
+    detect52WeekHigh(series, minSimilarity),
   ];
   for (const e of extras) if (e) results.push(e);
 
