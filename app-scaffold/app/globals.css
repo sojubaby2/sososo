@@ -29,6 +29,12 @@ html, body {
   background: var(--bg);
   color: var(--ink);
   font-family: var(--font-body);
+  /* [2026-09-07 추가] 모바일 화면비율 깨짐의 실제 원인은 헤더 내비게이션
+     바(.nav)였음 — 좁은 화면에서 6개 메뉴가 줄바꿈 없이 한 줄에 다 들어가려고
+     하면서 넘친 부분이 페이지 전체 가로폭을 넓혀버렸음(아래 .nav 자체
+     스크롤로 고쳤지만), 혹시 모를 다른 요소의 튀어나옴까지 막는 최후
+     안전장치로 문서 자체는 가로 스크롤이 아예 안 생기게 막아둠. */
+  overflow-x: hidden;
 }
 
 button, input { font-family: inherit; }
@@ -62,8 +68,24 @@ button, input { font-family: inherit; }
 @media (max-width: 480px) {
   .site-header-inner { flex-wrap: wrap; gap: 8px; padding: 12px 0; }
   .brand h1 { font-size: 19px; }
-  .nav { width: 100%; justify-content: space-between; gap: 2px; font-size: 11px; }
-  .nav-btn { padding: 5px 6px; gap: 3px; flex: 1; justify-content: center; }
+  /* [2026-09-07 변경] 예전엔 .nav-btn에 flex:1을 줘서 6개 메뉴를 한 줄에
+     욱여넣으려 했는데, .nav-btn에 걸린 white-space:nowrap 때문에 글자가
+     줄어들지 못하고(플렉스 아이템은 기본적으로 내용물 너비 밑으로는 안
+     줄어듦) 화면 밖으로 넘쳐서 페이지 전체가 옆으로 밀리는 원인이 됐음.
+     그 대신 메뉴 줄 자체를 옆으로 스크롤되게 바꿔서, 넘치는 부분이 페이지
+     전체를 밀지 않고 메뉴 줄 안에서만 스크롤되도록 함. */
+  .nav {
+    width: 100%;
+    justify-content: flex-start;
+    gap: 4px;
+    font-size: 12px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+  .nav::-webkit-scrollbar { display: none; }
+  .nav-btn { padding: 6px 10px; gap: 4px; flex: 0 0 auto; }
 }
 
 /* News feed */
@@ -112,7 +134,7 @@ button, input { font-family: inherit; }
 @media (prefers-reduced-motion: reduce) { .news-card.new-enter { animation: none; } }
 
 .news-meta { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ink-muted); margin-bottom: 10px; }
-.news-title { font-family: var(--font-display); font-size: 17px; font-weight: 700; line-height: 1.4; margin: 0 0 12px; }
+.news-title { font-family: var(--font-display); font-size: 17px; font-weight: 700; line-height: 1.4; margin: 0 0 12px; overflow-wrap: anywhere; }
 
 /* Credibility tag — compact pill instead of a heavy colored block */
 .credibility-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
@@ -155,8 +177,8 @@ button, input { font-family: inherit; }
 .down { color: var(--down); }
 .flat { color: var(--ink-muted); }
 
-.news-summary { font-size: 14px; line-height: 1.65; color: var(--ink-muted); margin: 0 0 10px; }
-.news-reason { font-size: 12px; line-height: 1.6; color: var(--down); margin: 0 0 12px; }
+.news-summary { font-size: 14px; line-height: 1.65; color: var(--ink-muted); margin: 0 0 10px; overflow-wrap: anywhere; }
+.news-reason { font-size: 12px; line-height: 1.6; color: var(--down); margin: 0 0 12px; overflow-wrap: anywhere; }
 .news-reason strong { color: var(--down); font-weight: 700; }
 .news-link {
   display: inline-flex; align-items: center; gap: 6px;

@@ -28,6 +28,11 @@ function ChangeTag({ value }) {
 export default function ThemesPage() {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(THEMES[0]?.theme ?? "");
+  // 모바일 드롭다운이 "펼쳐져 있는지"만 따로 관리 — selected(데스크톱 오른쪽
+  // 패널/좌측 강조 표시용)는 항상 마지막으로 누른 테마를 유지하지만,
+  // 모바일에서는 같은 테마를 한 번 더 누르면 드롭다운만 접히고 selected는
+  // 그대로 둠(다시 열면 바로 그 테마가 보이도록).
+  const [expanded, setExpanded] = useState(THEMES[0]?.theme ?? "");
   const [rawThemeChanges, setRawThemeChanges] = useState([]); // [{theme, change1W, change1M}, ...]
   const [stockChanges1W, setStockChanges1W] = useState({}); // code -> change1W
   const [stockChanges1M, setStockChanges1M] = useState({}); // code -> change1M
@@ -177,10 +182,14 @@ export default function ThemesPage() {
             <div className="theme-list">
               {sortedThemes.map((t) => {
                 const isActive = selected === t.theme;
+                const isOpen = expanded === t.theme;
                 return (
                   <Fragment key={t.theme}>
                     <button
-                      onClick={() => setSelected(t.theme)}
+                      onClick={() => {
+                        setSelected(t.theme);
+                        setExpanded((prev) => (prev === t.theme ? "" : t.theme));
+                      }}
                       className={`theme-item ${isActive ? "active" : ""}`}
                     >
                       <span className="theme-item-name">
@@ -191,8 +200,9 @@ export default function ThemesPage() {
                     </button>
                     {/* 모바일 전용 인라인 드롭다운 — 데스크톱(768px 이상)에서는 CSS로 숨기고
                         오른쪽 <section> 패널을 대신 씀. 화면 폭과 상관없이 항상 렌더는 되지만
-                        .open 클래스가 있어도 768px 이상에서는 globals.css가 display:none 처리함. */}
-                    {isActive && (
+                        .open 클래스가 있어도 768px 이상에서는 globals.css가 display:none 처리함.
+                        같은 테마를 다시 누르면 isOpen만 꺼지고(접힘) selected는 유지됨. */}
+                    {isOpen && (
                       <div className="theme-item-accordion open">
                         {renderThemeDetail(t, sortStocksFor(t))}
                       </div>
