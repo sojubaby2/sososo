@@ -29,10 +29,16 @@
 const DATES_INDEX_KEY = "hist:dates";
 const DAY_KEY_PREFIX = "hist:day:";
 
-// ~1 trading year plus margin — long enough for the widest pattern window
-// (컵앤핸들, ~80 trading days) and doubles as a "52-week high" proxy for
-// the 전고점돌파(breakout) detector. Tune later if a pattern needs more.
-export const HISTORY_LOOKBACK_DAYS = 260;
+// [2026-09-07 확장 — 재성님 요청] 원래는 딱 1년(260거래일)만 저장해서,
+// lib/patternDetection.js의 전고점돌파(breakout)가 보는 "이전 최고가" 범위가
+// 사실상 52주 신고가랑 거의 똑같아지는 문제가 있었음(52주보다 더 예전
+// 기록까지 봐야 전고점돌파란 이름이 의미가 있다는 재성님 지적). 그래서
+// 약 3년(750거래일)치를 저장하도록 늘림 — 컵앤핸들(~80거래일) 같은 가장 긴
+// 패턴 윈도우는 물론 충분히 커버하고, 52주 신고가/신저가는 여전히
+// lib/patternDetection.js의 FIFTY_TWO_WEEK_WINDOW(252)로 최근 52주만 잘라서
+// 보므로 이 값이 커져도 영향 없음 — 전고점돌파만 더 넓은(최대 3년) "진짜
+// 예전 고점"까지 보게 됨.
+export const HISTORY_LOOKBACK_DAYS = 750;
 
 function dayKey(basDt) {
   return DAY_KEY_PREFIX + basDt;

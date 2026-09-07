@@ -76,7 +76,14 @@ export const maxDuration = 60;
 // 되돌림 — "직전까지의 모든 값 중 최고치를 새로 넘어서는 매 순간"이 맞는
 // 정의였음. 그 게이트 때문에 v9~v10 배포 기간 동안 정당한 단기 재돌파가
 // 안 잡히고 있었을 수 있어 또 올림.
-const RESULTS_CACHE_KEY = "patterns:results:v11";
+// v11 -> v12: 전고점돌파가 보는 "이전 최고가" 범위를 1년(260거래일)에서
+// 3년(750거래일)으로 늘림(lib/priceHistory.js의 HISTORY_LOOKBACK_DAYS 변경) —
+// 재성님 지적대로, 예전엔 이 범위가 사실상 52주 신고가랑 거의 같아서
+// 전고점돌파란 이름이 무색했음. 저장된 히스토리가 3년치로 다 쌓이기까지는
+// (자동 백필로 몇 시간~하루 정도 걸림) 점진적으로 더 먼 과거까지 반영됨.
+// 이 시점 기준으로 이전 캐시(v11)에 남아있던, 더 짧은 범위로 계산된
+// 전고점돌파 결과가 30분 더 나가는 걸 막으려고 올림.
+const RESULTS_CACHE_KEY = "patterns:results:v12";
 const RESULTS_CACHE_TTL_SECONDS = 60 * 30;
 
 export async function GET(request) {

@@ -471,13 +471,26 @@ function detectThreeBlackCrows(series, minSimilarity) {
 
 // ---------------------------------------------------------------------------
 // Breakout pattern (돌파형) — 전고점돌파: today's close clears the highest
-// high seen anywhere earlier in the stored history (up to
-// HISTORY_LOOKBACK_DAYS back — a "52-week-high"-style proxy, not a true
-// all-time high). Not a shape template at all — the closest thing to a
-// pure yes/no signal in this file, scored by how far above the prior high
-// and how long that prior high had stood.
+// intraday high (h) seen anywhere earlier in the stored history (up to
+// HISTORY_LOOKBACK_DAYS back, now ~3년/750거래일 — see lib/priceHistory.js).
+// Deliberately a *longer* lookback than 52주 신고가(FIFTY_TWO_WEEK_WINDOW=252,
+// 아래 참고) — 52주보다 더 예전에 세워진 고점까지 넘어서야 진짜 "전고점돌파"라는
+// 재성님 지적(2026-09-07)에 따라 둘을 서로 다른 의미의 지표로 분리함. Not a
+// shape template at all — the closest thing to a pure yes/no signal in this
+// file, scored by how far above the prior high and how long that prior high
+// had stood.
 // ---------------------------------------------------------------------------
 
+// [2026-09-07 8차 수정] 재성님 요청 — 전고점돌파가 보던 "이전 최고가" 범위가
+// (당시 저장 기간이 1년/260거래일이었어서) 사실상 52주 신고가랑 거의 같은
+// 기간을 보고 있었음. 52주보다 더 예전 기록까지 봐야 의미가 있다는 지적에
+// 따라, lib/priceHistory.js의 HISTORY_LOOKBACK_DAYS를 260 -> 750(약 3년)으로
+// 늘림. 이 함수 자체는 그대로 "전달받은 series 전체"를 prior 구간으로 쓰므로
+// (아래 참고) 코드 변경 없이 저장 기간이 늘어난 만큼 자동으로 더 먼 과거까지
+// "전고점" 후보에 포함됨. 여전히 종가가 아니라 장중 고가(h) 기준으로 비교함
+// (재성님 확인 완료 — 52주 신고가/신저가도 이미 고가/저가 기준으로 맞춰져
+// 있음, 위 v10 변경 참고).
+//
 // [2026-09-07 6차 수정, 이후 재성님 확인 후 되돌림] 한때 "전고점"이 너무
 // 최근에 세워진 경우(예: 며칠 전)는 안 잡히게 최소 보유일수 게이트를
 // 넣었었는데, 재성님이 직접 예시로 설명해주신 정의는 그게 아니었음 —
@@ -659,31 +672,178 @@ function detectMovingAverageCross(series, minSimilarity) {
 
 // Static metadata for every pattern this module can detect — useful for a
 // frontend filter dropdown / legend even before any results come back.
+// [2026-09-07 추가] description: 재성님 요청으로 패턴마다 한 줄짜리 쉬운
+// 설명을 붙임(패턴검색 페이지에 그대로 노출).
 export const PATTERN_DEFS = [
-  { id: "breakout_prior_high", label: "전고점돌파", category: "돌파형", window: null },
-  { id: "fifty_two_week_high", label: "52주 신고가", category: "돌파형", window: FIFTY_TWO_WEEK_WINDOW },
-  { id: "golden_cross", label: "골든크로스", category: "돌파형", window: MA_LONG_PERIOD },
-  { id: "double_bottom", label: "쌍바닥", category: "바닥형", window: 40 },
-  { id: "triple_bottom", label: "삼중바닥", category: "바닥형", window: 55 },
-  { id: "cup_and_handle", label: "컵앤핸들", category: "바닥형", window: 80 },
-  { id: "u_bottom", label: "U자바닥", category: "바닥형", window: 35 },
-  { id: "inverse_head_shoulders", label: "역헤드앤숄더", category: "바닥형", window: 55 },
-  { id: "double_top", label: "쌍봉", category: "천정형", window: 40 },
-  { id: "triple_top", label: "삼중천정", category: "천정형", window: 55 },
-  { id: "head_shoulders_top", label: "헤드앤숄더", category: "천정형", window: 55 },
-  { id: "rising_channel", label: "상승채널", category: "추세형", window: TREND_WINDOW },
-  { id: "ascending_triangle", label: "상승삼각형", category: "추세형", window: TREND_WINDOW },
-  { id: "falling_wedge", label: "하락쐐기", category: "추세형", window: TREND_WINDOW },
-  { id: "box_range", label: "박스권", category: "추세형", window: TREND_WINDOW },
-  { id: "falling_channel", label: "하락채널", category: "하락형", window: TREND_WINDOW },
-  { id: "descending_triangle", label: "하락삼각형", category: "하락형", window: TREND_WINDOW },
-  { id: "rising_wedge", label: "상승쐐기", category: "하락형", window: TREND_WINDOW },
-  { id: "dead_cross", label: "데드크로스", category: "하락형", window: MA_LONG_PERIOD },
-  { id: "fifty_two_week_low", label: "52주 신저가", category: "하락형", window: FIFTY_TWO_WEEK_WINDOW },
-  { id: "pullback", label: "눌림목", category: "조정형", window: 30 },
-  { id: "flag", label: "깃발", category: "조정형", window: 15 },
-  { id: "three_white_soldiers", label: "적삼병", category: "캔들형", window: 3 },
-  { id: "three_black_crows", label: "흑삼병", category: "캔들형", window: 3 },
+  {
+    id: "breakout_prior_high",
+    label: "전고점돌파",
+    category: "돌파형",
+    window: null,
+    description:
+      "최근 3년(최대 약 750거래일) 안에서 이제껏 없었던 최고가(장중 고가 기준)를 오늘 종가가 처음 넘어서는 순간을 찾습니다.",
+  },
+  {
+    id: "fifty_two_week_high",
+    label: "52주 신고가",
+    category: "돌파형",
+    window: FIFTY_TWO_WEEK_WINDOW,
+    description: "최근 52주(약 252거래일) 동안의 장중 최고가에 근접했거나 이를 넘어선 상태를 매일 확인합니다.",
+  },
+  {
+    id: "golden_cross",
+    label: "골든크로스",
+    category: "돌파형",
+    window: MA_LONG_PERIOD,
+    description: "20일 이동평균선이 60일 이동평균선을 아래에서 위로 뚫고 올라가는 상승 전환 신호입니다.",
+  },
+  {
+    id: "double_bottom",
+    label: "쌍바닥",
+    category: "바닥형",
+    window: 40,
+    description: "비슷한 저점을 두 번 찍고 반등하는 'W자' 모양의 바닥 패턴입니다.",
+  },
+  {
+    id: "triple_bottom",
+    label: "삼중바닥",
+    category: "바닥형",
+    window: 55,
+    description: "비슷한 저점을 세 번 찍고 올라오는, 쌍바닥보다 더 견고한 바닥 패턴입니다.",
+  },
+  {
+    id: "cup_and_handle",
+    label: "컵앤핸들",
+    category: "바닥형",
+    window: 80,
+    description: "완만한 U자형 바닥(컵)을 만든 뒤 짧게 눌렸다가(핸들) 다시 상승하는 패턴입니다.",
+  },
+  {
+    id: "u_bottom",
+    label: "U자바닥",
+    category: "바닥형",
+    window: 35,
+    description: "급락 없이 완만하게 내려갔다가 다시 완만하게 올라오는 U자 모양의 바닥권입니다.",
+  },
+  {
+    id: "inverse_head_shoulders",
+    label: "역헤드앤숄더",
+    category: "바닥형",
+    window: 55,
+    description: "가운데 저점(머리)이 양옆 저점(어깨)보다 더 깊은 3중 바닥으로, 대표적인 상승 반전 신호입니다.",
+  },
+  {
+    id: "double_top",
+    label: "쌍봉",
+    category: "천정형",
+    window: 40,
+    description: "비슷한 고점을 두 번 찍고 꺾이는 'M자' 모양의 천정 패턴으로, 하락 반전 가능성을 나타냅니다.",
+  },
+  {
+    id: "triple_top",
+    label: "삼중천정",
+    category: "천정형",
+    window: 55,
+    description: "비슷한 고점을 세 번 찍고 무너지는, 쌍봉보다 더 뚜렷한 천정 패턴입니다.",
+  },
+  {
+    id: "head_shoulders_top",
+    label: "헤드앤숄더",
+    category: "천정형",
+    window: 55,
+    description: "가운데 고점(머리)이 양옆 고점(어깨)보다 더 높은 3중 천정으로, 대표적인 하락 반전 신호입니다.",
+  },
+  {
+    id: "rising_channel",
+    label: "상승채널",
+    category: "추세형",
+    window: TREND_WINDOW,
+    description: "일정한 기울기로 상승하며 그 흐름 주변을 좁게 오가는 우상향 추세입니다.",
+  },
+  {
+    id: "ascending_triangle",
+    label: "상승삼각형",
+    category: "추세형",
+    window: TREND_WINDOW,
+    description: "저항선(고가)은 평평한데 지지선(저가)은 계속 올라와 범위가 좁아지는, 상승 돌파를 앞둔 패턴입니다.",
+  },
+  {
+    id: "falling_wedge",
+    label: "하락쐐기",
+    category: "추세형",
+    window: TREND_WINDOW,
+    description: "고가와 저가가 둘 다 내려가지만 저가가 더 완만하게 내려와 범위가 좁아지는, 상승 반전 가능성이 있는 패턴입니다.",
+  },
+  {
+    id: "box_range",
+    label: "박스권",
+    category: "추세형",
+    window: TREND_WINDOW,
+    description: "뚜렷한 방향 없이 일정한 가격대 안에서 오르내리는 횡보 구간입니다.",
+  },
+  {
+    id: "falling_channel",
+    label: "하락채널",
+    category: "하락형",
+    window: TREND_WINDOW,
+    description: "일정한 기울기로 하락하며 그 흐름 주변을 좁게 오가는 우하향 추세입니다.",
+  },
+  {
+    id: "descending_triangle",
+    label: "하락삼각형",
+    category: "하락형",
+    window: TREND_WINDOW,
+    description: "지지선(저가)은 평평한데 저항선(고가)은 계속 낮아져 범위가 좁아지는, 하락 돌파를 앞둔 패턴입니다.",
+  },
+  {
+    id: "rising_wedge",
+    label: "상승쐐기",
+    category: "하락형",
+    window: TREND_WINDOW,
+    description: "고가와 저가가 둘 다 올라가지만 저가가 더 가파르게 따라붙어 범위가 좁아지는, 대표적인 하락 반전 신호입니다.",
+  },
+  {
+    id: "dead_cross",
+    label: "데드크로스",
+    category: "하락형",
+    window: MA_LONG_PERIOD,
+    description: "20일 이동평균선이 60일 이동평균선을 위에서 아래로 뚫고 내려가는 하락 전환 신호입니다.",
+  },
+  {
+    id: "fifty_two_week_low",
+    label: "52주 신저가",
+    category: "하락형",
+    window: FIFTY_TWO_WEEK_WINDOW,
+    description: "최근 52주(약 252거래일) 동안의 장중 최저가에 근접했거나 이를 밑돈 상태를 매일 확인합니다.",
+  },
+  {
+    id: "pullback",
+    label: "눌림목",
+    category: "조정형",
+    window: 30,
+    description: "많이 오른 뒤 상승폭의 일부(약 15~65%)를 되돌리며 잠시 쉬어가는 조정 구간입니다.",
+  },
+  {
+    id: "flag",
+    label: "깃발",
+    category: "조정형",
+    window: 15,
+    description: "급등(깃대) 이후 좁은 범위에서 짧게 횡보하는(깃발) 구간으로, 상승이 재개될 가능성이 있는 패턴입니다.",
+  },
+  {
+    id: "three_white_soldiers",
+    label: "적삼병",
+    category: "캔들형",
+    window: 3,
+    description: "3거래일 연속으로 몸통이 큰 양봉이 이어지며 종가가 계속 높아지는 강한 상승 신호입니다.",
+  },
+  {
+    id: "three_black_crows",
+    label: "흑삼병",
+    category: "캔들형",
+    window: 3,
+    description: "3거래일 연속으로 몸통이 큰 음봉이 이어지며 종가가 계속 낮아지는 강한 하락 신호입니다.",
+  },
 ];
 
 // [2026-09-07 4차 수정] 재성님이 보내주신 미스터블루/아이큐어/지엘팜텍/

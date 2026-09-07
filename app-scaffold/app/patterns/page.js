@@ -40,8 +40,21 @@ export default function PatternsPage() {
   const [selected, setSelected] = useState(null);
   const [loadState, setLoadState] = useState("loading"); // loading | ready | empty | error
   const [historyDays, setHistoryDays] = useState(0);
-  const [historyTarget, setHistoryTarget] = useState(260);
+  const [historyTarget, setHistoryTarget] = useState(750);
   const [errorMsg, setErrorMsg] = useState("");
+  // [2026-09-07 추가] 재성님 요청 — 종목 행 클릭 시 종목코드를 클립보드에
+  // 복사하고, 방금 복사된 코드 옆에 짧게 "복사됨" 표시를 보여줌.
+  const [copiedCode, setCopiedCode] = useState(null);
+
+  async function handleCopyCode(code) {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopiedCode(code);
+      setTimeout(() => setCopiedCode((c) => (c === code ? null : c)), 1500);
+    } catch {
+      // 클립보드 권한이 없거나 지원 안 되는 환경 — 조용히 무시(다른 기능엔 영향 없음)
+    }
+  }
 
   useEffect(() => {
     fetch("/api/patterns")
@@ -50,7 +63,7 @@ export default function PatternsPage() {
         setPatternDefs(data.patternDefs || []);
         setPatterns(data.patterns || {});
         setHistoryDays(data.historyDays || 0);
-        setHistoryTarget(data.historyTarget || 260);
+        setHistoryTarget(data.historyTarget || 750);
         if (data.error) {
           setErrorMsg(data.error);
           setLoadState("empty");
@@ -166,6 +179,7 @@ export default function PatternsPage() {
                         type="button"
                         onClick={() => setSelected(d.id)}
                         className={`theme-item ${selected === d.id ? "active" : ""}`}
+                        title={d.description || undefined}
                       >
                         <span className="theme-item-name">{d.label}</span>
                         <span className="mono" style={{ fontSize: 12, color: count > 0 ? "var(--up)" : "var(--ink-muted)" }}>
@@ -182,12 +196,15 @@ export default function PatternsPage() {
           <section>
             {selectedDef && (
               <>
-                <div className="theme-heading">
+                <div className="theme-heading" style={{ flexDirection: "column", alignItems: "flex-start", gap: 4 }}>
                   <h2>{selectedDef.label}</h2>
                   <span className="text-xs" style={{ color: "var(--ink-muted)", fontSize: 12 }}>
                     {selectedDef.window ? `최근 ${selectedDef.window}거래일 기준` : "전체 보유 기간 기준"} · 유사도 55%
                     이상만 표시
                   </span>
+                  {selectedDef.description && (
+                    <span style={{ fontSize: 13, color: "var(--ink-muted)" }}>{selectedDef.description}</span>
+                  )}
                 </div>
 
                 {selectedResults.length === 0 ? (
@@ -195,32 +212,45 @@ export default function PatternsPage() {
                     현재 이 패턴에 해당하는 종목이 없습니다.
                   </p>
                 ) : (
-                  <table className="stock-table">
-                    <thead>
-                      <tr>
-                        <th>종목명</th>
-                        <th>코드</th>
-                        <th>시장</th>
-                        <th>유사도</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {selectedResults.map((r) => (
-                        <tr key={r.code}>
-                          <td style={{ fontWeight: 500 }}>{r.name}</td>
-                          <td className="mono" style={{ color: "var(--ink-muted)" }}>
-                            {r.code}
-                          </td>
-                          <td>
-                            <span className="market-tag">{r.market}</span>
-                          </td>
-                          <td>
-                            <SimilarityBar value={r.similarity} />
-                          </td>
+                  <>
+                    <p style={{ fontSize: 12, color: "var(--ink-muted)", margin: "0 0 8px" }}>
+                      종목을 클릭하면 종목코드가 복사됩니다.
+                    </p>
+                    <table className="stock-table">
+                      <thead>
+                        <tr>
+                          <th>종목명</th>
+                          <th>코드</th>
+                          <th>시장</th>
+                          <th>유사도</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {selectedResults.map((r) => (
+                          <tr
+                            key={r.code}
+                            onClick={() => handleCopyCode(r.code)}
+                            style={{ cursor: "pointer" }}
+                            title="클릭하면 종목코드가 복사됩니다"
+                          >
+                            <td style={{ fontWeight: 500 }}>{r.name}</td>
+                            <td className="mono" style={{ color: "var(--ink-muted)" }}>
+                              {r.code}
+                              {copiedCode === r.code && (
+                                <span style={{ marginLeft: 6, fontSize: 11, color: "var(--up)" }}>복사됨</span>
+                              )}
+                            </td>
+                            <td>
+                              <span className="market-tag">{r.market}</span>
+                            </td>
+                            <td>
+                              <SimilarityBar value={r.similarity} />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </>
                 )}
               </>
             )}
