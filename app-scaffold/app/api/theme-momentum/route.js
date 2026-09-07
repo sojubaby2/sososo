@@ -78,7 +78,15 @@ async function fetchKrxDailyMarket(trdDd, mktId) {
   const res = await fetch(KRX_JSON_URL, {
     method: "POST",
     headers: {
-      "User-Agent": "Mozilla/5.0 (compatible; newsmeme-bot/1.0)",
+      // [2026-09-07 변경] "newsmeme-bot/1.0"이라고 자기소개하는 User-Agent를
+      // 썼었는데, 이게 KRX 쪽에서 "이건 자동화 프로그램이다"라고 걸러내는
+      // 신호가 됐을 가능성이 높아서(status 400이 KRX 홈페이지가 사람이
+      // 직접 브라우저로 접속했을 때 쓰는 것과 똑같은 실제 브라우저
+      // User-Agent로 바꿈 — 다른 회사/공공기관 API에서도 자주 있는
+      // 패턴이라 우선 이걸로 시도해봄.
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+      Accept: "application/json, text/javascript, */*; q=0.01",
       Referer: "https://data.krx.co.kr/contents/MDC/MDI/outerLoader/index.cmd",
       "X-Requested-With": "XMLHttpRequest",
       "Content-Type": "application/x-www-form-urlencoded",
@@ -86,7 +94,12 @@ async function fetchKrxDailyMarket(trdDd, mktId) {
     body: params.toString(),
     cache: "no-store",
   });
-  if (!res.ok) throw new Error(`KRX 데이터 요청 오류 (status ${res.status})`);
+  if (!res.ok) {
+    // 응답 본문에 KRX 쪽이 왜 거부했는지 힌트가 들어있는 경우가 많아서,
+    // 다음에 또 실패하면 바로 원인을 알 수 있게 앞부분만 같이 남김.
+    const bodyText = await res.text().catch(() => "");
+    throw new Error(`KRX 데이터 요청 오류 (status ${res.status}): ${bodyText.slice(0, 200)}`);
+  }
   const data = await res.json();
   return Array.isArray(data?.OutBlock_1) ? data.OutBlock_1 : [];
 }

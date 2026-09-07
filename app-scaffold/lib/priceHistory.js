@@ -190,7 +190,12 @@ async function fetchKrxDailyMarket(trdDd, mktId) {
   const res = await fetch(KRX_JSON_URL, {
     method: "POST",
     headers: {
-      "User-Agent": "Mozilla/5.0 (compatible; newsmeme-bot/1.0)",
+      // "newsmeme-bot/1.0"이라고 자기소개하는 User-Agent가 KRX 쪽에
+      // 자동화 프로그램으로 걸러졌을 가능성이 있어서, 실제 브라우저와
+      // 똑같은 User-Agent로 바꿈 (app/api/theme-momentum/route.js와 동일).
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+      Accept: "application/json, text/javascript, */*; q=0.01",
       Referer: "https://data.krx.co.kr/contents/MDC/MDI/outerLoader/index.cmd",
       "X-Requested-With": "XMLHttpRequest",
       "Content-Type": "application/x-www-form-urlencoded",
@@ -198,7 +203,10 @@ async function fetchKrxDailyMarket(trdDd, mktId) {
     body: params.toString(),
     cache: "no-store",
   });
-  if (!res.ok) throw new Error(`KRX 데이터 요청 오류 (status ${res.status})`);
+  if (!res.ok) {
+    const bodyText = await res.text().catch(() => "");
+    throw new Error(`KRX 데이터 요청 오류 (status ${res.status}): ${bodyText.slice(0, 200)}`);
+  }
   const data = await res.json();
   return Array.isArray(data?.OutBlock_1) ? data.OutBlock_1 : [];
 }
