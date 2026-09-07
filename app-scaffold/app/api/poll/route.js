@@ -22,19 +22,38 @@
 // 저장"뿐 아니라 과거 날짜 백필도 이 사이클에서 조금씩(최대
 // BACKFILL_DAYS_PER_CYCLE일) 같이 진행하도록 함 — 재성님이 /api/backfill-
 // history를 따로 열어줄 필요 없이, 이미 30분마다 자동으로 돌고 있는 이
-// 엔드포인트만으로 알아서 260일치가 다 쌓임(대략 반나절 정도 걸림). 둘 다
-// best-effort라 실패해도 이 엔드포인트 전체가 에러나진 않고, 다음 사이클에
-// 다시 시도됨.
+// 엔드포인트만으로 알아서 260일치가 다 쌓임. 둘 다 best-effort라 실패해도
+// 이 엔드포인트 전체가 에러나진 않고, 다음 사이클에 다시 시도됨.
+//
+// [2026-09-07 변경 — 2차] basDt(오늘 날짜, "YYYYMMDD")를 구하려고
+// getCachedUniverse(redis)(= 네이버 시세 전체 페이지를 최대 100번 가까이
+// 긁어오는 무거운 호출)를 재사용하고 있었는데, 이게 문제였음: ①
+// 네이버쪽이 느리거나 한 번이라도 실패하면 이 함수가 통째로 500을 반환하고
+// 끝나버려서 그 아래 있는 appendTodaysSnapshotIfMissing/backfillHistory가
+// 아예 실행조차 안 되고, ② 설령 성공하더라도 이 스크래핑에 시간을 많이
+// 써버려서 60초 제한(maxDuration) 안에 백필이 돌 시간이 얼마 안 남았음.
+// 실제로 이것 때문에 "/patterns" 페이지의 히스토리가 하루치(1/260일)에서
+// 전혀 늘지 않는 문제가 있었음. basDt는 그냥 오늘 날짜일 뿐이라 네트워크
+// 호출 없이 로컬에서 바로 계산하면 되므로(theme-momentum/route.js,
+// lib/priceHistory.js에서 이미 쓰던 것과 동일한 toBasDt 방식), 여기서도
+// getCachedUniverse 의존을 완전히 제거함.
 
 import { getRedis } from "../../../lib/redis";
-import { getCachedUniverse } from "../../../lib/newsPipeline";
 import { appendTodaysSnapshotIfMissing, backfillHistory } from "../../../lib/priceHistory";
 
+function toBasDt(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${y}${m}${dd}`;
+}
+
 // 한 사이클(이 엔드포인트 1회 호출)당 과거로 더 채워넣을 최대 일수. 하루치가
-// KRX 호출 2번(코스피/코스닥)이라, 10일이면 최대 20번 — 60초 제한 안에
-// 오늘 치 저장까지 넉넉하게 끝남. 30분마다 도니까 10일씩이면 260일 전부
-// 채우는 데 대략 13사이클(≈6.5시간)이면 충분함.
-const BACKFILL_DAYS_PER_CYCLE = 10;
+// KRX 호출 2번(코스피/코스닥)이라, 24일이면 최대 48번 — 네이버 스크래핑을
+// 뺀 덕분에 60초 제한 안에 오늘 치 저장까지 넉넉하게 끝남. 30분마다
+// 도니까 24일씩이면 260일 전부 채우는 데 대략 11사이클(≈5.5시간)이면
+// 충분함.
+const BACKFILL_DAYS_PER_CYCLE = 24;
 
 // Vercel terminates a function that runs past this many seconds.
 export const maxDuration = 60;
@@ -56,18 +75,7 @@ export async function GET(request) {
     return Response.json({ error: "Redis(Upstash) 환경변수가 아직 설정되지 않았습니다." }, { status: 500 });
   }
 
-  // getCachedUniverse는 뉴스 매칭에 더 이상 안 쓰지만, 오늘 날짜(basDt)를
-  // 이미 알고 있는 형태로 계산해주기 때문에 시세 히스토리 저장 호출에
-  // basDt를 넘기려고 그대로 재사용함 — KRX(네이버 시세) 호출을 두 번
-  // 하지 않아도 됨.
-  const universe = await getCachedUniverse(redis);
-  if (!universe) {
-    return Response.json(
-      { error: "시세 데이터를 가져오지 못했습니다 (네이버 시세 페이지 응답 오류)." },
-      { status: 500 }
-    );
-  }
-  const { basDt } = universe;
+  const basDt = toBasDt(new Date());
 
   // Best-effort — 실패해도 이 엔드포인트 전체가 에러가 되진 않음. 다음
   // 사이클에 다시 시도됨.
