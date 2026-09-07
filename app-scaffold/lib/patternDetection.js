@@ -705,6 +705,64 @@ export function detectPatternsForStock(series, { minSimilarity = 55 } = {}) {
   return results.sort((a, b) => b.similarity - a.similarity);
 }
 
+// [2026-09-07 발견된 버그 — 1차 수정] 거래정지·관리종목처럼 최근에 거래가
+// 안 되는 종목은 series의 마지막 날짜가 다른 종목들보다 오래될 거라고
+// 가정하고, 그런 종목을 최신 날짜 기준으로 걸러내는 코드를 아래
+// scanAllStocksForPatterns()에 추가했었음.
+//
+// [2026-09-07 발견된 버그 — 2차 수정, 진짜 원인] 그런데도 재성님이 계속
+// 캡처로 확인해줘서 다시 살펴보니, 그 가정 자체가 틀렸음 — KRX 정식 API는
+// 거래정지 종목도 "오늘" 날짜로 매일 데이터를 내려줌. 다만 실제로 거래가
+// 없었으니 시가·고가·저가·종가를 정지 직전 마지막 값 그대로("얼어붙은
+// 채") 반복해서 줌. 그래서 날짜만 보는 1차 수정으로는 전혀 안 걸러졌던
+// 것. 이게 두 가지 방식으로 오탐을 만들어냄:
+//   ① 52주 신고가처럼 "지금 고점권에 머물러 있는가"를 매일 재판정하는
+//      패턴 — 가격이 그 자리에 영원히 멈춰있으니 "그 가격이 곧 최고가"인
+//      상태가 끝없이 이어져서 계속 100%로 잡힘.
+//   ② 하락쐐기·상승채널 같은 추세형 패턴 — 구간 끝부분의 가격 변동폭이
+//      정확히 0(고가-저가=0, 어제-오늘 변동=0)이 되니, "변동성이 완벽히
+//      수렴/수축했다"고 수학적으로 만점에 가깝게 오판함. 유사도가 유독
+//      90% 이상으로 몰려 있던 것도 상당 부분 이 현상 때문으로 보임 —
+//      변동이 0인 구간은 어떤 추세/채널 패턴에도 "완벽하게" 들어맞아
+//      버리기 때문.
+// 그래서 날짜 체크는 (다른 이유로 아예 그날 데이터 자체가 안 들어온
+// 경우를 위해) 그대로 두고, 그 위에 "최근 며칠간 실질적인 가격 변동이
+// 전혀 없었는가"를 직접 검사하는 필터를 추가함 — 이게 진짜 수정.
+// ---------------------------------------------------------------------------
+
+// 재성님 요청: "최근 일주일" 기준. 국내 거래일 기준 5거래일 ≈ 1주일.
+const INACTIVITY_LOOKBACK_DAYS = 5;
+
+// 거래정지/관리종목 등 "실질적으로 거래가 없는" 종목을 판별함. 두 가지
+// 신호를 씀:
+//  1) 거래량(v) 데이터가 있는 경우 — 가장 확실한 신호. 최근
+//     INACTIVITY_LOOKBACK_DAYS일 연속 거래량이 0이면 거래정지로 판단.
+//     (v는 2026-09-07 이후 새로 쌓이는 데이터부터 저장되므로, 예전
+//     히스토리에는 없을 수 있음 — lib/priceHistory.js 참고.)
+//  2) 거래량 데이터가 없어도 안전하게 걸러지도록, 종가가 여러 거래일
+//     연속으로 "완전히 동일"하면 — 실제로 거래가 있었다면 국내 증시
+//     특성상(상한가 굳히기 등도 기준가가 매일 달라짐) 종가가 여러 날
+//     정확히 똑같을 확률은 사실상 없으므로 — 이것도 거래정지로 간주.
+//     5일치가 아직 안 쌓인 종목(신규 상장 등)을 위해, 더 짧게 최근
+//     3거래일 동안 하루 중 가격도 전혀 안 움직였으면(시가=고가=저가=
+//     종가) 이것만으로도 즉시 걸러내는 보조 신호도 같이 둠.
+function isLikelyInactive(series) {
+  const n = series.length;
+  if (n < 3) return false;
+
+  if (n >= INACTIVITY_LOOKBACK_DAYS) {
+    const recent = series.slice(n - INACTIVITY_LOOKBACK_DAYS);
+    if (recent.every((p) => typeof p.v === "number" && p.v === 0)) return true;
+    if (recent.every((p) => p.c === recent[0].c)) return true;
+  }
+
+  const recent3 = series.slice(n - 3);
+  const isFlatDay = (p) => p.o === p.c && p.h === p.c && p.l === p.c;
+  if (recent3.every(isFlatDay) && recent3.every((p) => p.c === recent3[0].c)) return true;
+
+  return false;
+}
+
 // priceSeriesMap: the Map lib/priceHistory.js's buildPriceSeriesForAllStocks
 // returns (code -> {name, market, series}). Returns { [patternId]: [{code,
 // name, market, patternId, label, similarity, ...}, ...] }, each pattern's
@@ -712,14 +770,6 @@ export function detectPatternsForStock(series, { minSimilarity = 55 } = {}) {
 export function scanAllStocksForPatterns(priceSeriesMap, { minSimilarity = 55, maxPerPattern = 20 } = {}) {
   const byPattern = new Map();
 
-  // [2026-09-07 발견된 버그] 거래정지·관리종목처럼 최근에 거래가 안 되는
-  // 종목은 series의 마지막 날짜가 다른 종목들보다 오래됨(정지되기 직전
-  // 날짜에서 그대로 멈춰 있음). 그런데 모든 패턴 판정은 "series의 제일
-  // 마지막 항목 = 오늘"이라고 가정하고 동작해서, 정지 직전에 우연히
-  // 급등해있던 상태가 "오늘 막 전고점을 돌파했다/52주 신고가다"로 영원히
-  // 고정되어 계속 잡히는 문제가 있었음(재성님이 캡처로 확인). 그래서 이
-  // 스캔에 실제로 참여한 종목들 중 가장 최신 날짜를 구해서, 그보다 데이터가
-  // 뒤처진(=최근 며칠 새 거래가 없었던) 종목은 아예 스캔에서 제외함.
   let latestDate = null;
   for (const stock of priceSeriesMap.values()) {
     const series = stock?.series;
@@ -731,8 +781,11 @@ export function scanAllStocksForPatterns(priceSeriesMap, { minSimilarity = 55, m
   for (const [code, stock] of priceSeriesMap.entries()) {
     const series = stock?.series;
     if (!Array.isArray(series) || series.length < 10) continue;
-    // 최신 거래일 데이터가 없는(=거래정지 등으로 뒤처진) 종목은 제외.
+    // 그날 데이터 자체가 없는(뒤처진) 종목 제외 — 1차 방어선.
     if (latestDate !== null && series[series.length - 1]?.date !== latestDate) continue;
+    // 데이터는 매일 들어오지만 실질적으로 안 움직이는(거래정지 등) 종목
+    // 제외 — 진짜 원인에 대한 2차(핵심) 방어선.
+    if (isLikelyInactive(series)) continue;
     const matches = detectPatternsForStock(series, { minSimilarity });
     for (const m of matches) {
       if (!byPattern.has(m.patternId)) byPattern.set(m.patternId, []);

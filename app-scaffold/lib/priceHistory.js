@@ -49,6 +49,14 @@ function marketLabel(mrktCtg) {
 // clpr=종가/close — same API as fetchAllStocksToday in newsPipeline.js,
 // just keeping open/high/low too, which the news-matching path never
 // needed.)
+// [2026-09-07 추가 — 거래정지 종목 필터링용] 거래량(v)도 같이 저장함 —
+// 시가/고가/저가/종가만으로는 "오늘 실제로 거래가 있었는지"를 구분하기
+// 어려워서(거래정지 종목도 KRX가 매일 데이터를 내려주되 직전 마지막
+// 가격을 그대로 반복해서 줌), lib/patternDetection.js가 "최근 며칠간
+// 거래량이 0이었는가"를 직접 확인할 수 있게 함. 값을 못 읽으면(예전
+// 필드명이 안 맞거나 없으면) v는 그냥 undefined로 남기고, 그 경우엔
+// patternDetection.js가 가격이 안 움직였는지로 대신 판단함(아래
+// isLikelyInactive 참고).
 function toHistoryRecords(krxItems) {
   const records = [];
   for (const it of krxItems) {
@@ -58,7 +66,9 @@ function toHistoryRecords(krxItems) {
     const l = Number(it.lopr);
     const c = Number(it.clpr);
     if (![o, h, l, c].every((n) => Number.isFinite(n))) continue;
-    records.push({ code: it.srtnCd, name: it.itmsNm, market: marketLabel(it.mrktCtg), o, h, l, c });
+    const vRaw = Number(it.vol);
+    const v = Number.isFinite(vRaw) ? vRaw : undefined;
+    records.push({ code: it.srtnCd, name: it.itmsNm, market: marketLabel(it.mrktCtg), o, h, l, c, v });
   }
   return records;
 }
@@ -151,7 +161,7 @@ export async function buildPriceSeriesForAllStocks(redis, limit = HISTORY_LOOKBA
     for (const r of records) {
       if (!r?.code) continue;
       if (!byCode.has(r.code)) byCode.set(r.code, { name: r.name, market: r.market, series: [] });
-      byCode.get(r.code).series.push({ date: basDt, o: r.o, h: r.h, l: r.l, c: r.c });
+      byCode.get(r.code).series.push({ date: basDt, o: r.o, h: r.h, l: r.l, c: r.c, v: r.v });
     }
   }
 
@@ -272,6 +282,9 @@ const FIELD_CANDIDATES = {
   high: ["TDD_HGPRC", "HGPRC"],
   low: ["TDD_LWPRC", "LWPRC"],
   close: ["TDD_CLSPRC", "CLSPRC"],
+  // 거래량 — 후보가 안 맞아도(못 읽어도) 나머지 시세 저장 자체는 그대로
+  // 진행됨(아래 normalizeKrxRow에서 optional로 처리).
+  volume: ["ACC_TRDVOL", "ACC_TRDVOL_QTY", "TDD_TRDVOL", "TRDVOL"],
 };
 
 function pickField(row, keys) {
@@ -306,6 +319,7 @@ function normalizeKrxRow(row, marketLabel) {
     hipr: parseKrxNum(pickField(row, FIELD_CANDIDATES.high)),
     lopr: parseKrxNum(pickField(row, FIELD_CANDIDATES.low)),
     clpr: parseKrxNum(pickField(row, FIELD_CANDIDATES.close)),
+    vol: parseKrxNum(pickField(row, FIELD_CANDIDATES.volume)),
   };
 }
 

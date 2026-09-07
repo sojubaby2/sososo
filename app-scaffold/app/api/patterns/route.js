@@ -35,7 +35,12 @@ export const maxDuration = 60;
 // v3 -> v4: 거래정지 종목이 전고점돌파/52주 신고가에 계속 100%로 잡히던
 // 버그(lib/patternDetection.js — 최신 거래일 데이터 없는 종목 제외)를 고치면서,
 // 예전 버그가 낀 결과가 30분 캐시에 남아 계속 나가는 걸 막으려고 또 올림.
-const RESULTS_CACHE_KEY = "patterns:results:v4";
+// v4 -> v5: v4의 수정이 근본 원인을 못 잡았던 게 확인됨(거래정지 종목도
+// KRX가 매일 "오늘" 날짜로 데이터를 주되 직전 가격을 그대로 반복해서 줌
+// — 날짜만 봐선 못 걸러짐). lib/patternDetection.js에 "최근 며칠간 실제
+// 가격 변동이 있었는가"를 직접 보는 필터(isLikelyInactive)를 추가하면서,
+// 예전(여전히 버그 낀) 캐시 결과가 30분 더 나가는 걸 막으려고 또 올림.
+const RESULTS_CACHE_KEY = "patterns:results:v5";
 const RESULTS_CACHE_TTL_SECONDS = 60 * 30;
 
 export async function GET(request) {
