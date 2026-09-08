@@ -59,6 +59,21 @@ function stripLeadingEmoji(text) {
 // 하면 이 배열에 그 단어만 한 줄 추가하면 됨.
 const NOISE_LEADING_TAGS = ["약업", "재업"];
 
+// [2026-09-08 추가] 재성님 리포트 — "[김과장 네프콘]" 처럼 개인 브랜드·유료
+// 세미나/컨퍼런스 홍보용으로 붙는 태그가, 본문 내용이 진짜 시황처럼 그럴듯해서
+// (이 경우도 LNG·천연가스 얘기라 AI 필터가 재료성 있다고 판단해버림) 광고인데도
+// 필터를 통과해 게재된 사례. NOISE_LEADING_TAGS(약업/재업)는 "태그만 지우고
+// 본문은 진짜 뉴스로 계속 진행"하는 경우고, 이건 반대로 "이 태그가 보이면
+// 광고이므로 메시지 전체를 아예 게재하지 않음" — AI 필터를 태우기 전에
+// 여기서 하드 차단해서 확실하게 막음. 나중에 다른 광고 태그가 또 나오면
+// 이 배열에 한 줄만 추가하면 됨.
+const AD_LEADING_TAGS = ["김과장 네프콘"];
+
+function isAdTaggedMessage(text) {
+  const match = (text || "").trim().match(/^\[([^[\]]{1,20})\]/);
+  return !!match && AD_LEADING_TAGS.includes(match[1].trim());
+}
+
 function stripNoiseLeadingTag(text) {
   const t = text || "";
   const match = t.match(/^\[([^[\]]{1,10})\]\s*/);
@@ -311,6 +326,11 @@ export async function POST(request) {
   const alreadySeen = await redis.get(key);
   if (alreadySeen) {
     return Response.json({ published: false, reason: "이미 처리된 메시지" });
+  }
+
+  if (isAdTaggedMessage(cleanLeadingNoise(rawText))) {
+    await redis.set(key, "1", { ex: SEEN_TTL_SECONDS });
+    return Response.json({ published: false, reason: "광고성 태그로 제외됨" });
   }
 
   const { title: rawTitle, summary: telegramSummary } = splitMessageText(rawText);
