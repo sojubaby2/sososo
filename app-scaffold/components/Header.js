@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Newspaper, LayoutGrid, BookOpen, Rocket, Landmark, Activity } from "lucide-react";
+import { Newspaper, LayoutGrid, BookOpen, Rocket, Landmark, Activity, FileText } from "lucide-react";
 
 export default function Header() {
   const pathname = usePathname();
@@ -24,6 +24,11 @@ export default function Header() {
           </Link>
           <Link href="/themes" className={`nav-btn ${pathname?.startsWith("/themes") ? "active" : ""}`}>
             <LayoutGrid size={15} />테마별 종목정리
+          </Link>
+          {/* [2026-09-08 추가] 매 거래일 저녁 9시 자동 생성되는 마감시황 —
+              재성님 요청. */}
+          <Link href="/daily-review" className={`nav-btn ${pathname?.startsWith("/daily-review") ? "active" : ""}`}>
+            <FileText size={15} />마감시황
           </Link>
           {/* IPO schedule link: points to DART's own official page instead of scraping a private site. */}
           <a href="https://dart.fss.or.kr/dsac008/main.do" target="_blank" rel="noopener noreferrer" className="nav-btn">

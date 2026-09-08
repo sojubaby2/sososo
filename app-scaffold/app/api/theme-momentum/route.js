@@ -260,9 +260,14 @@ function toDailyChangeMap(items) {
 }
 
 // 최신 스냅샷 전체(테마 등록 여부와 무관하게 시장 전체)에서 전일 등락률
-// 상위 종목을 뽑아 "전일 급등주" 랭킹을 만듦. 거래량(trqu)이 0인 종목(거래
-// 정지 등으로 그날 매매가 없었던 종목)은 제외.
-function topDailyMovers(items, count) {
+// 상위/하위 종목을 뽑아 "전일 급등주/급락주" 랭킹을 만듦. 거래량(trqu)이
+// 0인 종목(거래정지 등으로 그날 매매가 없었던 종목)은 제외.
+//
+// [2026-09-08 추가] direction 파라미터 — 원래 상승률 기준(desc)만 있었는데,
+// "마감시황" 자동 작성(app/api/daily-review/source-data)이 오늘 급락주도
+// 같이 참고할 수 있게 하락률 기준(asc)도 뽑을 수 있게 함. 기본값은 기존
+// 동작(desc) 그대로라 다른 호출부(프론트 등)엔 영향 없음.
+function topDailyMovers(items, count, direction = "desc") {
   return items
     .filter((it) => it.srtnCd && it.itmsNm && Number.isFinite(Number(it.fltRt)) && Number(it.trqu) > 0)
     .map((it) => ({
@@ -271,7 +276,7 @@ function topDailyMovers(items, count) {
       market: it.mrktCtg || null,
       change: Number(it.fltRt),
     }))
-    .sort((a, b) => b.change - a.change)
+    .sort((a, b) => (direction === "asc" ? a.change - b.change : b.change - a.change))
     .slice(0, count);
 }
 
@@ -346,7 +351,9 @@ export async function GET() {
     };
   });
 
-  const dailyMovers = topDailyMovers(recent.items, 20);
+  const dailyMovers = topDailyMovers(recent.items, 20, "desc");
+  // [2026-09-08 추가] 마감시황 자동 작성용 — 급락주 랭킹.
+  const dailyLosers = topDailyMovers(recent.items, 20, "asc");
 
   return Response.json(
     {
@@ -358,6 +365,7 @@ export async function GET() {
       stockChanges1W,
       stockChanges1M,
       dailyMovers,
+      dailyLosers,
     },
     { headers: { "Cache-Control": "public, max-age=0, s-maxage=1800, stale-while-revalidate=3600" } }
   );
