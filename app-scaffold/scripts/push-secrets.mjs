@@ -25,7 +25,18 @@
 // ALPHA_VANTAGE_API_KEY: [2026-09-08 추가] 홈페이지 맨 위 "나스닥 기반
 // 국장 예측" 배너용 — app/api/daily-outlook/refresh/route.js가 미국 상위
 // 상승 종목·뉴스를 가져올 때 씀 (lib/dailyOutlook.js 참고).
-
+//
+// [2026-09-08 수정] Cloudflare 이전을 마무리하면서 이 목록이 실제 코드가
+// 쓰는 이름과 어긋나 있던 걸 발견해서 고침:
+// - "KRX_SERVICE_KEY"는 예전(공공데이터포털) API 쓰던 시절 이름이 그대로
+//   남아있던 것 — 지금 코드(lib/priceHistory.js, app/api/theme-momentum)는
+//   KRX 정식 Open API 인증키로 "KRX_OPENAPI_KEY"를 씀. 이름이 안 맞으면
+//   Cloudflare에 실제 값이 있어도 이 스크립트가 못 찾아서 시세 조회가
+//   조용히 실패함.
+// - Redis(Upstash) 접속 정보는 lib/redis.js가 "KV_REST_API_*"(예전 Vercel
+//   KV 이름)와 "UPSTASH_REDIS_REST_*"(요즘 Upstash 직접 연동 이름) 둘 다
+//   확인하도록 돼 있어서, 어느 쪽 이름으로 설정해뒀든 다 챙겨가도록 둘 다
+//   목록에 넣어둠(실제로 없는 쪽은 그냥 건너뜀 — 아래 로직 참고).
 import { execSync } from "node:child_process";
 import { writeFileSync, unlinkSync, existsSync } from "node:fs";
 
@@ -34,9 +45,11 @@ const NAMES = [
   "ANTHROPIC_API_KEY",
   "CRON_SECRET",
   "FRED_API_KEY",
-  "KRX_SERVICE_KEY",
+  "KRX_OPENAPI_KEY",
   "KV_REST_API_TOKEN",
   "KV_REST_API_URL",
+  "UPSTASH_REDIS_REST_TOKEN",
+  "UPSTASH_REDIS_REST_URL",
   "NAVER_CLIENT_ID",
   "NAVER_CLIENT_SECRET",
   "TELEGRAM_INGEST_SECRET",
