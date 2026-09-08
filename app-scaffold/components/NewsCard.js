@@ -33,7 +33,10 @@ export default function NewsCard({ n, isNew }) {
         ))}
       </div>
 
-      <p className="news-summary">{n.summary}</p>
+      {/* [2026-09-08 수정] 제목+링크만 있고 본문이 없던 메시지는 summary가
+          빈 문자열로 옴(app/api/telegram-ingest/route.js 참고) — 그 경우
+          제목을 또 보여주는 대신 이 줄 자체를 생략함. */}
+      {n.summary && <p className="news-summary">{n.summary}</p>}
 
       <p className="news-reason">
         <strong>근거</strong> · {n.reason}

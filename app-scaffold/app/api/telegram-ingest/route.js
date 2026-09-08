@@ -90,10 +90,21 @@ function cleanLeadingNoise(text) {
 //    따로 뽑아서 "원문 기사 전체 보기"에 쓰고 있음),
 // 2) 그러고 남은 본문도 일정 길이(SUMMARY_MAX_LENGTH)를 넘으면 자름 — 문장
 //    중간이 아니라 마지막 줄바꿈/문장 경계에서 자르도록 함.
-const SUMMARY_MAX_LENGTH = 280;
+// [2026-09-08 수정] 재성님 리포트 — 카드에 제목과 본문(summary)이 완전히
+// 똑같이 뜨는 경우가 있었음. 원인 두 가지: ① 예전엔 summary를 "제목+본문
+// 전체"(text)에서 만들었는데, 짧은 속보성 메시지는 애초에 제목 한 줄 +
+// 링크가 전부라(본문 문단 자체가 없음) 그 상태로 URL만 잘라내면 결과가
+// 제목과 완전히 같아짐. ② 본문이 있는 경우에도 summary 맨 앞에 제목이 또
+// 한 번 포함돼 있었음. 그래서 이제 summary는 "제목 줄 다음"부터만 뽑고,
+// 그 나머지가 아예 없으면(=제목+링크만 있는 메시지) summary를 빈
+// 문자열로 둬서 프론트에서 그 줄 자체를 안 보여주도록 함
+// (components/NewsCard.js 참고) — 제목 반복보다 안 보여주는 게 나음. 길이
+// 상한도 280 -> 100자로 줄임(재성님 요청).
+const SUMMARY_MAX_LENGTH = 100;
 
 function trimSummaryBody(text) {
   let t = (text || "").replace(/https?:\/\/\S+[\s\S]*$/, "").trim();
+  if (!t) return "";
   if (t.length <= SUMMARY_MAX_LENGTH) return t;
   const cut = t.slice(0, SUMMARY_MAX_LENGTH);
   // 잘라낸 지점 바로 앞의 줄바꿈이나 문장 마침("다.", ". ") 위치를 찾아서 그
@@ -109,7 +120,11 @@ function splitMessageText(raw) {
   if (!text) return { title: "", summary: "" };
   const firstBreak = text.indexOf("\n");
   const title = (firstBreak === -1 ? text : text.slice(0, firstBreak)).trim().slice(0, 200);
-  return { title: title || text.slice(0, 200), summary: trimSummaryBody(text) };
+  // 제목 줄 "다음" 부분만 본문으로 취급 — 줄바꿈이 아예 없던 메시지(제목+
+  // 링크만 있던 경우)라면 bodyOnly는 빈 문자열이 되고, trimSummaryBody도
+  // 빈 문자열을 그대로 돌려줘서 summary가 "" 가 됨.
+  const bodyOnly = firstBreak === -1 ? "" : text.slice(firstBreak + 1);
+  return { title: title || text.slice(0, 200), summary: trimSummaryBody(bodyOnly) };
 }
 
 // 채널 메시지 본문에서 실제 기사 URL을 찾아냄(보통 헤드라인 뒤에
