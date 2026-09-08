@@ -3,7 +3,7 @@
 export const dynamic = "force-dynamic";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Newspaper, Loader2, Flame, Bell, Globe, Volume2, VolumeX, Smartphone, X } from "lucide-react";
+import { Newspaper, Loader2, Flame, Bell, BellOff, Globe, Volume2, VolumeX, Smartphone, X } from "lucide-react";
 import Header from "../components/Header";
 import NewsCard from "../components/NewsCard";
 import DailyOutlookBanner from "../components/DailyOutlookBanner";
@@ -278,16 +278,62 @@ export default function HomePage() {
   const [newIds, setNewIds] = useState(new Set());
   const [toast, setToast] = useState(null); // { count, headline } | null
   const [soundEnabled, setSoundEnabled] = useState(false);
+  // [2026-09-08 추가] 재성님 요청 — 사이트 안에서 뜨는 우측 하단 토스트(위
+  // .new-toast, 이건 그대로 둠)와는 별개로, 윈도우 화면 자체의 우측 하단에
+  // 뜨는 OS 알림(브라우저 Notification API)도 추가함. 이 사이트 탭이 다른
+  // 창에 가려져 있거나 최소화돼 있어도 뜨는 게 핵심 차이 — 브라우저가 열려있기만
+  // 하면 됨(브라우저 자체가 꺼져 있을 때도 뜨게 하려면 서비스워커 + 웹푸시
+  // 구독/서버 발송까지 만들어야 하는 훨씬 큰 작업이라, 일단은 "탭이
+  // 열려있는 동안" 범위로 구현함). 브라우저 정책상 사용자가 버튼을 눌러
+  // 명시적으로 허용해야만 알림을 띄울 수 있어서 토글 버튼으로 만듦.
+  const [notifyEnabled, setNotifyEnabled] = useState(false);
   const knownIdsRef = useRef(new Set());
   const toastTimerRef = useRef(null);
   const newIdsTimerRef = useRef(null);
   const soundEnabledRef = useRef(false);
+  const notifyEnabledRef = useRef(false);
 
   function toggleSound() {
     const next = !soundEnabled;
     setSoundEnabled(next);
     soundEnabledRef.current = next;
     if (next) playAlertBeep(); // confirms it's on AND unlocks autoplay for later
+  }
+
+  // 이전에 켜둔 적이 있으면(로컬 저장소) 자동으로 다시 켜줌 — 단, 그 사이에
+  // 사용자가 브라우저 설정에서 알림 권한을 직접 껐다면(Notification.permission
+  // 이 더 이상 "granted"가 아니면) 존중해서 꺼진 채로 둠.
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof Notification === "undefined") return;
+    const wantedOn = localStorage.getItem("browserNotifyEnabled") === "1";
+    if (wantedOn && Notification.permission === "granted") {
+      setNotifyEnabled(true);
+      notifyEnabledRef.current = true;
+    }
+  }, []);
+
+  function toggleNotify() {
+    if (typeof Notification === "undefined") {
+      alert("이 브라우저는 데스크톱 알림 기능을 지원하지 않아요.");
+      return;
+    }
+    if (notifyEnabled) {
+      setNotifyEnabled(false);
+      notifyEnabledRef.current = false;
+      localStorage.setItem("browserNotifyEnabled", "0");
+      return;
+    }
+    Notification.requestPermission().then((perm) => {
+      if (perm !== "granted") return; // 사용자가 거부했거나 닫음 — 꺼진 채로 둠
+      setNotifyEnabled(true);
+      notifyEnabledRef.current = true;
+      localStorage.setItem("browserNotifyEnabled", "1");
+      // 켜지자마자 확인용 알림 한 번 — "정말 뜨는구나"를 바로 확인시켜줌.
+      new Notification("데스크톱 알림이 켜졌어요", {
+        body: "새 소식이 올라오면 이렇게 화면 알림으로 알려드릴게요.",
+        icon: "/icon-192.png",
+      });
+    });
   }
 
   function applyFeed(items, isFirstLoad) {
@@ -307,6 +353,24 @@ export default function HomePage() {
         if (soundEnabledRef.current) {
           const hasKeywordHit = freshItems.some((it) => ALERT_KEYWORDS.some((k) => it.title?.includes(k)));
           if (hasKeywordHit) playAlertBeep();
+        }
+
+        // [2026-09-08 추가] 기존 우측 하단 인앱 토스트(위 setToast)는 그대로
+        // 두고, 그 옆에 윈도우 자체의 데스크톱 알림도 띄움 — tag를 고정값으로
+        // 줘서 폴링이 연달아 새 글을 여러 번 감지해도 알림이 계속 쌓이지
+        // 않고 마지막 것으로 교체되게 함.
+        if (notifyEnabledRef.current && typeof Notification !== "undefined" && Notification.permission === "granted") {
+          const notifTitle = freshIds.length > 1 ? `새 소식 ${freshIds.length}건 도착` : latest?.title || "새 소식 도착";
+          const notifBody = freshIds.length > 1 ? latest?.title || "" : latest?.summary || "";
+          const n = new Notification(notifTitle, {
+            body: notifBody,
+            icon: "/icon-192.png",
+            tag: "newsmeme-feed",
+          });
+          n.onclick = () => {
+            window.focus();
+            n.close();
+          };
         }
       }
     }
@@ -360,10 +424,16 @@ export default function HomePage() {
                 <span className="live-label">실시간 뉴스 검색 중</span>
                 <span className="loading-dots"><span>.</span><span>.</span><span>.</span></span>
               </h2>
-              <button type="button" className={`sound-toggle ${soundEnabled ? "on" : ""}`} onClick={toggleSound}>
-                {soundEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
-                주요 키워드 알림음 {soundEnabled ? "켜짐" : "꺼짐"}
-              </button>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button type="button" className={`sound-toggle ${soundEnabled ? "on" : ""}`} onClick={toggleSound}>
+                  {soundEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
+                  주요 키워드 알림음 {soundEnabled ? "켜짐" : "꺼짐"}
+                </button>
+                <button type="button" className={`sound-toggle ${notifyEnabled ? "on" : ""}`} onClick={toggleNotify}>
+                  {notifyEnabled ? <Bell size={14} /> : <BellOff size={14} />}
+                  데스크톱 알림 {notifyEnabled ? "켜짐" : "꺼짐"}
+                </button>
+              </div>
             </div>
 
             {loadState === "loading" && (
