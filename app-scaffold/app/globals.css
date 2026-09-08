@@ -239,25 +239,33 @@ button, input { font-family: inherit; }
 .search-box svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--ink-muted); }
 
 .theme-layout { display: grid; grid-template-columns: 1fr; gap: 24px; }
-/* [2026-09-08 추가] 재성님 리포트 — 테마가 109개라 왼쪽 목록이 화면보다 훨씬
+/* [2026-09-08 추가] 재성님 리포트 — 테마가 154개라 왼쪽 목록이 화면보다 훨씬
    길어서, 아래쪽 테마를 눌러도 오른쪽 종목 패널은 그냥 그 자리(페이지 맨
    위, grid row 시작점)에 그려짐. 그래서 클릭한 지점은 화면 아래쪽인데
    패널은 저 위에 있어서 매번 스크롤을 위로 올려야 보이는 문제가 있었음.
-   position: sticky로 오른쪽 패널이 스크롤을 따라오게 해서, 방금 클릭한
-   테마의 종목이 항상 화면에 바로 보이게 함. align-items: start를 같이
-   줘야 grid가 오른쪽 패널을 왼쪽 목록 높이만큼 강제로 늘리지 않고 자기
-   내용물 높이(sticky 기준점)만큼만 갖게 됨. */
+
+   [2026-09-08 수정] 처음엔 오른쪽 패널에 position: sticky를 줘서 스크롤을
+   따라오게 하려 했는데, 실제로 배포해서 콘솔로 직접 측정해보니 안 먹혔음
+   — 원인은 위에 있는 html, body { overflow-x: hidden }(모바일 메뉴 줄
+   넘침 방지용으로 따로 추가해둔 규칙). html에 overflow가 직접 지정되면
+   브라우저가 html 자체를 스크롤 컨테이너로 취급하게 되는데, 이 상태에서는
+   sticky가 제대로 안 붙는 걸 실측으로 확인함(패널이 뷰포트 밖 수천 px
+   위에 그대로 남아있었음). 그 overflow-x:hidden 규칙은 다른 화면 깨짐을
+   막고 있어서 건드리기보다, 접근 자체를 바꿈: 오른쪽 패널을 스크롤 따라
+   움직이게 하는 대신, 왼쪽 목록 쪽 높이를 화면 높이로 제한하고 목록 내부만
+   스크롤되게 함(.theme-list 참고). 그러면 페이지 자체가 길어질 일이 없어서
+   오른쪽 패널이 항상 처음 위치(목록 바로 옆)에 보임 — sticky 없이 훨씬
+   더 확실하게 동작함. */
 @media (min-width: 768px) {
   .theme-layout { grid-template-columns: 320px 1fr; align-items: start; }
-  .theme-detail-desktop {
-    position: sticky;
-    top: 20px;
-    max-height: calc(100vh - 40px);
-    overflow-y: auto;
-  }
 }
 
-.theme-list { border-radius: 12px; border: 1px solid var(--border); background: var(--surface); overflow: hidden; }
+.theme-list {
+  border-radius: 12px; border: 1px solid var(--border); background: var(--surface); overflow: hidden;
+}
+@media (min-width: 768px) {
+  .theme-list { max-height: calc(100vh - 40px); overflow-y: auto; }
+}
 .theme-item { width: 100%; text-align: left; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border: none; background: transparent; border-left: 3px solid transparent; border-bottom: 1px solid var(--border); cursor: pointer; font-size: 14px; }
 .theme-item:last-of-type { border-bottom: none; }
 .theme-item.active { background: #f6f3ea; border-left-color: var(--amber); }
