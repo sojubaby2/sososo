@@ -12,10 +12,10 @@ export default function Header() {
       <div className="container-wide site-header-inner">
         <div className="brand">
           {/* [2026-09-08 추가] 재성님이 만든 로고 이미지(public/logo.png).
-              처음엔 텍스트 대신 이미지로만 바꿨었는데, 재성님이 "뉴스매매"
-              글씨는 그대로 두고 로고만 옆에 붙여달라고 해서 둘 다 표시함. */}
-          <img src="/logo.png" alt="뉴스매매 로고" className="brand-logo" />
-          <h1>뉴스매매</h1>
+              처음엔 텍스트 대신 이미지로만 바꿨다가, 재성님이 "뉴스매매"
+              글씨를 옆에 붙여달라고 해서 둘 다 표시했었는데, 다시 재성님
+              요청으로 글씨는 지우고 로고만 (더 크게) 표시함. */}
+          <img src="/logo.png" alt="뉴스매매" className="brand-logo" />
         </div>
         {/* 재성님 요청으로 메뉴 순서 재배치: 홈·뉴스 - 패턴검색 - 테마별
             종목정리(구 "테마 둘러보기") - 공모주 정보 - 차트가이드 - 칼럼 */}
