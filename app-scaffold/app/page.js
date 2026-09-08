@@ -2,6 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Newspaper, Loader2, Flame, Bell, BellOff, Globe, Volume2, VolumeX, Smartphone, X } from "lucide-react";
 import Header from "../components/Header";
@@ -127,13 +128,16 @@ function HotThemePanel() {
         themes.map((t) => {
           const val = t[field];
           return (
-            <div key={t.theme} className="trending-row">
+            // [2026-09-08 추가] 재성님 요청 — HOT 테마를 누르면 "테마별
+            // 종목정리"(/themes) 페이지의 그 테마로 바로 이동해서 관련
+            // 종목이 보이게 함(DailyOutlookBanner의 테마 링크와 동일한 방식).
+            <Link key={t.theme} href={`/themes?theme=${encodeURIComponent(t.theme)}`} className="trending-row trending-row-link">
               <span className="trending-row-name">{t.theme}</span>
               <span className="mono up" style={{ fontSize: 13, fontWeight: 700 }}>
                 {val > 0 ? "+" : ""}
                 {val.toFixed(1)}%
               </span>
-            </div>
+            </Link>
           );
         })
       )}
