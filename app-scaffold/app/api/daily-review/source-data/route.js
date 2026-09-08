@@ -18,6 +18,7 @@
 
 import { getRedis } from "../../../../lib/redis";
 import rawThemeData from "../../../../lib/themeData.json";
+import { fetchBothIndexSummaries } from "../../../../lib/marketIndex";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -78,6 +79,31 @@ export async function GET(request) {
     patternsData = await fetchJson(origin, "/api/patterns");
   } catch {
     patternsData = null;
+  }
+
+  // [2026-09-08 추가] 재성님 질문 — "오늘 불장이었다가 장막판에 하락해서
+  // 음전했는데, 이런 내용도 쓸 수 있나?" 답으로 추가함. 위의 themeMomentum은
+  // 전부 "전일 대비 등락률"만 있고 코스피/코스닥 지수 자체의 하루 흐름(장중
+  // 얼마나 올랐다가 얼마나 빠졌는지)은 없었어서, 지수 시가/고가/저가/종가와
+  // 거기서 계산한 "고점 대비 종가 낙폭" 같은 걸 따로 가져옴 — 자세한 이유는
+  // lib/marketIndex.js 주석 참고. 이것도 best-effort(실패해도 나머지 자료로
+  // 글은 쓸 수 있어야 하므로 전체를 막지 않음).
+  let indexSummaries = { kospi: null, kosdaq: null };
+  try {
+    indexSummaries = await fetchBothIndexSummaries();
+  } catch (err) {
+    console.error("daily-review/source-data: 지수 요약 조회 실패:", err.message || err);
+  }
+
+  // 원/달러 환율도 참고 자료로 같이 내려줌 — 장 후반 낙폭 확대의 배경으로
+  // 자주 언급되는 변수라(환율 급등=원화 약세 흐름 등) 있으면 도움이 됨.
+  // 이미 있는 /api/market-ticker를 그대로 재사용(중복 구현 안 함).
+  let usdKrw = null;
+  try {
+    const ticker = await fetchJson(origin, "/api/market-ticker");
+    usdKrw = typeof ticker?.usd === "number" ? ticker.usd : null;
+  } catch {
+    usdKrw = null;
   }
 
   const { themeChanges = [], dailyMovers = [], dailyLosers = [], recentBasDt } = themeMomentum;
@@ -158,5 +184,8 @@ export async function GET(request) {
     topMentionedThemes,
     topMentionedStocks,
     patternHighlights,
+    kospiIndex: indexSummaries.kospi,
+    kosdaqIndex: indexSummaries.kosdaq,
+    usdKrw,
   });
 }
