@@ -50,8 +50,38 @@ function stripLeadingEmoji(text) {
   return (text || "").replace(/^[\p{Extended_Pictographic}\p{Emoji_Presentation}\uFE0F\u200D\s]+/u, "");
 }
 
+// [2026-09-08 \uCD94\uAC00] \uC7AC\uC131\uB2D8 \uC694\uCCAD \u2014 "[\uC57D\uC5C5]", "[\uC7AC\uC5C5]"\uCC98\uB7FC \uCC44\uB110 \uC6B4\uC601\uC790\uAC00 \uC790\uAE30
+// \uCC44\uB110/\uCD9C\uCC98 \uD45C\uC2DC\uC6A9\uC73C\uB85C \uADF8\uB0E5 \uBD99\uC774\uB294 \uD0DC\uADF8\uB294 \uAE30\uC0AC \uB0B4\uC6A9\uACFC \uBB34\uAD00\uD558\uB2C8 \uC9C0\uC6CC\uC57C \uD558\uACE0,
+// \uBC18\uB300\uB85C "[\uD2B9\uC9D5\uC8FC]", "[\uC18D\uBCF4]"\uCC98\uB7FC \uAE30\uC0AC \uC131\uACA9 \uC790\uCCB4\uB97C \uB098\uD0C0\uB0B4\uB294 \uC9C4\uC9DC \uD0DC\uADF8\uB294 \uADF8\uB300\uB85C
+// \uC0B4\uB824\uC57C \uD568(\uC7AC\uC131\uB2D8 \uD655\uC778: "\uD2B9\uC9D5\uC8FC, \uC18D\uBCF4 \uC774\uB7F0 \uAE00\uC528\uB294 \uADF8\uB300\uB85C \uAC00\uC838\uC640\uB3C4 \uB3FC"). \uADF8\uB798\uC11C
+// "\uC9C0\uC6B8 \uD0DC\uADF8"\uB9CC \uD654\uC774\uD2B8\uB9AC\uC2A4\uD2B8\uB85C \uAD00\uB9AC\uD568(\uBE14\uB799\uB9AC\uC2A4\uD2B8\uB85C \uD558\uBA74 \uC0C8\uB85C \uB098\uD0C0\uB098\uB294 \uC9C4\uC9DC
+// \uD0DC\uADF8\uAE4C\uC9C0 \uC2E4\uC218\uB85C \uC9C0\uC6B8 \uC704\uD5D8\uC774 \uC788\uC74C) \u2014 \uB098\uC911\uC5D0 \uC7AC\uC131\uB2D8\uC774 \uB2E4\uB978 "OO"\uB3C4 \uC9C0\uC6CC\uB2EC\uB77C\uACE0
+// \uD558\uBA74 \uC774 \uBC30\uC5F4\uC5D0 \uADF8 \uB2E8\uC5B4\uB9CC \uD55C \uC904 \uCD94\uAC00\uD558\uBA74 \uB428.
+const NOISE_LEADING_TAGS = ["\uC57D\uC5C5", "\uC7AC\uC5C5"];
+
+function stripNoiseLeadingTag(text) {
+  const t = text || "";
+  const match = t.match(/^\[([^[\]]{1,10})\]\s*/);
+  if (match && NOISE_LEADING_TAGS.includes(match[1].trim())) {
+    return t.slice(match[0].length);
+  }
+  return t;
+}
+
+// \uC774\uBAA8\uC9C0\uC640 \uC7A1\uC74C \uD0DC\uADF8\uAC00 \uC5EC\uB7EC \uACB9\uC73C\uB85C \uBD99\uC5B4\uC788\uC744 \uC218 \uC788\uC5B4\uC11C(\uC608: "\u2705[\uC57D\uC5C5] \uC81C\uBAA9"),
+// \uB354 \uC774\uC0C1 \uC548 \uC9C0\uC6CC\uC9C8 \uB54C\uAE4C\uC9C0 \uBC88\uAC08\uC544 \uCD5C\uB300 5\uBC88 \uBC18\uBCF5 \uC801\uC6A9\uD568.
+function cleanLeadingNoise(text) {
+  let t = (text || "").trim();
+  for (let i = 0; i < 5; i++) {
+    const next = stripNoiseLeadingTag(stripLeadingEmoji(t)).trim();
+    if (next === t) break;
+    t = next;
+  }
+  return t;
+}
+
 function splitMessageText(raw) {
-  const text = stripLeadingEmoji((raw || "").trim()).trim();
+  const text = cleanLeadingNoise(raw);
   if (!text) return { title: "", summary: "" };
   const firstBreak = text.indexOf("\n");
   const title = (firstBreak === -1 ? text : text.slice(0, firstBreak)).trim().slice(0, 200);
