@@ -115,16 +115,57 @@ function trimSummaryBody(text) {
   return safeCut.trim() + "…";
 }
 
+// [2026-09-08 추가] 재성님 리포트 — "AWAKE 실시간 주식 공시 정리채널"에서
+// 넘어온(그 채널이 다른 채널로 전달한) 메시지의 제목이 "2026.09.08
+// 15:03:44" 같은 타임스탬프로만 뜨는 문제. 원인: 이 채널 메시지는 일반
+// 뉴스와 형식이 완전히 달라서, 첫 줄이 헤드라인이 아니라 타임스탬프뿐이고
+// 실제 내용은 "기업명:", "보고서명:", "계약상대 :" 같은 "키: 값" 줄들로만
+// 이뤄진 "공시 요약" 포맷임(전자공시 DART 내용을 봇이 필드별로 정리해서
+// 보내주는 방식). splitMessageText의 "첫 줄 = 제목" 규칙은 일반 뉴스에는
+// 맞지만 이 포맷에는 안 맞아서, 이 포맷을 감지하면 필드를 직접 조합해
+// 자연스러운 한국어 제목을 새로 만들어줌.
+function buildDisclosureHeadline(text) {
+  if (!/기업명\s*[:：]/.test(text)) return null; // 이 포맷의 표식 — 없으면 일반 메시지
+
+  const fields = {};
+  for (const rawLine of text.split("\n")) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    const m = line.match(/^([가-힣A-Za-z0-9\s]{2,12}?)\s*[:：]\s*(.+)$/);
+    if (!m) continue;
+    const key = m[1].trim();
+    if (!(key in fields)) fields[key] = m[2].trim(); // 같은 키가 또 나와도 처음 값만 씀
+  }
+
+  // "대명에너지(시가총액: 2,324억) A389260" 형태에서 회사명만 뽑음(괄호 앞까지).
+  const companyName = (fields["기업명"] || "").split("(")[0].trim();
+  if (!companyName) return null;
+
+  const counterparty = fields["계약상대"]; // 있으면 계약 상대방
+  const amount = fields["계약금액"]; // 있으면 계약 규모
+  const label = fields["보고서명"] || fields["계약내용"] || "공시"; // 공시 종류 — 없으면 마지막 대체
+
+  let title = `${companyName},`;
+  if (counterparty) title += ` ${counterparty} 대상`;
+  if (amount) title += ` ${amount} 규모`;
+  title += ` ${label}`;
+  return title.replace(/\s+/g, " ").trim().slice(0, 200);
+}
+
 function splitMessageText(raw) {
   const text = cleanLeadingNoise(raw);
   if (!text) return { title: "", summary: "" };
+  const disclosureTitle = buildDisclosureHeadline(text);
   const firstBreak = text.indexOf("\n");
-  const title = (firstBreak === -1 ? text : text.slice(0, firstBreak)).trim().slice(0, 200);
+  const firstLineTitle = (firstBreak === -1 ? text : text.slice(0, firstBreak)).trim().slice(0, 200);
+  const title = disclosureTitle || firstLineTitle || text.slice(0, 200);
   // 제목 줄 "다음" 부분만 본문으로 취급 — 줄바꿈이 아예 없던 메시지(제목+
   // 링크만 있던 경우)라면 bodyOnly는 빈 문자열이 되고, trimSummaryBody도
-  // 빈 문자열을 그대로 돌려줘서 summary가 "" 가 됨.
+  // 빈 문자열을 그대로 돌려줘서 summary가 "" 가 됨. 공시 포맷이어도 제목만
+  // 새로 만들 뿐 본문(summary) 추출 방식은 그대로 — 원래도 "첫 줄(타임스탬프)
+  // 다음"부터 잘 뽑혔음(NewsCard에 이미 정상적으로 보이던 부분).
   const bodyOnly = firstBreak === -1 ? "" : text.slice(firstBreak + 1);
-  return { title: title || text.slice(0, 200), summary: trimSummaryBody(bodyOnly) };
+  return { title, summary: trimSummaryBody(bodyOnly) };
 }
 
 // 채널 메시지 본문에서 실제 기사 URL을 찾아냄(보통 헤드라인 뒤에
