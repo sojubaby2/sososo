@@ -191,10 +191,41 @@ function extractArticleUrl(rawText) {
 // 안 보이는 경우가 너무 잦아짐. 그래서 텔레그램 메시지 자체에 본문이 없으면,
 // 링크로 걸린 실제 기사 페이지에서 og:description(대부분의 국내 언론사가
 // 기사 요약을 이 메타태그에 넣어둠)을 대신 가져와서 씀 — 진짜 기사 요약이라
-// 제목과 겹칠 걱정도 없음. 사이트 구조가 달라도 안전하게 실패(빈 문자열
-// 반환)하도록 하고, 이 시도 자체가 전체 게재 흐름을 막지 않게 함(아래
-// POST 핸들러에서 호출부 참고).
-async function fetchArticleSummaryFallback(url) {
+// 제목과 겹칠 걱정도 없음.
+//
+// [2026-09-08 수정(2차)] 재성님 리포트 — 카드 제목이 아예
+// "http://www.hani.co.kr/arti/area/honam/1276805.html" 처럼 URL 그대로
+// 뜨는 경우 발견. 원인: 이 메시지는 헤드라인 텍스트 없이 링크 하나만 딱
+// 왔던 경우라(첫 줄 자체가 URL), splitMessageText의 "첫 줄 = 제목" 규칙이
+// 그 URL을 그대로 제목으로 삼아버림. 그래서 제목도 og:description과 같은
+// 방식으로 원문 기사 페이지에서 og:title(대부분의 언론사가 기사 제목을
+// 이 메타태그에 정확히 넣어둠)을 대신 가져오도록 함 — summary와 한 번의
+// fetch로 같이 처리(제목·본문 둘 다 필요한 경우 URL을 두 번 요청하지
+// 않게). 사이트 구조가 달라도 안전하게 실패(빈 문자열 반환)하도록 하고,
+// 이 시도 자체가 전체 게재 흐름을 막지 않게 함(아래 POST 핸들러의 호출부
+// 참고 — 제목을 끝내 못 찾으면 그때는 게재 자체를 건너뜀).
+function decodeHtmlEntities(raw) {
+  return raw
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function pickMetaContent(html, patterns) {
+  for (const re of patterns) {
+    const m = html.match(re);
+    if (m && m[1] && m[1].trim()) return m[1];
+  }
+  return "";
+}
+
+async function fetchArticleMetaFallback(url) {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
@@ -203,42 +234,41 @@ async function fetchArticleSummaryFallback(url) {
       signal: controller.signal,
     });
     clearTimeout(timeout);
-    if (!res.ok) return "";
+    if (!res.ok) return { title: "", summary: "" };
     const html = await res.text();
-    // og:description을 우선 쓰고, 없으면 일반 description 메타태그로 대체.
-    // 속성 순서(property/content vs content/property)가 사이트마다 달라서
-    // 두 방향 다 시도함.
-    const metaPatterns = [
+
+    // og:xxx을 우선 쓰고, 없으면 일반 메타태그/<title> 태그로 대체. 속성
+    // 순서(property/content vs content/property)가 사이트마다 달라서 두
+    // 방향 다 시도함.
+    const rawTitle =
+      pickMetaContent(html, [
+        /<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']*)["']/i,
+        /<meta[^>]+content=["']([^"']*)["'][^>]+property=["']og:title["']/i,
+      ]) || (html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? "");
+
+    const rawSummary = pickMetaContent(html, [
       /<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']*)["']/i,
       /<meta[^>]+content=["']([^"']*)["'][^>]+property=["']og:description["']/i,
       /<meta[^>]+name=["']description["'][^>]+content=["']([^"']*)["']/i,
       /<meta[^>]+content=["']([^"']*)["'][^>]+name=["']description["']/i,
-    ];
-    let raw = "";
-    for (const re of metaPatterns) {
-      const m = html.match(re);
-      if (m && m[1] && m[1].trim()) {
-        raw = m[1];
-        break;
-      }
-    }
-    if (!raw) return "";
-    const decoded = raw
-      .replace(/&quot;/g, '"')
-      .replace(/&apos;/g, "'")
-      .replace(/&#39;/g, "'")
-      .replace(/&amp;/g, "&")
-      .replace(/&lt;/g, "<")
-      .replace(/&gt;/g, ">")
-      .replace(/&nbsp;/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
-    return trimSummaryBody(decoded);
+    ]);
+
+    return {
+      title: rawTitle ? decodeHtmlEntities(rawTitle).slice(0, 200) : "",
+      summary: rawSummary ? trimSummaryBody(decodeHtmlEntities(rawSummary)) : "",
+    };
   } catch {
-    // 사이트 차단, 타임아웃, HTML 구조 이상 등 — 실패해도 게재 자체는
-    // 막지 않고 그냥 summary 없이 진행함(기존 동작과 동일).
-    return "";
+    // 사이트 차단, 타임아웃, HTML 구조 이상 등 — 실패해도 게재 자체를
+    // 무조건 막진 않고, 호출부에서 상황에 맞게 처리함(제목이 필요했는데
+    // 못 얻었으면 게재를 건너뜀 / summary만 필요했으면 빈 채로 진행).
+    return { title: "", summary: "" };
   }
+}
+
+// 텔레그램 메시지에 헤드라인 텍스트 없이 링크만 달랑 온 경우, splitMessageText가
+// 그 링크 자체를 "제목"으로 뽑아버림 — 그걸 감지하기 위한 판별.
+function looksLikeBareUrl(text) {
+  return /^https?:\/\/\S+$/i.test((text || "").trim());
 }
 
 export async function POST(request) {
@@ -283,8 +313,8 @@ export async function POST(request) {
     return Response.json({ published: false, reason: "이미 처리된 메시지" });
   }
 
-  const { title, summary: telegramSummary } = splitMessageText(rawText);
-  if (!title) {
+  const { title: rawTitle, summary: telegramSummary } = splitMessageText(rawText);
+  if (!rawTitle) {
     return Response.json({ published: false, reason: "빈 메시지" });
   }
 
@@ -294,11 +324,26 @@ export async function POST(request) {
     return Response.json({ published: false, reason: "뉴스 링크 없음" });
   }
 
-  // 텔레그램 메시지 자체에 본문이 없으면(제목+링크만 온 경우, 이 채널의
-  // 흔한 형태) 실제 기사 페이지에서 요약을 대신 가져옴 — 위
-  // fetchArticleSummaryFallback 주석 참고. 실패해도 그냥 빈 요약으로
-  // 계속 진행(게재 자체를 막지 않음).
-  const summary = telegramSummary || (await fetchArticleSummaryFallback(articleUrl));
+  // 텔레그램 메시지 자체에 헤드라인/본문이 없으면(제목 없이 링크만 왔거나,
+  // 제목+링크만 왔거나) 실제 기사 페이지에서 제목·요약을 대신 가져옴 — 위
+  // fetchArticleMetaFallback 주석 참고. fetch는 필요할 때만(제목 또는
+  // 요약 중 하나라도 부족할 때) 한 번만 함.
+  const needsTitleFallback = looksLikeBareUrl(rawTitle);
+  let title = rawTitle;
+  let summary = telegramSummary;
+  if (needsTitleFallback || !summary) {
+    const meta = await fetchArticleMetaFallback(articleUrl);
+    if (needsTitleFallback) {
+      if (!meta.title) {
+        // 원문 기사에서도 제목을 못 뽑으면, URL을 그대로 제목으로 노출시키느니
+        // 게재를 건너뜀(재성님 리포트 — 카드 제목이 통째로 URL로 뜨는 문제).
+        await redis.set(key, "1", { ex: SEEN_TTL_SECONDS });
+        return Response.json({ published: false, reason: "제목을 찾을 수 없음(링크만 있는 메시지)" });
+      }
+      title = meta.title;
+    }
+    if (!summary) summary = meta.summary || "";
+  }
 
   let passesFilter = false;
   try {
