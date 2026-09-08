@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
-import { TrendingUp, TrendingDown, ChevronDown, ChevronUp } from "lucide-react";
+import { TrendingUp, TrendingDown, ChevronDown, ChevronUp, ChevronRight } from "lucide-react";
 
 // [2026-09-08 추가] 재성님 요청 — 홈페이지 맨 위에 매일 아침 "나스닥 기반
 // 국장 예측" 배너. 실제 데이터는 /api/daily-outlook/refresh가 매일 아침
@@ -18,6 +19,12 @@ import { TrendingUp, TrendingDown, ChevronDown, ChevronUp } from "lucide-react";
 // 다만 처음 화면엔 첫 줄(가장 우선순위 높은 예측) 하나만 보여주고, 나머지는
 // "펼치기" 버튼을 눌러야 펼쳐지도록 함 — picks가 10개까지 늘어나도 배너가
 // 화면을 다 차지하지 않도록.
+//
+// [2026-09-08 수정(3차)] 재성님 질문 — "관련주 매칭 되나?" — 재성님이 고른
+// 방식대로, 각 줄을 누르면 그 테마의 "테마별 종목정리"(/themes) 페이지로
+// 이동해서 실제 관련주를 바로 보여주게 함(lib/dailyOutlook.js가 이제
+// theme을 /themes가 아는 정식 테마명 중에서만 고르도록 강제하기 때문에
+// 링크가 항상 유효함 — 자세한 이유는 그 파일 주석 참고).
 export default function DailyOutlookBanner() {
   const [outlook, setOutlook] = useState(null);
   const [state, setState] = useState("loading");
@@ -48,12 +55,17 @@ export default function DailyOutlookBanner() {
     const isUp = pick.direction === "up";
     const Icon = isUp ? TrendingUp : TrendingDown;
     return (
-      <div key={i} className={`daily-outlook-row ${isUp ? "up" : "down"}`}>
+      <Link
+        key={i}
+        href={`/themes?theme=${encodeURIComponent(pick.theme)}`}
+        className={`daily-outlook-row ${isUp ? "up" : "down"}`}
+      >
         <Icon size={14} style={{ flexShrink: 0 }} />
         <span className="daily-outlook-theme">{pick.theme}</span>
         <span className="daily-outlook-reason">{pick.reason}</span>
         <span className="daily-outlook-verdict">{isUp ? "강세 예상" : "하락 예상"}</span>
-      </div>
+        <ChevronRight size={14} style={{ flexShrink: 0, opacity: 0.5 }} />
+      </Link>
     );
   };
 

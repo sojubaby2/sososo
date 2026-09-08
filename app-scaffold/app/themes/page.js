@@ -39,6 +39,20 @@ export default function ThemesPage() {
   const [loadState, setLoadState] = useState("loading"); // loading | ready | error
   const [range, setRange] = useState("1M"); // "1W" | "1M"
 
+  // [2026-09-08 추가] 홈페이지 "국장 예측" 배너(components/DailyOutlookBanner.js)
+  // 에서 특정 테마 줄을 누르면 /themes?theme=반도체 처럼 쿼리스트링을 달고
+  // 들어오는데, 그 값이 있으면 처음부터 그 테마가 선택된 채로 보여줌(useState
+  // 함수를 그냥 window.location.search가 아니라 useEffect에서 나중에 읽는
+  // 이유: 이 페이지가 "use client"라 Next.js의 useSearchParams()를 쓰려면
+  // Suspense 경계가 필요한데, 그냥 브라우저 기본 API로 읽으면 그럴 필요가 없음).
+  useEffect(() => {
+    const themeParam = new URLSearchParams(window.location.search).get("theme");
+    if (themeParam && THEMES.some((t) => t.theme === themeParam)) {
+      setSelected(themeParam);
+      setExpanded(themeParam);
+    }
+  }, []);
+
   useEffect(() => {
     fetch("/api/theme-momentum")
       .then((r) => r.json())

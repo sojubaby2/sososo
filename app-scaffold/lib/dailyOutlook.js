@@ -34,6 +34,20 @@
 // 절대로 홈페이지 방문마다 직접 호출하면 안 됨. 그래서 아래 fetch 함수들은
 // refreshDailyOutlook 안에서만 쓰이고, 읽기 전용 getCachedDailyOutlook은
 // Redis만 보고 끝냄.
+//
+// [2026-09-08 수정(3차)] 재성님 질문 — "이 배너에 관련주 매칭 되나?" — 답은
+// "지금은 안 됨"이었음. 이유: Claude가 theme을 완전히 자유롭게 만들어내서
+// ("AI 인프라", "클라우드/소프트웨어" 처럼) /themes 페이지가 아는 154개
+// 정식 테마명(lib/themeData.js)과 문자열이 안 맞음. 그래서 재성님이 고른
+// 방식(관련주 칩 대신 "테마별 종목정리" 페이지로 연결)이 실제로 작동하려면
+// theme 이름 자체가 정식 테마명과 정확히 일치해야 함 — 그래서 아래
+// ALLOWED_THEME_NAMES 목록을 만들어 프롬프트에 통째로 넣고, Claude가 반드시
+// 이 목록 중에서만 theme을 고르도록 강제함(응답 파싱 후에도 한 번 더
+// 필터링 — 혹시 목록에 없는 이름을 냈으면 그 pick은 버림).
+import { getAllThemeNames } from "./themeData";
+
+const ALLOWED_THEME_NAMES = getAllThemeNames();
+const ALLOWED_THEME_SET = new Set(ALLOWED_THEME_NAMES);
 
 const ALPHA_VANTAGE_BASE = "https://www.alphavantage.co/query";
 
@@ -91,17 +105,21 @@ function toKoreanDateLabel(d) {
 
 const SYNTH_SYSTEM_PROMPT = `너는 한국 개인 투자자를 위한 아침 시황 브리핑을 짧게 써주는 애널리스트야.
 
-너한테는 미국 증시(나스닥 포함) 상위 상승 종목·상위 하락 종목 목록과 최근 기술/실적 관련 뉴스 제목·요약 목록이 주어져. 이 정보를 바탕으로, 오늘 한국 증시에서 강세 또는 약세가 예상되는 테마·종목을 최대 10개까지 짧게 예측해줘.
+너한테는 미국 증시(나스닥 포함) 상위 상승 종목·상위 하락 종목 목록과 최근 기술/실적 관련 뉴스 제목·요약 목록이 주어져. 이 정보를 바탕으로, 오늘 한국 증시에서 강세 또는 약세가 예상되는 테마를 최대 10개까지 짧게 예측해줘.
 
 **작성 규칙**:
 - 나스닥이 전반적으로 강세면 강세(up) 예측 위주로, 전반적으로 약세면 약세(down) 예측 위주로 만들어도 되지만, 테마별로 방향이 명확히 갈리면(예: 반도체는 호재, 원전은 악재) 억지로 방향을 통일시키지 말고 각각 따로 만들어. 상승·하락이 섞여 나와도 전혀 문제 없어 — 오히려 더 정확해.
-- 각 예측 항목은 세 가지: theme(테마 또는 종목명, 10자 이내 — 예: "반도체", "원전", "2차전지"), direction("up" 또는 "down" 중 하나), reason(그 방향으로 예상하는 구체적 근거).
+- theme은 반드시 아래 [허용된 테마 목록]에 있는 이름 중 하나를 토씨 하나 안 틀리고 그대로 써야 해. 목록에 없는 이름을 새로 만들어내지 마 — 나스닥 뉴스가 이 목록의 여러 테마와 관련될 수 있으니, 그중 가장 관련 있는 걸 골라 써(예: 엔비디아·AI 반도체 관련 뉴스면 "반도체" 또는 "반도체 제품(비메모리)", 데이터센터 뉴스면 "데이터 센터", 오픈AI 등 AI 서비스 뉴스면 "인공지능(AI)"). 이 목록과 관련된 근거가 하나도 없는 뉴스는 그냥 씀.
+- 각 예측 항목은 세 가지: theme([허용된 테마 목록] 중 정확히 하나), direction("up" 또는 "down" 중 하나), reason(그 방향으로 예상하는 구체적 근거).
 - 근거(reason)는 나스닥 상승/하락 종목, 뉴스 재료, 또는 젠슨 황·일론 머스크·트럼프·팀 쿡처럼 영향력 있는 인물의 발언 중에서 실제로 주어진 자료에 있는 내용만 써. 지어내지 마.
 - 근거가 충분하면 최대 10개까지, 우선순위(확신 높은 순서) 높은 것부터 채워. 억지로 10개를 채우려 하지는 말고, 근거가 그만큼 없으면 있는 만큼만(1~2개도 괜찮음) 내면 돼. 정말 근거가 하나도 없으면 picks를 빈 배열로 둬.
 - reason은 40자 이내로 짧게. 존댓말 쓰지 말고 개조식으로 사실만(예: "~발언", "~급등", "~부진"). "강세 예상"/"하락 예상" 같은 결론 문구는 reason에 넣지 마 — 그건 direction 필드로 이미 표현되니까, reason에는 순수 근거만.
 
+[허용된 테마 목록] (반드시 이 중에서만 골라 theme에 써):
+${ALLOWED_THEME_NAMES.join(", ")}
+
 응답은 반드시 아래 JSON 형식 하나만, 다른 텍스트 없이:
-{"picks":[{"theme":"반도체","direction":"up","reason":"엔비디아 급등과 젠슨 황 'AI 수요 견조' 발언"},{"theme":"원전","direction":"down","reason":"관련 종목 실적 부진 우려"}]}`;
+{"picks":[{"theme":"반도체","direction":"up","reason":"엔비디아 급등과 젠슨 황 'AI 수요 견조' 발언"},{"theme":"원자력발전(SMR)","direction":"down","reason":"관련 종목 실적 부진 우려"}]}`;
 
 function extractJsonObject(text) {
   let depth = 0;
@@ -158,6 +176,10 @@ async function synthesizeOutlook(gainers, losers, news) {
         p &&
         typeof p.theme === "string" &&
         p.theme.trim() &&
+        // [2026-09-08 추가] theme이 /themes 페이지가 아는 정식 테마명이
+        // 아니면(프롬프트로 강제했지만 모델이 가끔 벗어날 수 있음) 링크가
+        // 깨지므로 통째로 버림 — 어설프게 보여주느니 그 pick만 빼는 게 나음.
+        ALLOWED_THEME_SET.has(p.theme.trim()) &&
         (p.direction === "up" || p.direction === "down") &&
         typeof p.reason === "string" &&
         p.reason.trim()

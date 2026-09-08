@@ -127,7 +127,9 @@ button, input { font-family: inherit; }
 .daily-outlook-row {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
   font-size: 13px; border-radius: 10px; padding: 9px 14px; border: 1px solid transparent;
+  text-decoration: none; cursor: pointer; transition: filter 0.12s ease;
 }
+.daily-outlook-row:hover { filter: brightness(0.97); }
 .daily-outlook-row.up { background: rgba(194, 59, 59, 0.1); border-color: rgba(194, 59, 59, 0.35); color: var(--up); }
 .daily-outlook-row.down { background: rgba(46, 95, 163, 0.1); border-color: rgba(46, 95, 163, 0.35); color: var(--down); }
 .daily-outlook-theme { font-weight: 700; white-space: nowrap; }
