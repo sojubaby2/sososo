@@ -143,6 +143,63 @@ function extractArticleUrl(rawText) {
   return match[0].replace(/[),.!?"'”’]+$/g, "") || null;
 }
 
+// [2026-09-08 추가] 재성님 리포트 — "본문내용이 전혀 안 적히고 있어". 원인:
+// 이 채널은 "제목 한 줄 + 링크"만 오는 메시지가 대부분이라(문단으로 된 본문
+// 자체가 없음), splitMessageText가 뽑아내는 summary가 거의 항상 빈 문자열이
+// 됨 — 의도한 동작(제목 반복 방지)이었지만, 그 결과 카드에 본문이 아예
+// 안 보이는 경우가 너무 잦아짐. 그래서 텔레그램 메시지 자체에 본문이 없으면,
+// 링크로 걸린 실제 기사 페이지에서 og:description(대부분의 국내 언론사가
+// 기사 요약을 이 메타태그에 넣어둠)을 대신 가져와서 씀 — 진짜 기사 요약이라
+// 제목과 겹칠 걱정도 없음. 사이트 구조가 달라도 안전하게 실패(빈 문자열
+// 반환)하도록 하고, 이 시도 자체가 전체 게재 흐름을 막지 않게 함(아래
+// POST 핸들러에서 호출부 참고).
+async function fetchArticleSummaryFallback(url) {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    const res = await fetch(url, {
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; newsmeme-bot/1.0)" },
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    if (!res.ok) return "";
+    const html = await res.text();
+    // og:description을 우선 쓰고, 없으면 일반 description 메타태그로 대체.
+    // 속성 순서(property/content vs content/property)가 사이트마다 달라서
+    // 두 방향 다 시도함.
+    const metaPatterns = [
+      /<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']*)["']/i,
+      /<meta[^>]+content=["']([^"']*)["'][^>]+property=["']og:description["']/i,
+      /<meta[^>]+name=["']description["'][^>]+content=["']([^"']*)["']/i,
+      /<meta[^>]+content=["']([^"']*)["'][^>]+name=["']description["']/i,
+    ];
+    let raw = "";
+    for (const re of metaPatterns) {
+      const m = html.match(re);
+      if (m && m[1] && m[1].trim()) {
+        raw = m[1];
+        break;
+      }
+    }
+    if (!raw) return "";
+    const decoded = raw
+      .replace(/&quot;/g, '"')
+      .replace(/&apos;/g, "'")
+      .replace(/&#39;/g, "'")
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&nbsp;/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    return trimSummaryBody(decoded);
+  } catch {
+    // 사이트 차단, 타임아웃, HTML 구조 이상 등 — 실패해도 게재 자체는
+    // 막지 않고 그냥 summary 없이 진행함(기존 동작과 동일).
+    return "";
+  }
+}
+
 export async function POST(request) {
   const ingestSecret = process.env.TELEGRAM_INGEST_SECRET;
   if (!ingestSecret) {
@@ -185,7 +242,7 @@ export async function POST(request) {
     return Response.json({ published: false, reason: "이미 처리된 메시지" });
   }
 
-  const { title, summary } = splitMessageText(rawText);
+  const { title, summary: telegramSummary } = splitMessageText(rawText);
   if (!title) {
     return Response.json({ published: false, reason: "빈 메시지" });
   }
@@ -195,6 +252,12 @@ export async function POST(request) {
     await redis.set(key, "1", { ex: SEEN_TTL_SECONDS });
     return Response.json({ published: false, reason: "뉴스 링크 없음" });
   }
+
+  // 텔레그램 메시지 자체에 본문이 없으면(제목+링크만 온 경우, 이 채널의
+  // 흔한 형태) 실제 기사 페이지에서 요약을 대신 가져옴 — 위
+  // fetchArticleSummaryFallback 주석 참고. 실패해도 그냥 빈 요약으로
+  // 계속 진행(게재 자체를 막지 않음).
+  const summary = telegramSummary || (await fetchArticleSummaryFallback(articleUrl));
 
   let passesFilter = false;
   try {
