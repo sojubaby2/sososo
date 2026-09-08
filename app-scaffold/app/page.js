@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Newspaper, Loader2, Flame, Bell, Globe, Volume2, VolumeX, Smartphone, X } from "lucide-react";
 import Header from "../components/Header";
 import NewsCard from "../components/NewsCard";
+import DailyOutlookBanner from "../components/DailyOutlookBanner";
 import { isPoliticalTheme } from "../lib/themeData";
 
 const HOT_THEME_COUNT = 8;
@@ -349,6 +350,7 @@ export default function HomePage() {
     <div>
       <Header />
       <main className="container-wide" style={{ paddingTop: 32, paddingBottom: 32 }}>
+        <DailyOutlookBanner />
         <InstallHintBanner />
         <div className="home-layout">
           <div>

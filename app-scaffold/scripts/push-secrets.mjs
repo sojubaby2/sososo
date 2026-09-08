@@ -21,11 +21,16 @@
 // TELEGRAM_INGEST_SECRET: /api/telegram-ingest 인증용 — 오라클 VM에서
 // 도는 텔레그램 리스너(server/listener.py)가 이 값을 Authorization 헤더에
 // 담아 보내고, 서버는 이 값과 비교해서 요청을 인증합니다.
+//
+// ALPHA_VANTAGE_API_KEY: [2026-09-08 추가] 홈페이지 맨 위 "나스닥 기반
+// 국장 예측" 배너용 — app/api/daily-outlook/refresh/route.js가 미국 상위
+// 상승 종목·뉴스를 가져올 때 씀 (lib/dailyOutlook.js 참고).
 
 import { execSync } from "node:child_process";
 import { writeFileSync, unlinkSync, existsSync } from "node:fs";
 
 const NAMES = [
+  "ALPHA_VANTAGE_API_KEY",
   "ANTHROPIC_API_KEY",
   "CRON_SECRET",
   "FRED_API_KEY",
