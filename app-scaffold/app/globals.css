@@ -177,7 +177,17 @@ button, input { font-family: inherit; }
 .down { color: var(--down); }
 .flat { color: var(--ink-muted); }
 
-.news-summary { font-size: 14px; line-height: 1.65; color: var(--ink-muted); margin: 0 0 10px; overflow-wrap: anywhere; }
+/* [2026-09-08 추가] 재성님 요청 — 텔레그램 메시지가 유난히 길게 온 경우
+   (요약 자체를 자르는 lib단 조치와는 별개로) 카드 하나가 화면을 너무 많이
+   차지하지 않도록 한 번 더 안전장치를 둠: 5줄을 넘기면 "…"으로 잘라 보여줌.
+   전체 내용은 "원문 기사 전체 보기" 링크로 확인 가능. */
+.news-summary {
+  font-size: 14px; line-height: 1.65; color: var(--ink-muted); margin: 0 0 10px; overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 5;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
 .news-reason { font-size: 12px; line-height: 1.6; color: var(--down); margin: 0 0 12px; overflow-wrap: anywhere; }
 .news-reason strong { color: var(--down); font-weight: 700; }
 .news-link {
@@ -229,7 +239,23 @@ button, input { font-family: inherit; }
 .search-box svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--ink-muted); }
 
 .theme-layout { display: grid; grid-template-columns: 1fr; gap: 24px; }
-@media (min-width: 768px) { .theme-layout { grid-template-columns: 320px 1fr; } }
+/* [2026-09-08 추가] 재성님 리포트 — 테마가 109개라 왼쪽 목록이 화면보다 훨씬
+   길어서, 아래쪽 테마를 눌러도 오른쪽 종목 패널은 그냥 그 자리(페이지 맨
+   위, grid row 시작점)에 그려짐. 그래서 클릭한 지점은 화면 아래쪽인데
+   패널은 저 위에 있어서 매번 스크롤을 위로 올려야 보이는 문제가 있었음.
+   position: sticky로 오른쪽 패널이 스크롤을 따라오게 해서, 방금 클릭한
+   테마의 종목이 항상 화면에 바로 보이게 함. align-items: start를 같이
+   줘야 grid가 오른쪽 패널을 왼쪽 목록 높이만큼 강제로 늘리지 않고 자기
+   내용물 높이(sticky 기준점)만큼만 갖게 됨. */
+@media (min-width: 768px) {
+  .theme-layout { grid-template-columns: 320px 1fr; align-items: start; }
+  .theme-detail-desktop {
+    position: sticky;
+    top: 20px;
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
+  }
+}
 
 .theme-list { border-radius: 12px; border: 1px solid var(--border); background: var(--surface); overflow: hidden; }
 .theme-item { width: 100%; text-align: left; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border: none; background: transparent; border-left: 3px solid transparent; border-bottom: 1px solid var(--border); cursor: pointer; font-size: 14px; }

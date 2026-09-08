@@ -65,8 +65,20 @@ function toBasDt(d) {
   return `${y}${m}${dd}`;
 }
 
+// [2026-09-08 수정] 재성님 확인 요청으로 발견한 버그 — 원래는 여기서 무조건
+// 하루부터 빼고 시작해서, "오늘"(from 그 자체)이 후보에 아예 안 들어갔음.
+// 장 마감(15:30) 후 KRX가 당일 종가를 이미 공시한 저녁 시간대에도, 이
+// 엔드포인트는 계속 하루 늦은 날짜를 "최신(recent)"으로 돌려주고 있었음 —
+// 자정이 지나 날짜가 바뀌어야만("어제"가 "오늘"이 되어야만) 비로소 따라
+// 잡히는 구조라, 상승률이 매일 저녁 한동안 하루 묵은 값으로 보였음.
+// 그래서 오늘(from) 날짜도 평일이면 첫 후보로 포함하도록 고침 — 아직 장중이라
+// 당일 데이터가 없으면 fetchStockPage가 빈 배열을 반환하고, 호출부
+// (fetchLatestAvailable)가 알아서 하루 전으로 넘어가므로 안전함(빈 응답을
+// "최신"으로 잘못 확정하는 부작용 없음).
 function* businessDaysBackFrom(from) {
   const d = new Date(from);
+  const startDay = d.getDay();
+  if (startDay !== 0 && startDay !== 6) yield toBasDt(d);
   while (true) {
     d.setDate(d.getDate() - 1);
     const day = d.getDay();

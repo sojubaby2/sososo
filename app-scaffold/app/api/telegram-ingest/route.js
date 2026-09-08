@@ -50,14 +50,14 @@ function stripLeadingEmoji(text) {
   return (text || "").replace(/^[\p{Extended_Pictographic}\p{Emoji_Presentation}\uFE0F\u200D\s]+/u, "");
 }
 
-// [2026-09-08 \uCD94\uAC00] \uC7AC\uC131\uB2D8 \uC694\uCCAD \u2014 "[\uC57D\uC5C5]", "[\uC7AC\uC5C5]"\uCC98\uB7FC \uCC44\uB110 \uC6B4\uC601\uC790\uAC00 \uC790\uAE30
-// \uCC44\uB110/\uCD9C\uCC98 \uD45C\uC2DC\uC6A9\uC73C\uB85C \uADF8\uB0E5 \uBD99\uC774\uB294 \uD0DC\uADF8\uB294 \uAE30\uC0AC \uB0B4\uC6A9\uACFC \uBB34\uAD00\uD558\uB2C8 \uC9C0\uC6CC\uC57C \uD558\uACE0,
-// \uBC18\uB300\uB85C "[\uD2B9\uC9D5\uC8FC]", "[\uC18D\uBCF4]"\uCC98\uB7FC \uAE30\uC0AC \uC131\uACA9 \uC790\uCCB4\uB97C \uB098\uD0C0\uB0B4\uB294 \uC9C4\uC9DC \uD0DC\uADF8\uB294 \uADF8\uB300\uB85C
-// \uC0B4\uB824\uC57C \uD568(\uC7AC\uC131\uB2D8 \uD655\uC778: "\uD2B9\uC9D5\uC8FC, \uC18D\uBCF4 \uC774\uB7F0 \uAE00\uC528\uB294 \uADF8\uB300\uB85C \uAC00\uC838\uC640\uB3C4 \uB3FC"). \uADF8\uB798\uC11C
-// "\uC9C0\uC6B8 \uD0DC\uADF8"\uB9CC \uD654\uC774\uD2B8\uB9AC\uC2A4\uD2B8\uB85C \uAD00\uB9AC\uD568(\uBE14\uB799\uB9AC\uC2A4\uD2B8\uB85C \uD558\uBA74 \uC0C8\uB85C \uB098\uD0C0\uB098\uB294 \uC9C4\uC9DC
-// \uD0DC\uADF8\uAE4C\uC9C0 \uC2E4\uC218\uB85C \uC9C0\uC6B8 \uC704\uD5D8\uC774 \uC788\uC74C) \u2014 \uB098\uC911\uC5D0 \uC7AC\uC131\uB2D8\uC774 \uB2E4\uB978 "OO"\uB3C4 \uC9C0\uC6CC\uB2EC\uB77C\uACE0
-// \uD558\uBA74 \uC774 \uBC30\uC5F4\uC5D0 \uADF8 \uB2E8\uC5B4\uB9CC \uD55C \uC904 \uCD94\uAC00\uD558\uBA74 \uB428.
-const NOISE_LEADING_TAGS = ["\uC57D\uC5C5", "\uC7AC\uC5C5"];
+// [2026-09-08 추가] 재성님 요청 — "[약업]", "[재업]"처럼 채널 운영자가 자기
+// 채널/출처 표시용으로 그냥 붙이는 태그는 기사 내용과 무관하니 지워야 하고,
+// 반대로 "[특징주]", "[속보]"처럼 기사 성격 자체를 나타내는 진짜 태그는 그대로
+// 살려야 함(재성님 확인: "특징주, 속보 이런 글씨는 그대로 가져와도 돼"). 그래서
+// "지울 태그"만 화이트리스트로 관리함(블랙리스트로 하면 새로 나타나는 진짜
+// 태그까지 실수로 지울 위험이 있음) — 나중에 재성님이 다른 태그도 지워달라고
+// 하면 이 배열에 그 단어만 한 줄 추가하면 됨.
+const NOISE_LEADING_TAGS = ["약업", "재업"];
 
 function stripNoiseLeadingTag(text) {
   const t = text || "";
@@ -68,8 +68,8 @@ function stripNoiseLeadingTag(text) {
   return t;
 }
 
-// \uC774\uBAA8\uC9C0\uC640 \uC7A1\uC74C \uD0DC\uADF8\uAC00 \uC5EC\uB7EC \uACB9\uC73C\uB85C \uBD99\uC5B4\uC788\uC744 \uC218 \uC788\uC5B4\uC11C(\uC608: "\u2705[\uC57D\uC5C5] \uC81C\uBAA9"),
-// \uB354 \uC774\uC0C1 \uC548 \uC9C0\uC6CC\uC9C8 \uB54C\uAE4C\uC9C0 \uBC88\uAC08\uC544 \uCD5C\uB300 5\uBC88 \uBC18\uBCF5 \uC801\uC6A9\uD568.
+// 이모지와 잡음 태그가 여러 겹으로 붙어있을 수 있어서(예: "✅[약업] 제목"),
+// 더 이상 안 지워질 때까지 번갈아 최대 5번 반복 적용함.
 function cleanLeadingNoise(text) {
   let t = (text || "").trim();
   for (let i = 0; i < 5; i++) {
@@ -80,12 +80,36 @@ function cleanLeadingNoise(text) {
   return t;
 }
 
+// [2026-09-08 추가] 재성님 요청 — 텔레그램 메시지 원문을 그대로 summary에
+// 다 넣으면 카드에 문단 여러 개짜리 "글 벽"이 통째로 뜨는 문제가 있었음.
+// summary는 카드 미리보기 + AI 필터/매칭 프롬프트에 쓰이는 용도지(SYSTEM_PROMPT
+// 자체가 "너한테는 뉴스 제목과 요약만 주어져"라고 전제함) 기사 전문을 보여주는
+// 자리가 아님 — 전문은 "원문 기사 전체 보기" 링크로 감. 그래서:
+// 1) 본문에 섞여 있는 실제 기사 URL과 그 뒤에 흔히 붙는 해시태그·구독 유도
+//    문구 같은 꼬리말은 통째로 잘라내고(원문 링크는 extractArticleUrl로 이미
+//    따로 뽑아서 "원문 기사 전체 보기"에 쓰고 있음),
+// 2) 그러고 남은 본문도 일정 길이(SUMMARY_MAX_LENGTH)를 넘으면 자름 — 문장
+//    중간이 아니라 마지막 줄바꿈/문장 경계에서 자르도록 함.
+const SUMMARY_MAX_LENGTH = 280;
+
+function trimSummaryBody(text) {
+  let t = (text || "").replace(/https?:\/\/\S+[\s\S]*$/, "").trim();
+  if (t.length <= SUMMARY_MAX_LENGTH) return t;
+  const cut = t.slice(0, SUMMARY_MAX_LENGTH);
+  // 잘라낸 지점 바로 앞의 줄바꿈이나 문장 마침("다.", ". ") 위치를 찾아서 그
+  // 자리에서 자름 — 다만 그 위치가 너무 앞쪽(원래 길이의 60% 미만)이면 그냥
+  // 글자 수 기준으로 자름(문장부호 없는 메시지도 많아서).
+  const lastBreak = Math.max(cut.lastIndexOf("\n"), cut.lastIndexOf("다. "), cut.lastIndexOf(". "));
+  const safeCut = lastBreak > SUMMARY_MAX_LENGTH * 0.6 ? cut.slice(0, lastBreak + 1) : cut;
+  return safeCut.trim() + "…";
+}
+
 function splitMessageText(raw) {
   const text = cleanLeadingNoise(raw);
   if (!text) return { title: "", summary: "" };
   const firstBreak = text.indexOf("\n");
   const title = (firstBreak === -1 ? text : text.slice(0, firstBreak)).trim().slice(0, 200);
-  return { title: title || text.slice(0, 200), summary: text };
+  return { title: title || text.slice(0, 200), summary: trimSummaryBody(text) };
 }
 
 // 채널 메시지 본문에서 실제 기사 URL을 찾아냄(보통 헤드라인 뒤에
