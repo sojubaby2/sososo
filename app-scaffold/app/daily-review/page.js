@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "마감시황 | 뉴스매매",
-  description: "매 거래일 저녁, 그날 장을 주도했던 테마와 종목을 자동으로 정리해 드립니다.",
+  description: "매 거래일 저녁, 그날 장을 주도했던 테마와 종목을 정리해 드립니다.",
 };
 
 export default async function DailyReviewListPage() {
@@ -29,15 +29,13 @@ export default async function DailyReviewListPage() {
         <div className="blog-intro">
           <h1 className="blog-title">마감시황</h1>
           <p className="blog-subtitle">
-            매 거래일 저녁 9시, 그날 장을 주도했던 테마와 종목을 자동으로 정리해 드립니다.
+            매 거래일 저녁 9시, 그날 장을 주도했던 테마와 종목을 정리해 드립니다.
           </p>
         </div>
 
-        {posts.length === 0 ? (
-          <p style={{ fontSize: 14, color: "var(--ink-muted)", padding: "24px 0" }}>
-            아직 작성된 마감시황이 없습니다. 다음 거래일 저녁 9시에 자동으로 올라와요.
-          </p>
-        ) : (
+        {/* [2026-09-08 수정] 재성님 요청으로 "아직 작성된 마감시황이
+            없습니다..." 안내 문구 제거 — 글이 없으면 그냥 아무것도 안 보임. */}
+        {posts.length > 0 && (
           <div className="blog-list">
             {posts.map((post) => (
               <Link key={post.date} href={`/daily-review/${post.date}`} className="blog-card">
