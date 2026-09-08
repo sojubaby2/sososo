@@ -177,13 +177,28 @@ export async function buildPriceSeriesForAllStocks(redis, limit = HISTORY_LOOKBA
   // dayResults는 dates와 같은 순서(오래된 날짜 -> 최신 날짜)를 그대로
   // 유지함 — Promise.all은 완료 순서가 아니라 입력 배열 순서로 결과를
   // 돌려주므로, 아래에서 series에 순서대로 push하기만 하면 됨.
+  //
+  // [2026-09-08 수정 — 재성님 리포트: "전고점돌파"에 097780(에코볼트)이
+  // "에스맥"이라는 이름으로 표시됨] 원인은 이 루프였음 — byCode.set을
+  // "그 코드를 처음 만났을 때 딱 한 번만" 했었는데, dayResults가 오래된
+  // 날짜부터 순서대로 오다 보니 그 "처음"이 3년 치 히스토리 중 가장 오래된
+  // 날짜였음. 097780은 그 오래된 시점엔 "에스맥"이었다가 그 후 "에코볼트"로
+  // 종목명이 바뀐 종목이라(개명), name 필드가 옛날 이름에 그대로 얼어붙어
+  // 있었던 것 — 정작 코드(097780)는 최신 데이터를 그대로 잘 썼기 때문에
+  // "종목코드를 복사하면 에코볼트가 나온다"는 재성님 관찰과도 정확히 맞음.
+  // 그래서 이제 name/market은 매번(더 최근 날짜를 만날 때마다) 덮어써서,
+  // 루프가 끝나면 자연스럽게 "가장 최근 날짜에 KRX가 알려준 이름"으로
+  // 남도록 함.
   for (const entry of dayResults) {
     if (!entry) continue;
     const { basDt, records } = entry;
     for (const r of records) {
       if (!r?.code) continue;
       if (!byCode.has(r.code)) byCode.set(r.code, { name: r.name, market: r.market, series: [] });
-      byCode.get(r.code).series.push({ date: basDt, o: r.o, h: r.h, l: r.l, c: r.c, v: r.v });
+      const stockEntry = byCode.get(r.code);
+      stockEntry.name = r.name;
+      stockEntry.market = r.market;
+      stockEntry.series.push({ date: basDt, o: r.o, h: r.h, l: r.l, c: r.c, v: r.v });
     }
   }
 
