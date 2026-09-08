@@ -111,17 +111,26 @@ button, input { font-family: inherit; }
 .install-hint-close:hover { color: var(--ink); }
 
 /* [2026-09-08 추가] 홈페이지 맨 위 "나스닥 기반 국장 예측" 배너
-   (components/DailyOutlookBanner.js). HOT 테마 등 다른 강조 요소와
-   구분되게 amber(주황) 톤으로, 페이지 최상단이라 눈에 잘 띄도록 함. */
+   (components/DailyOutlookBanner.js). 테마별로 최대 3줄까지 나올 수 있어서
+   전체를 감싸는 컨테이너 + 줄마다 상승(붉은)/하락(파란) 색 구분.
+   rgba 값은 이 파일에서 이미 쓰고 있는 .blog-thumb-up/-down과 동일한
+   톤(연한 배경 tint)을 그대로 재사용함. */
 .daily-outlook-banner {
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-  font-size: 13px; color: var(--amber-tint-ink);
-  background: var(--amber-tint); border: 1px solid var(--amber);
-  border-radius: 10px; padding: 10px 16px; margin-bottom: 20px;
+  display: flex; flex-direction: column; gap: 6px; margin-bottom: 20px;
 }
-.daily-outlook-date { font-weight: 700; white-space: nowrap; }
-.daily-outlook-sep { opacity: 0.5; }
-.daily-outlook-summary { font-weight: 500; }
+.daily-outlook-heading {
+  margin: 0 0 2px; font-size: 12px; font-weight: 700; color: var(--ink-muted);
+  text-transform: uppercase; letter-spacing: 0.03em;
+}
+.daily-outlook-row {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  font-size: 13px; border-radius: 10px; padding: 9px 14px; border: 1px solid transparent;
+}
+.daily-outlook-row.up { background: rgba(194, 59, 59, 0.1); border-color: rgba(194, 59, 59, 0.35); color: var(--up); }
+.daily-outlook-row.down { background: rgba(46, 95, 163, 0.1); border-color: rgba(46, 95, 163, 0.35); color: var(--down); }
+.daily-outlook-theme { font-weight: 700; white-space: nowrap; }
+.daily-outlook-reason { color: var(--ink); font-weight: 500; opacity: 0.85; }
+.daily-outlook-verdict { margin-left: auto; font-weight: 700; white-space: nowrap; }
 .filter-btns { display: flex; align-items: center; gap: 4px; font-size: 13px; }
 .filter-btn { padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border); background: transparent; color: var(--ink-muted); cursor: pointer; }
 .filter-btn.active { border-color: var(--amber); color: var(--amber); background: var(--amber-tint); }
