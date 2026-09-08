@@ -37,7 +37,7 @@ export default function ThemesPage() {
   const [stockChanges1W, setStockChanges1W] = useState({}); // code -> change1W
   const [stockChanges1M, setStockChanges1M] = useState({}); // code -> change1M
   const [loadState, setLoadState] = useState("loading"); // loading | ready | error
-  const [range, setRange] = useState("1M"); // "1W" | "1M"
+  const [range, setRange] = useState("1W"); // "1W" | "1M" — 재성님 요청으로 기본값을 1주일로 변경
 
   // [2026-09-08 추가] 홈페이지 "국장 예측" 배너(components/DailyOutlookBanner.js)
   // 에서 특정 테마 줄을 누르면 /themes?theme=반도체 처럼 쿼리스트링을 달고

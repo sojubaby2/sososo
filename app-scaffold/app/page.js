@@ -71,7 +71,7 @@ function toCardShape(item) {
 function HotThemePanel() {
   const [rawThemes, setRawThemes] = useState([]);
   const [state, setState] = useState("loading");
-  const [range, setRange] = useState("1M"); // "1W" | "1M"
+  const [range, setRange] = useState("1W"); // "1W" | "1M" — 재성님 요청으로 기본값을 1주일로 변경
 
   useEffect(() => {
     fetch("/api/theme-momentum")

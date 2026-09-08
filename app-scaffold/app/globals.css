@@ -251,8 +251,12 @@ button, input { font-family: inherit; }
 .trending-panel-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 14px; }
 .trending-panel-header .trending-panel-title { margin: 0; }
 .range-toggle { display: inline-flex; border: 1px solid var(--border); border-radius: 999px; padding: 2px; gap: 2px; }
-.range-toggle-btn { font-size: 11px; font-weight: 600; color: var(--ink-muted); background: transparent; border: none; border-radius: 999px; padding: 4px 10px; cursor: pointer; line-height: 1.2; }
-.range-toggle-btn.active { color: var(--amber-tint-ink); background: var(--amber-tint); }
+/* [2026-09-08 수정] 재성님 요청 — 1주일/1개월 선택이 눈에 잘 안 띄어서,
+   눌렀을 때 색이 확실히 바뀌고(연한 배경색 대신 진한 amber 배경 + 흰 글씨)
+   살짝 커지는 애니메이션도 넣어서 지금 뭐가 선택돼 있는지 한눈에 보이게 함. */
+.range-toggle-btn { font-size: 11px; font-weight: 600; color: var(--ink-muted); background: transparent; border: none; border-radius: 999px; padding: 4px 10px; cursor: pointer; line-height: 1.2; transition: background-color 0.15s ease, color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease; }
+.range-toggle-btn:hover:not(.active) { color: var(--amber); background: var(--amber-tint); }
+.range-toggle-btn.active { color: #fff; background: var(--amber); box-shadow: 0 2px 6px rgba(198, 134, 43, 0.4); transform: scale(1.08); }
 .trending-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); }
 .trending-row:last-child { border-bottom: none; }
 /* [2026-09-08 추가] HOT 테마 줄을 누르면 테마별 종목정리로 이동하는 링크로 바뀜 */
