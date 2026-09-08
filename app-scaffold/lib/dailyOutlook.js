@@ -142,7 +142,14 @@ const OUTLOOK_REDIS_KEY = "dailyOutlook:latest";
 // /api/daily-outlook/refresh 전용. 홈페이지 쪽에서는 절대 이걸 직접
 // 부르면 안 됨(항상 저장된 값만 읽어야 함 — 위 파일 설명 참고).
 export async function refreshDailyOutlook(redis) {
-  const [gainers, news] = await Promise.all([fetchTopGainers(), fetchTechNews()]);
+  // [2026-09-08 수정] 처음엔 Promise.all로 두 Alpha Vantage 호출을 동시에
+  // 보냈는데, 실제로 재성님이 테스트해보니 "1 request per second" 에러가
+  // 남 — Alpha Vantage 무료 키는 같은 순간에 여러 요청이 들어오는 걸
+  // 허용 안 하는 초당 호출 제한이 있어서(하루 25회 한도와는 별개 문제).
+  // 그래서 동시 호출 대신 순서대로 호출하고, 사이에 1.2초 쉬어감.
+  const gainers = await fetchTopGainers();
+  await new Promise((resolve) => setTimeout(resolve, 1200));
+  const news = await fetchTechNews();
   const summary = await synthesizeOutlook(gainers, news);
   if (!summary) throw new Error("AI 요약 생성 실패(근거 부족 또는 파싱 실패)");
 
