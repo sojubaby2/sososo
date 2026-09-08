@@ -57,9 +57,9 @@ button, input { font-family: inherit; }
 /* Header */
 .site-header { border-bottom: 1px solid var(--border); background: var(--surface); }
 .site-header-inner { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 0; }
-.brand { display: flex; align-items: center; gap: 12px; }
-.brand h1 { margin: 0; line-height: 0; }
-.brand-logo { height: 44px; width: auto; display: block; }
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand h1 { font-family: var(--font-display); font-size: 24px; font-weight: 700; margin: 0; }
+.brand-logo { height: 36px; width: auto; display: block; }
 .badge { font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--amber); color: var(--amber); }
 .nav { display: flex; align-items: center; gap: 4px; font-size: 14px; }
 .nav-btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; font-weight: 500; background: transparent; border: none; color: var(--ink-muted); cursor: pointer; text-decoration: none; white-space: nowrap; }
@@ -68,7 +68,8 @@ button, input { font-family: inherit; }
 
 @media (max-width: 480px) {
   .site-header-inner { flex-wrap: wrap; gap: 8px; padding: 12px 0; }
-  .brand-logo { height: 34px; }
+  .brand h1 { font-size: 19px; }
+  .brand-logo { height: 28px; }
   /* [2026-09-07 변경] 예전엔 .nav-btn에 flex:1을 줘서 6개 메뉴를 한 줄에
      욱여넣으려 했는데, .nav-btn에 걸린 white-space:nowrap 때문에 글자가
      줄어들지 못하고(플렉스 아이템은 기본적으로 내용물 너비 밑으로는 안
@@ -132,6 +133,22 @@ button, input { font-family: inherit; }
 .daily-outlook-theme { font-weight: 700; white-space: nowrap; }
 .daily-outlook-reason { color: var(--ink); font-weight: 500; opacity: 0.85; }
 .daily-outlook-verdict { margin-left: auto; font-weight: 700; white-space: nowrap; }
+.daily-outlook-toggle {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink-muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.daily-outlook-toggle:hover { border-color: var(--amber); color: var(--amber); }
 .filter-btns { display: flex; align-items: center; gap: 4px; font-size: 13px; }
 .filter-btn { padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border); background: transparent; color: var(--ink-muted); cursor: pointer; }
 .filter-btn.active { border-color: var(--amber); color: var(--amber); background: var(--amber-tint); }
