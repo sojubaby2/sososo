@@ -58,8 +58,8 @@ button, input { font-family: inherit; }
 .site-header { border-bottom: 1px solid var(--border); background: var(--surface); }
 .site-header-inner { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 0; }
 .brand { display: flex; align-items: center; gap: 10px; }
-/* [2026-09-08 수정] 재성님 요청으로 "뉴스매매" 글씨는 지우고 로고 이미지만
-   표시 — 글씨가 없어진 만큼 로고 크기를 눈에 띄게 키움(36px → 52px). */
+.brand h1 { font-family: var(--font-display); font-size: 24px; font-weight: 700; margin: 0; }
+/* [2026-09-08 수정] 로고 크기를 키움(36px → 52px), "뉴스매매" 글씨는 유지. */
 .brand-logo { height: 52px; width: auto; display: block; }
 .badge { font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--amber); color: var(--amber); }
 .nav { display: flex; align-items: center; gap: 4px; font-size: 14px; }
@@ -69,6 +69,7 @@ button, input { font-family: inherit; }
 
 @media (max-width: 480px) {
   .site-header-inner { flex-wrap: wrap; gap: 8px; padding: 12px 0; }
+  .brand h1 { font-size: 19px; }
   .brand-logo { height: 38px; }
   /* [2026-09-07 변경] 예전엔 .nav-btn에 flex:1을 줘서 6개 메뉴를 한 줄에
      욱여넣으려 했는데, .nav-btn에 걸린 white-space:nowrap 때문에 글자가
