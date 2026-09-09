@@ -453,7 +453,7 @@ export default function HomePage() {
             <div className="filter-row">
               <h2 className="live-heading" style={{ margin: 0 }}>
                 <span className="live-dot" />
-                <span className="live-label">실시간 뉴스 검색 중</span>
+                <span className="live-label">실시간 급등뉴스 감시중</span>
                 <span className="loading-dots"><span>.</span><span>.</span><span>.</span></span>
               </h2>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
