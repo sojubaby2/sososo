@@ -12,6 +12,12 @@ import { isPoliticalTheme } from "../lib/themeData";
 
 const HOT_THEME_COUNT = 8;
 const FEED_POLL_MS = 10000; // check for new articles every 10s
+// [2026-09-09 추가] 폴링(재조회) 때는 전체 250개 대신 최근 30개만 받아옴 —
+// 새 글은 보통 폴링 주기 사이에 0~2개뿐이라 30개면 충분히 여유 있고,
+// Upstash 대역폭 사용량을 크게 줄여줌(자세한 이유는 app/api/feed/route.js
+// 주석 참고). 최초 로딩 때는 이 값을 안 쓰고 기본값(250개)을 그대로 받음.
+const FEED_POLL_LIMIT = 30;
+const FEED_DISPLAY_CAP = 250; // 화면에 유지하는 최대 개수 — 기존 동작과 동일
 const ALERT_KEYWORDS = ["공급계약", "특허", "FDA", "무상증자", "단독", "세계 최초", "국내 최초", "인수", "합병", "수주", "유상증자"];
 
 // Short beep via Web Audio — no audio file to host/fetch. Browsers block
@@ -340,6 +346,12 @@ export default function HomePage() {
     });
   }
 
+  // [2026-09-09 추가] isFirstLoad가 아닐 땐(=폴링) items가 이제 전체
+  // 목록이 아니라 최근 FEED_POLL_LIMIT개짜리 "작은 조각"임 — 그래서 예전처럼
+  // setRawItems(items)로 통째로 갈아끼우면 화면에 보이던 나머지 글들이
+  // 사라져버림. 대신 기존 목록(prev)에 새로 온 조각을 병합하고, 최신순으로
+  // 다시 정렬한 다음 FEED_DISPLAY_CAP개까지만 유지함 — 화면에 보이는 개수는
+  // 예전과 동일하게 유지되면서 서버에서 매번 받아오는 양만 줄어듦.
   function applyFeed(items, isFirstLoad) {
     const incomingIds = items.map((it) => it.id);
     if (!isFirstLoad) {
@@ -378,15 +390,31 @@ export default function HomePage() {
         }
       }
     }
-    knownIdsRef.current = new Set(incomingIds);
-    setRawItems(items);
+
+    if (isFirstLoad) {
+      knownIdsRef.current = new Set(incomingIds);
+      setRawItems(items);
+      return;
+    }
+
+    setRawItems((prev) => {
+      const byId = new Map(prev.map((it) => [it.id, it]));
+      for (const it of items) byId.set(it.id, it);
+      const merged = Array.from(byId.values()).sort(
+        (a, b) => new Date(b.savedAt || b.pubDate || 0) - new Date(a.savedAt || a.pubDate || 0)
+      );
+      const capped = merged.slice(0, FEED_DISPLAY_CAP);
+      knownIdsRef.current = new Set(capped.map((it) => it.id));
+      return capped;
+    });
   }
 
   useEffect(() => {
     let cancelled = false;
 
     function load(isFirstLoad) {
-      fetch("/api/feed")
+      const url = isFirstLoad ? "/api/feed" : `/api/feed?limit=${FEED_POLL_LIMIT}`;
+      fetch(url)
         .then((r) => r.json())
         .then((data) => {
           if (cancelled) return;
