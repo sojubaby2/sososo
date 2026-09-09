@@ -286,6 +286,20 @@ function looksLikeBareUrl(text) {
   return /^https?:\/\/\S+$/i.test((text || "").trim());
 }
 
+// [2026-09-09 추가] 재성님 리포트 — 채널 운영자가 기사 링크 위에 자기
+// 코멘트("케이엔에스 상승 이유로 보입니다." 같은 식)를 한 줄 적어서 보내는
+// 경우, splitMessageText의 "첫 줄 = 제목" 규칙이 이 코멘트를 그대로 카드
+// 제목으로 삼아버림 — 실제 기사 제목("케이엔에스, 日 기업향 원통형 배터리
+// 자동화 설비 수주")이 아니라 운영자의 사견이 뜨는 문제.
+//
+// 한국어 뉴스 기사 제목은 거의 항상 명사형·개조식으로 끝나고("~수주",
+// "~발표", "~확대" 등) "-습니다/-입니다" 같은 정중한 문장 종결형으로는
+// 거의 안 끝나는 반면, 사람이 직접 쓴 코멘트("~보입니다", "~같아요",
+// "~네요")는 이런 종결형으로 끝나는 경우가 많음 — 이 차이로 감지함.
+function looksLikeOperatorComment(text) {
+  return /(습니다|입니다|같아요|보여요|네요)[.!?~…]*$/.test((text || "").trim());
+}
+
 export async function POST(request) {
   const ingestSecret = process.env.TELEGRAM_INGEST_SECRET;
   if (!ingestSecret) {
@@ -345,22 +359,28 @@ export async function POST(request) {
   }
 
   // 텔레그램 메시지 자체에 헤드라인/본문이 없으면(제목 없이 링크만 왔거나,
-  // 제목+링크만 왔거나) 실제 기사 페이지에서 제목·요약을 대신 가져옴 — 위
-  // fetchArticleMetaFallback 주석 참고. fetch는 필요할 때만(제목 또는
-  // 요약 중 하나라도 부족할 때) 한 번만 함.
-  const needsTitleFallback = looksLikeBareUrl(rawTitle);
+  // 제목+링크만 왔거나, 제목 자리에 운영자 코멘트만 있거나) 실제 기사
+  // 페이지에서 제목·요약을 대신 가져옴 — 위 fetchArticleMetaFallback 주석
+  // 참고. fetch는 필요할 때만(제목 또는 요약 중 하나라도 부족할 때) 한 번만 함.
+  const isBareUrl = looksLikeBareUrl(rawTitle);
+  const isOperatorComment = !isBareUrl && looksLikeOperatorComment(rawTitle);
+  const needsTitleFallback = isBareUrl || isOperatorComment;
   let title = rawTitle;
   let summary = telegramSummary;
   if (needsTitleFallback || !summary) {
     const meta = await fetchArticleMetaFallback(articleUrl);
     if (needsTitleFallback) {
-      if (!meta.title) {
+      if (meta.title) {
+        title = meta.title;
+      } else if (isBareUrl) {
         // 원문 기사에서도 제목을 못 뽑으면, URL을 그대로 제목으로 노출시키느니
         // 게재를 건너뜀(재성님 리포트 — 카드 제목이 통째로 URL로 뜨는 문제).
         await redis.set(key, "1", { ex: SEEN_TTL_SECONDS });
         return Response.json({ published: false, reason: "제목을 찾을 수 없음(링크만 있는 메시지)" });
       }
-      title = meta.title;
+      // isOperatorComment인데 원문에서도 제목을 못 가져온 경우엔, 운영자
+      // 코멘트라도 있는 게 제목이 아예 없는 것보다는 나으니 title은
+      // rawTitle(운영자 코멘트) 그대로 두고 게재 자체는 막지 않음.
     }
     if (!summary) summary = meta.summary || "";
   }
