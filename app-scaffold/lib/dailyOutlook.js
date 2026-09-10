@@ -99,8 +99,17 @@ async function fetchTechNews(limit = 15) {
   }));
 }
 
+// [2026-09-10 수정] 재성님 리포트 — 배너 날짜가 9월 8일에서 며칠째 안
+// 바뀜. 원인: Vercel 서버는 UTC로 돌아가는데, 여기선 그냥 new Date()의
+// 날짜(getMonth/getDate)를 그대로 썼음. cron-job.org가 한국시간(KST)
+// 아침 7시 50분에 호출하면, 그 시각은 UTC로는 "전날 밤 10시 50분"이라서
+// getDate()가 하루 전 날짜를 돌려줌 — 그래서 매일 한국 날짜보다 하루
+// 늦게 표시됨(lib/dailyReviewWriter.js 쪽 마감시황에서도 똑같은 종류의
+// 착오를 이미 한 번 겪고 고친 적이 있음). 지금부터는 UTC 시각에 9시간을
+// 더해서 "한국 시간 기준 벽시계 날짜"를 구한 뒤 그 날짜를 씀.
 function toKoreanDateLabel(d) {
-  return `${d.getMonth() + 1}월 ${d.getDate()}일`;
+  const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
+  return `${kst.getUTCMonth() + 1}월 ${kst.getUTCDate()}일`;
 }
 
 const SYNTH_SYSTEM_PROMPT = `너는 한국 개인 투자자를 위한 아침 시황 브리핑을 짧게 써주는 애널리스트야.
