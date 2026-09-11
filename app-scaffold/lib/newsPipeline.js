@@ -12,6 +12,7 @@
 
 import rawThemeData from "./themeData.json";
 import { buildSubsidiaryPromptBlock } from "./subsidiaryMap";
+import { fetchLatestAvailable } from "./krxOpenApi";
 
 const MAX_STOCKS_PER_PRIMARY_THEME = 6;
 const MAX_STOCKS_PER_SECONDARY_THEME = 3;
@@ -29,127 +30,50 @@ const FEED_MAX_LENGTH = 300; // roughly 5 "pages" worth of retained history
 // minute by cron) and telegram-ingest/route.js (called once per incoming
 // channel message, potentially in quick bursts) share this cache so we
 // don't hammer the KRX API — it only actually changes once per trading day.
-// ---------------------------------------------------------------------------
-function toBasDt(d) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${y}${m}${dd}`;
-}
-
-// [2026-09-06/07 변경 내역]
-// 1차: 공공데이터포털(apis.data.go.kr)의 KRX 시세 API를 썼는데, 어느
-//      시점부터 클라우드(Vercel) 서버가 보내는 요청을 연결 단계에서부터
-//      막기 시작했음(10초 Connect Timeout — 예전에 수출입은행 API가
-//      클라우드발 트래픽을 막았던 것과 똑같은 증상). 뉴스 매칭·테마
-//      등락률 등 시세가 필요한 기능이 전부 죽어있었음.
-// 2차: m.stock.naver.com의 비공식 JSON API로 교체 시도 → 404 (그 사이
-//      네이버 앱 쪽 API 구조가 바뀐 것으로 보임).
-// 3차(현재): 네이버 금융(finance.naver.com)의 "시가총액" 페이지
-//      (sise_market_sum.naver)를 직접 파싱. 이 페이지는 2010년대부터
-//      국내 개인 투자자용 크롤링 도구들이 계속 사용해온 오래되고 안정적인
-//      페이지라, 구조가 바뀔 위험이 상대적으로 적음. 파싱 라이브러리 설치
-//      없이 정규식으로 표를 직접 읽음.
 //
-// 그래도 혹시 이 페이지 구조도 나중에 바뀌면 바로 알 수 있도록, 종목을
-// 하나도 못 찾으면 원본 HTML에서 뽑아낸 샘플 행을 에러 로그에 남기게
-// 해뒀음 — 다음에 또 깨지면 로그만 보고 바로 원인을 알 수 있게.
-const NAVER_MARKET_SUM_URL = "https://finance.naver.com/sise/sise_market_sum.naver";
-// 넉넉하게 잡은 상한 — KOSPI/KOSDAQ 각각 실제로는 20~35페이지 정도면 끝남
-// (한 페이지 50종목 기준). 빈 페이지가 나오는 순간 그 자리에서 멈춤.
-const NAVER_MAX_PAGES_PER_MARKET = 50;
+// [시세 데이터 출처 변경 이력]
+// 1차: 공공데이터포털(apis.data.go.kr)의 KRX 시세 API — 클라우드(Vercel)
+//      서버 트래픽을 막기 시작해서 죽음(ConnectTimeout).
+// 2차: m.stock.naver.com의 비공식 JSON API로 교체 시도 → 404.
+// 3차: 네이버 금융(finance.naver.com)의 "시가총액" 페이지를 직접 파싱하는
+//      방식으로 한동안 버텼는데, 2026-09-10~11 사이 이 페이지도 클라우드
+//      트래픽을 막기 시작한 것으로 보여 종목을 하나도 못 가져오는 상태가
+//      됨(getCachedUniverse가 계속 null 반환) — 그 결과 HOT테마 패널은
+//      멀쩡한데(아래 4차 방식을 이미 쓰고 있었음) 텔레그램 뉴스의 "관련주
+//      매칭"만 조용히 전부 실패하는 사고가 발생함(재성님 리포트로 발견,
+//      /api/debug-universe로 확인).
+// 4차(현재): app/api/theme-momentum/route.js(HOT테마 패널)가 이미 쓰고
+//      있던, KRX가 직접 운영하는 정식 Open API(data-dbg.krx.co.kr)로
+//      통일함. 그 공통 로직을 lib/krxOpenApi.js로 뽑아서 여기서도 그대로
+//      재사용 — 이제 이 사이트의 시세 데이터 출처는 어디서 쓰이든 단
+//      하나뿐이라, 한쪽만 조용히 막히는 이런 사고가 다시 생기지 않음.
+// ---------------------------------------------------------------------------
 
-async function fetchNaverMarketSumPage(sosok, page) {
-  const qs = new URLSearchParams({ sosok: String(sosok), page: String(page) });
-  const url = `${NAVER_MARKET_SUM_URL}?${qs.toString()}`;
-  const res = await fetch(url, {
-    cache: "no-store",
-    headers: { "User-Agent": "Mozilla/5.0 (compatible; newsmeme-bot/1.0)" },
-  });
-  if (!res.ok) throw new Error(`네이버 시세 페이지 오류 (status ${res.status})`);
-  const buf = await res.arrayBuffer();
-  // 이 구형 네이버 금융 페이지는 EUC-KR 인코딩이라, 그냥 text()로 읽으면
-  // 한글이 깨져서 TextDecoder로 직접 변환해줘야 함.
-  return new TextDecoder("euc-kr").decode(buf);
-}
-
-// 표 컬럼 순서(오랫동안 안 바뀐 것으로 알려짐): N, 종목명(링크에 종목코드
-// 포함), 현재가, 전일비, 등락률, 액면가, 시가총액, 상장주식수, 외국인비율,
-// 거래량, PER, ROE. 구분선 행은 <td>가 1개뿐이라 자동으로 걸러짐.
-function parseMarketSumHtml(html) {
-  const rowChunks = html.split(/<tr[\s>]/i).slice(1);
-  const results = [];
-  let sampleRow = null;
-
-  for (const chunk of rowChunks) {
-    const cellMatches = [...chunk.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)];
-    if (cellMatches.length < 10) continue; // 데이터 행이 아님(구분선 등)
-
-    const rawCells = cellMatches.map((m) => m[1]);
-    const textCells = rawCells.map((c) =>
-      c.replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim()
-    );
-
-    const codeMatch = rawCells[1]?.match(/code=(\d{6})/);
-    const name = textCells[1];
-    if (!codeMatch || !name) continue;
-    const code = codeMatch[1];
-
-    if (!sampleRow) sampleRow = { code, name, cells: textCells.slice(0, 6) };
-
-    const price = Number((textCells[2] || "").replace(/,/g, ""));
-    const changeNumMatch = (textCells[4] || "").match(/([\d.]+)%/);
-    let changePct = changeNumMatch ? Number(changeNumMatch[1]) : NaN;
-    if (Number.isFinite(changePct) && /(-|−)/.test(rawCells[4] || "")) changePct = -changePct;
-    // 상장주식수(7번째 컬럼)·거래량(9번째 컬럼)도 같은 표에 이미 들어있어서
-    // 같이 뽑아둠 — app/api/theme-momentum/route.js에서 "거래정지 종목
-    // 제외"(거래량>0)와 "감자/병합 종목 제외"(상장주식수 비교) 필터에 씀.
-    const shares = Number((textCells[7] || "").replace(/,/g, ""));
-    const volume = Number((textCells[9] || "").replace(/,/g, ""));
-
-    results.push({ code, name, price, changePct, shares, volume });
-  }
-  return { results, sampleRow };
-}
-
-async function fetchAllStocksTodayForMarket(sosok, marketLabel) {
-  const all = [];
-  let sampleRow = null;
-  for (let page = 1; page <= NAVER_MAX_PAGES_PER_MARKET; page++) {
-    let html;
-    try {
-      html = await fetchNaverMarketSumPage(sosok, page);
-    } catch (err) {
-      console.error(`fetchAllStocksToday(${marketLabel}) 페이지 ${page} 요청 실패:`, err.message || err);
-      break;
-    }
-    const parsed = parseMarketSumHtml(html);
-    if (!sampleRow && parsed.sampleRow) sampleRow = parsed.sampleRow;
-    if (parsed.results.length === 0) break; // 마지막 페이지
-    for (const r of parsed.results) all.push({ ...r, market: marketLabel });
-    if (parsed.results.length < 40) break; // 한 페이지 50종목 기준, 마지막 페이지로 판단
-  }
-  return { all, sampleRow };
+// KRX 정식 API가 돌려주는 마켓 코드("KOSPI"/"KOSDAQ")를 이 사이트 나머지
+// 코드가 쓰는 한글 표기("코스피"/"코스닥")로 맞춰줌.
+function toKoreanMarketLabel(mrktCtg) {
+  if (mrktCtg === "KOSPI") return "코스피";
+  if (mrktCtg === "KOSDAQ") return "코스닥";
+  return mrktCtg || "";
 }
 
 // Returns { items: [{code,name,market,price,changePct}], basDt } or null.
 export async function fetchAllStocksToday() {
-  const [kospi, kosdaq] = await Promise.all([
-    fetchAllStocksTodayForMarket(0, "코스피"),
-    fetchAllStocksTodayForMarket(1, "코스닥"),
-  ]);
-  const all = [...kospi.all, ...kosdaq.all];
-
-  if (all.length === 0) {
-    const sample = kospi.sampleRow || kosdaq.sampleRow;
+  const result = await fetchLatestAvailable(new Date());
+  if (!result) {
     console.error(
-      "네이버 시세 페이지 파싱 실패 — 종목을 하나도 못 찾음. 샘플 행:",
-      sample ? JSON.stringify(sample) : "(샘플 행도 없음 — 페이지 구조 자체가 다른 것으로 보임)"
+      "fetchAllStocksToday: KRX 정식 API에서 최근 영업일 시세를 하나도 못 가져옴(최대 6영업일 소급 시도 모두 실패)."
     );
     return null;
   }
-
-  return { items: all, basDt: toBasDt(new Date()) };
+  const items = result.items.map((it) => ({
+    code: it.srtnCd,
+    name: it.itmsNm,
+    market: toKoreanMarketLabel(it.mrktCtg),
+    price: it.clpr,
+    changePct: it.fltRt,
+  }));
+  return { items, basDt: result.basDt };
 }
 
 // Builds the full-universe "code|name|market" list Claude picks direct
