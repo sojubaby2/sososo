@@ -24,7 +24,12 @@ import { buildPriceSeriesForAllStocks } from "./priceHistory";
 import { scanAllStocksForPatterns, PATTERN_DEFS } from "./patternDetection";
 
 // v12(app/api/patterns/route.js에 있던 마지막 버전)를 이어받아 v13으로 시작.
-export const RESULTS_CACHE_KEY = "patterns:results:v13";
+//
+// [2026-09-13] v13 -> v14. 52주 신고가/신저가 판정 기준을 고쳤기 때문
+// (lib/patternDetection.js의 [2026-09-13 수정] 주석 참고). 키 이름을 안
+// 바꾸면 배포 직후에도 예전 기준으로 계산해둔 결과가 최대 3시간 동안 그대로
+// 보이므로, 스캔 로직을 바꿀 때는 이 번호를 반드시 같이 올려야 함.
+export const RESULTS_CACHE_KEY = "patterns:results:v14";
 
 // [2026-09-07] 예전엔 30분이었는데, 이제 이 캐시를 채우는 쪽(poll)이
 // 백필(과거 데이터 쌓기)과 시간 예산을 나눠 쓰다 보니 어떤 사이클엔

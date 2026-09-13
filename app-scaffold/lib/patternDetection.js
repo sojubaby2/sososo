@@ -503,7 +503,15 @@ function detectThreeBlackCrows(series, minSimilarity) {
 // 있다는 가중치)에만 계속 반영하고, 통과 여부 자체는 안 막음.
 function detectBreakout(series, minSimilarity) {
   const n = series.length;
-  if (n < 20) return null; // want at least some real history before calling anything a "breakout"
+  // [2026-09-13 수정] 20 -> 60. 이 패턴의 설명은 "최근 3년 안에서 이제껏
+  // 없었던 최고가"인데, 위 trimAtLastDiscontinuity가 액면병합·감자·거래재개
+  // 지점에서 이전 데이터를 잘라내기 때문에 남은 구간이 한 달(20거래일)밖에
+  // 안 되는 종목도 "전고점돌파"로 올라오고 있었음 — 한 달치 최고가를 넘은
+  // 걸 3년 전고점 돌파라고 부를 수는 없음. 최소 60거래일(약 3개월)은
+  // 있어야 비교할 "과거"가 있다고 보고 판정함. (전고점이 며칠 전에 세워진
+  // 것이어도 돌파로 인정하는 재성님 정의 자체는 그대로 — 바뀐 건 "전체
+  // 히스토리가 너무 짧으면 아예 판정하지 않는다"는 부분뿐.)
+  if (n < 60) return null;
   const today = series[n - 1];
   const prior = series.slice(0, n - 1);
   const priorHigh = Math.max(...prior.map((p) => p.h));
@@ -545,8 +553,36 @@ function detectBreakout(series, minSimilarity) {
 // ---------------------------------------------------------------------------
 
 const FIFTY_TWO_WEEK_WINDOW = 252; // 52주 ≈ 252거래일
-const FIFTY_TWO_WEEK_MIN_DAYS = 60; // "52주" 판정이 의미 있으려면 최소 이 정도는 쌓여있어야 함
-const FIFTY_TWO_WEEK_TOLERANCE = 0.02; // 신고가 대비 2% 이내면 "신고가권"으로 인정
+
+// [2026-09-13 수정 — 재성님 리포트: "52주 신고가 목록에 52주 신고가가 아닌
+// 종목이 자꾸 껴 있다"] 원인이 두 가지였고, 둘 다 여기서 고침.
+//
+// 원인 ①: 2% 톨러런스.
+//   예전엔 "52주 최고가보다 2% 이내로만 낮아도 신고가권으로 인정"했음
+//   (FIFTY_TWO_WEEK_TOLERANCE = 0.02). 그래서 작년 1월에 세운 고점 바로
+//   1.9% 아래에서 몇 달째 횡보만 하고 있는 종목도 매일 "52주 신고가"
+//   목록에 올라왔음 — 재성님이 MTS로 확인하면 당연히 신고가가 아니니까
+//   "이상하다"가 됨. 화면에 "52주 신고가"라고 써 있으면 진짜 신고가만
+//   있어야 맞음. 그래서 톨러런스를 아예 없애고, "오늘 장중 고가가 직전
+//   52주 최고가를 실제로 넘어섰는가"만 봄.
+//
+//   덤으로 예전 방식엔 반대 방향 오류도 있었음: 비교 대상 최고가에 오늘
+//   고가까지 포함시켜놓고 오늘 "종가"와 비교했기 때문에, 진짜로 신고가를
+//   찍었지만 장 막판에 밀려서 종가가 고가보다 2% 넘게 빠진 날은 오히려
+//   목록에서 빠졌음. 이제 오늘을 뺀 나머지 기간의 최고가와 비교하므로
+//   이 문제도 같이 사라짐.
+//
+// 원인 ②: 데이터가 3개월치만 있어도 "52주" 신고가라고 불렀음.
+//   예전 최소 요건이 60거래일(약 3개월)뿐이었음. 그런데 이 파일은
+//   액면병합·감자·거래재개처럼 가격 기준이 바뀐 지점에서 그 이전 데이터를
+//   통째로 잘라냄(trimAtLastDiscontinuity). 그런 일이 최근에 있었던
+//   종목은 남은 구간이 몇 달밖에 안 되는데, 그 짧은 구간의 최고가를
+//   넘었다는 이유로 "52주 신고가"로 올라왔음 — MTS는 수정주가로 1년치를
+//   제대로 보니 당연히 신고가가 아니라고 나옴. 그래서 최소 요건을
+//   240거래일(약 11.5개월)로 올려서, 진짜 1년에 가까운 데이터가 있는
+//   종목만 "52주" 판정을 받게 함. 데이터가 모자란 종목은 잡히지 않는 게
+//   맞는 동작임(비교할 1년치가 없으니까).
+const FIFTY_TWO_WEEK_MIN_DAYS = 240;
 
 // [2026-09-07 7차 수정] 코리안리로 확인됨 — "52주 신고가"를 종가(c) 기준
 // 최고가와 비교하고 있었는데, 실제 MTS/증권사 화면에서 말하는 "52주
@@ -560,16 +596,37 @@ const FIFTY_TWO_WEEK_TOLERANCE = 0.02; // 신고가 대비 2% 이내면 "신고�
 // 봐야 진짜 스크리너 정의에 맞음.
 function detect52WeekHigh(series, minSimilarity) {
   const n = series.length;
-  if (n < FIFTY_TWO_WEEK_MIN_DAYS) return null;
   const win = series.slice(Math.max(0, n - FIFTY_TWO_WEEK_WINDOW));
-  const today = win[win.length - 1];
-  const windowHigh = Math.max(...win.map((p) => p.h));
-  if (windowHigh <= 0 || today.c < windowHigh * (1 - FIFTY_TWO_WEEK_TOLERANCE)) return null;
+  // 오늘 하루를 뺀 나머지가 최소 요건을 채워야 함 — 비교 대상(직전 52주)이
+  // 충분히 길어야 "52주 신고가"라고 부를 수 있음.
+  if (win.length < FIFTY_TWO_WEEK_MIN_DAYS) return null;
 
-  const belowPct = ((windowHigh - today.c) / windowHigh) * 100;
-  const closeness = 1 - Math.min(1, belowPct / (FIFTY_TWO_WEEK_TOLERANCE * 100)); // 1 = 정확히 신고가
-  const coverageScore = Math.min(1, win.length / FIFTY_TWO_WEEK_WINDOW); // 실제 데이터가 52주에 가까울수록 신뢰도↑
-  const similarity = Math.min(100, Math.round(55 + closeness * 30 + coverageScore * 15));
+  const today = win[win.length - 1];
+  const prior = win.slice(0, win.length - 1); // 오늘은 비교 대상에서 뺌
+  const priorHigh = Math.max(...prior.map((p) => p.h));
+  if (!(priorHigh > 0)) return null;
+
+  // 진짜 신고가 조건: 오늘 장중 고가가 직전 52주 최고가를 실제로 넘어섰을 것.
+  // (종가가 넘었다면 고가는 당연히 더 높으므로 이 조건에 자동으로 포함됨.)
+  if (!(today.h > priorHigh)) return null;
+
+  const abovePct = ((today.h - priorHigh) / priorHigh) * 100;
+
+  // 직전 고점이 얼마나 오래 버텼는지 — 오래 버틴 고점을 넘을수록 의미가 큼
+  // (전고점돌파 detectBreakout이 쓰는 계산과 같은 방식).
+  let daysSincePriorHigh = prior.length;
+  let priorHighDate = prior[0]?.date || null;
+  for (let i = prior.length - 1; i >= 0; i--) {
+    if (prior[i].h >= priorHigh * 0.999) {
+      daysSincePriorHigh = prior.length - i;
+      priorHighDate = prior[i].date;
+      break;
+    }
+  }
+
+  const magnitudeScore = Math.min(1, abovePct / 5); // 직전 고점 대비 5% 이상 위면 만점
+  const durationScore = Math.min(1, daysSincePriorHigh / 120); // 120거래일 이상 버틴 고점이면 만점
+  const similarity = Math.min(100, Math.round(60 + magnitudeScore * 20 + durationScore * 20));
   if (similarity < minSimilarity) return null;
 
   return {
@@ -578,25 +635,51 @@ function detect52WeekHigh(series, minSimilarity) {
     similarity,
     window: win.length,
     asOfDate: today.date,
-    detail: { windowHigh: Math.round(windowHigh), belowHighPct: Math.round(belowPct * 10) / 10 },
+    // MTS와 직접 대조해볼 수 있도록 근거 숫자를 같이 담아둠.
+    detail: {
+      priorHigh: Math.round(priorHigh),
+      priorHighDate,
+      todayHigh: Math.round(today.h),
+      todayClose: Math.round(today.c),
+      abovePriorHighPct: Math.round(abovePct * 10) / 10,
+      daysSincePriorHigh,
+    },
   };
 }
 
-// 52주 신고가를 뒤집은 것 — 52주 신저가. 로직·톨러런스 전부 동일하고
-// 최고가 대신 최저가 기준으로 비교함. (마찬가지로 종가가 아니라 저가(l)
-// 기준으로 맞춤 — 위 detect52WeekHigh 주석 참고.)
+// 52주 신고가를 그대로 뒤집은 것 — 52주 신저가. 위 [2026-09-13 수정]에서
+// 고친 두 가지(톨러런스 제거 / 최소 240거래일)를 똑같이 적용함. 최고가
+// 대신 최저가, 고가(h) 대신 저가(l) 기준인 것만 다름.
 function detect52WeekLow(series, minSimilarity) {
   const n = series.length;
-  if (n < FIFTY_TWO_WEEK_MIN_DAYS) return null;
   const win = series.slice(Math.max(0, n - FIFTY_TWO_WEEK_WINDOW));
-  const today = win[win.length - 1];
-  const windowLow = Math.min(...win.map((p) => p.l));
-  if (windowLow <= 0 || today.c > windowLow * (1 + FIFTY_TWO_WEEK_TOLERANCE)) return null;
+  if (win.length < FIFTY_TWO_WEEK_MIN_DAYS) return null;
 
-  const abovePct = ((today.c - windowLow) / windowLow) * 100;
-  const closeness = 1 - Math.min(1, abovePct / (FIFTY_TWO_WEEK_TOLERANCE * 100)); // 1 = 정확히 신저가
-  const coverageScore = Math.min(1, win.length / FIFTY_TWO_WEEK_WINDOW);
-  const similarity = Math.min(100, Math.round(55 + closeness * 30 + coverageScore * 15));
+  const today = win[win.length - 1];
+  const prior = win.slice(0, win.length - 1);
+  const priorLows = prior.map((p) => p.l).filter((v) => v > 0);
+  if (priorLows.length === 0) return null;
+  const priorLow = Math.min(...priorLows);
+  if (!(priorLow > 0)) return null;
+
+  // 진짜 신저가 조건: 오늘 장중 저가가 직전 52주 최저가를 실제로 밑돌았을 것.
+  if (!(today.l > 0) || !(today.l < priorLow)) return null;
+
+  const belowPct = ((priorLow - today.l) / priorLow) * 100;
+
+  let daysSincePriorLow = prior.length;
+  let priorLowDate = prior[0]?.date || null;
+  for (let i = prior.length - 1; i >= 0; i--) {
+    if (prior[i].l > 0 && prior[i].l <= priorLow * 1.001) {
+      daysSincePriorLow = prior.length - i;
+      priorLowDate = prior[i].date;
+      break;
+    }
+  }
+
+  const magnitudeScore = Math.min(1, belowPct / 5);
+  const durationScore = Math.min(1, daysSincePriorLow / 120);
+  const similarity = Math.min(100, Math.round(60 + magnitudeScore * 20 + durationScore * 20));
   if (similarity < minSimilarity) return null;
 
   return {
@@ -605,7 +688,14 @@ function detect52WeekLow(series, minSimilarity) {
     similarity,
     window: win.length,
     asOfDate: today.date,
-    detail: { windowLow: Math.round(windowLow), abovePriorLowPct: Math.round(abovePct * 10) / 10 },
+    detail: {
+      priorLow: Math.round(priorLow),
+      priorLowDate,
+      todayLow: Math.round(today.l),
+      todayClose: Math.round(today.c),
+      belowPriorLowPct: Math.round(belowPct * 10) / 10,
+      daysSincePriorLow,
+    },
   };
 }
 
@@ -688,7 +778,8 @@ export const PATTERN_DEFS = [
     label: "52주 신고가",
     category: "돌파형",
     window: FIFTY_TWO_WEEK_WINDOW,
-    description: "최근 52주(약 252거래일) 동안의 장중 최고가에 근접했거나 이를 넘어선 상태를 매일 확인합니다.",
+    description:
+      "오늘 장중 고가가 직전 52주(약 252거래일) 최고가를 실제로 넘어선 종목만 보여줍니다. 데이터가 1년치(240거래일) 이상 쌓인 종목만 판정합니다.",
   },
   {
     id: "golden_cross",
@@ -814,7 +905,8 @@ export const PATTERN_DEFS = [
     label: "52주 신저가",
     category: "하락형",
     window: FIFTY_TWO_WEEK_WINDOW,
-    description: "최근 52주(약 252거래일) 동안의 장중 최저가에 근접했거나 이를 밑돈 상태를 매일 확인합니다.",
+    description:
+      "오늘 장중 저가가 직전 52주(약 252거래일) 최저가를 실제로 밑돈 종목만 보여줍니다. 데이터가 1년치(240거래일) 이상 쌓인 종목만 판정합니다.",
   },
   {
     id: "pullback",
