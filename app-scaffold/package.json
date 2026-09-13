@@ -5,9 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
-    "preview": "opennextjs-cloudflare build --dangerouslyUseUnsupportedNextVersion && opennextjs-cloudflare preview",
-    "deploy": "opennextjs-cloudflare build --dangerouslyUseUnsupportedNextVersion && opennextjs-cloudflare deploy --keep-vars && node scripts/push-secrets.mjs"
+    "start": "next start"
   },
   "dependencies": {
     "next": "14.2.5",
@@ -15,9 +13,5 @@
     "react-dom": "^18.3.1",
     "lucide-react": "^0.383.0",
     "@upstash/redis": "^1.34.3"
-  },
-  "devDependencies": {
-    "@opennextjs/cloudflare": "1.10.0",
-    "wrangler": "4.127.0"
   }
 }

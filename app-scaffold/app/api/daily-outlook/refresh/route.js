@@ -13,8 +13,11 @@
 // maxDuration: Alpha Vantage 호출 2번 + Claude 호출 1번 정도라 여유있게
 // 30초로 잡음(다른 라우트들의 60초보다는 훨씬 가벼운 작업).
 
+// [2026-09-11 추가] 이 작업이 마지막으로 언제·어떤 결과로 돌았는지 Redis에
+// 기록해둠 — /health 화면에서 확인 가능(lib/runStatus.js 참고).
 import { getRedis } from "../../../../lib/redis";
 import { refreshDailyOutlook } from "../../../../lib/dailyOutlook";
+import { recordRun, RUN_DAILY_OUTLOOK } from "../../../../lib/runStatus";
 
 export const maxDuration = 30;
 
@@ -40,8 +43,14 @@ export async function GET(request) {
 
   try {
     const record = await refreshDailyOutlook(redis);
+    await recordRun(redis, RUN_DAILY_OUTLOOK, {
+      ok: true,
+      dateLabel: record?.dateLabel || null,
+      pickCount: record?.picks?.length || 0,
+    });
     return Response.json({ ok: true, record });
   } catch (err) {
+    await recordRun(redis, RUN_DAILY_OUTLOOK, { ok: false, error: String(err.message || err) });
     return Response.json({ error: String(err.message || err) }, { status: 500 });
   }
 }

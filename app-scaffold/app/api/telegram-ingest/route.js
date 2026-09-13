@@ -17,7 +17,12 @@
 //   { "channel": "@NEWSZZANG", "messageId": 12345, "text": "...",
 //     "date": "2026-09-04T10:00:00.000Z" }
 
+// [2026-09-11 추가] 텔레그램 메시지가 "마지막으로 언제 도착했는지"를 Redis에
+// 남겨둠 — /health 화면에서 "뉴스가 안 올라오는 게 오라클 서버(수집기)가
+// 죽어서인지, 아니면 메시지는 오는데 전부 필터링되고 있어서인지"를 구분하기
+// 위함. 자세한 배경은 lib/runStatus.js 상단 설명 참고.
 import { getRedis } from "../../../lib/redis";
+import { recordRun, RUN_TELEGRAM } from "../../../lib/runStatus";
 import {
   getCachedUniverse,
   isMarketMovingHeadline,
@@ -336,6 +341,16 @@ export async function POST(request) {
     return Response.json({ error: "Redis(Upstash) 환경변수가 아직 설정되지 않았습니다." }, { status: 500 });
   }
 
+  // [2026-09-11 추가] 여기까지 왔다는 건 "오라클 서버의 수집기가 살아서
+  // 메시지를 보내왔다"는 뜻 — 이 메시지가 결국 게재되든 필터링되든 상관없이
+  // 기록해둠(수집기 생사 확인이 목적이라서).
+  await recordRun(redis, RUN_TELEGRAM, {
+    stage: "수신",
+    channel,
+    messageId,
+    preview: rawText.replace(/\s+/g, " ").trim().slice(0, 80),
+  });
+
   const key = telegramMessageKey(channel, messageId);
   const alreadySeen = await redis.get(key);
   if (alreadySeen) {
@@ -438,6 +453,17 @@ export async function POST(request) {
     },
     []
   );
+
+  // [2026-09-11 추가] 실제로 게재까지 성공한 경우엔 그 사실로 기록을 덮어씀 —
+  // /health에서 "메시지는 들어오는데 게재가 안 된다"와 "게재까지 잘 되고 있다"를
+  // 구분할 수 있게.
+  await recordRun(redis, RUN_TELEGRAM, {
+    stage: "게재",
+    channel,
+    messageId,
+    title: String(title).slice(0, 80),
+    matchCount: matches.length,
+  });
 
   return Response.json(result);
 }

@@ -41,9 +41,13 @@
 // lib/priceHistory.js에서 이미 쓰던 것과 동일한 toBasDt 방식), 여기서도
 // getCachedUniverse 의존을 완전히 제거함.
 
+// [2026-09-11 추가] 이 엔드포인트가 "마지막으로 언제, 어떤 결과로 돌았는지"를
+// Redis에 남겨둠 — /health 화면에서 cron이 실제로 돌고 있는지 확인하기 위함.
+// 자세한 배경은 lib/runStatus.js 상단 설명 참고.
 import { getRedis } from "../../../lib/redis";
 import { appendTodaysSnapshotIfMissing, backfillHistory } from "../../../lib/priceHistory";
 import { runPatternsScanAndCache } from "../../../lib/patternsScan";
+import { recordRun, RUN_POLL } from "../../../lib/runStatus";
 
 function toBasDt(d) {
   const y = d.getFullYear();
@@ -135,6 +139,16 @@ export async function GET(request) {
   } else {
     backfillResult = "건너뜀 (패턴 스캔에 시간을 많이 써서 이번 사이클은 생략 — 다음 사이클에 재시도)";
   }
+
+  // [2026-09-11 추가] 이번 사이클 결과를 기록해둠 — 실패하더라도(기록 자체가
+  // best-effort) 아래 응답은 그대로 나감.
+  await recordRun(redis, RUN_POLL, {
+    basDt,
+    snapshotResult,
+    patternsScanResult,
+    backfillResult,
+    elapsedMs: Date.now() - startedAt,
+  });
 
   return Response.json({
     checkedAt: new Date().toISOString(),
