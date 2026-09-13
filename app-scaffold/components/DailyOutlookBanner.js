@@ -71,7 +71,14 @@ export default function DailyOutlookBanner() {
 
   return (
     <div className="daily-outlook-banner">
-      <p className="daily-outlook-heading">{outlook.dateLabel} 나스닥 기반 국장 예측</p>
+      {/* [2026-09-13 변경] 주말에는 미국장도 한국장도 쉬는 중이라 "나스닥
+          기반 국장 예측"이라는 문구가 안 맞음 — 이제 서버가 상황에 맞는
+          제목(heading)을 같이 내려줌. heading이 없는 옛 기록(2026-09-13
+          이전에 저장된 것)이 아직 남아 있을 수 있어서, 없으면 예전 문구를
+          그대로 씀. */}
+      <p className="daily-outlook-heading">
+        {outlook.heading || `${outlook.dateLabel} 나스닥 기반 국장 예측`}
+      </p>
       {renderRow(firstPick, 0)}
       {expanded && restPicks.map((pick, i) => renderRow(pick, i + 1))}
       {hasMore && (

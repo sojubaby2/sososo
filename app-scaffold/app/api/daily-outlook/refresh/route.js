@@ -23,8 +23,10 @@ export const maxDuration = 30;
 
 export async function GET(request) {
   const cronSecret = process.env.CRON_SECRET;
+  // [2026-09-13 변경] searchParams를 if 블록 밖으로 꺼냄 — 아래 ?debug=1
+  // 확인에서도 써야 해서.
+  const { searchParams } = new URL(request.url);
   if (cronSecret) {
-    const { searchParams } = new URL(request.url);
     const provided =
       searchParams.get("secret") ||
       request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
@@ -41,14 +43,47 @@ export async function GET(request) {
     );
   }
 
+  // [2026-09-13 변경] refreshDailyOutlook의 반환값이 record 하나에서
+  // { ok, record?, skipped?, reason?, debug }로 바뀜 — AI가 근거를 못 찾아
+  // 빈 결과가 나왔을 때 에러를 던져 기존 예측까지 날리는 대신, 조용히
+  // "이번엔 갱신 안 함"으로 끝내기 위함(lib/dailyOutlook.js 주석 참고).
+  //
+  // ?debug=1 을 붙이면 AI가 실제로 뭘 받아서 뭘 뱉었는지(뉴스 몇 건,
+  // 응답 앞부분, 걸러진 테마와 그 이유)까지 같이 보여줌 — 원인 파악용.
+  const wantDebug = searchParams.get("debug") === "1";
+
   try {
-    const record = await refreshDailyOutlook(redis);
+    const result = await refreshDailyOutlook(redis);
+
+    if (!result.ok) {
+      await recordRun(redis, RUN_DAILY_OUTLOOK, {
+        ok: false,
+        skipped: true,
+        reason: result.reason || null,
+        weekend: result.debug?.weekend ?? null,
+        newsCount: result.debug?.newsCount ?? null,
+        rawPickCount: result.debug?.rawPickCount ?? null,
+      });
+      return Response.json({
+        ok: false,
+        skipped: true,
+        reason: result.reason,
+        note: "기존에 저장된 예측은 그대로 유지됩니다.",
+        ...(wantDebug ? { debug: result.debug } : {}),
+      });
+    }
+
     await recordRun(redis, RUN_DAILY_OUTLOOK, {
       ok: true,
-      dateLabel: record?.dateLabel || null,
-      pickCount: record?.picks?.length || 0,
+      dateLabel: result.record?.dateLabel || null,
+      weekend: !!result.record?.weekend,
+      pickCount: result.record?.picks?.length || 0,
     });
-    return Response.json({ ok: true, record });
+    return Response.json({
+      ok: true,
+      record: result.record,
+      ...(wantDebug ? { debug: result.debug } : {}),
+    });
   } catch (err) {
     await recordRun(redis, RUN_DAILY_OUTLOOK, { ok: false, error: String(err.message || err) });
     return Response.json({ error: String(err.message || err) }, { status: 500 });

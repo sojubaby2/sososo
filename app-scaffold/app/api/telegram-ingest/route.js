@@ -454,16 +454,11 @@ export async function POST(request) {
     []
   );
 
-  // [2026-09-11 추가] 실제로 게재까지 성공한 경우엔 그 사실로 기록을 덮어씀 —
-  // /health에서 "메시지는 들어오는데 게재가 안 된다"와 "게재까지 잘 되고 있다"를
-  // 구분할 수 있게.
-  await recordRun(redis, RUN_TELEGRAM, {
-    stage: "게재",
-    channel,
-    messageId,
-    title: String(title).slice(0, 80),
-    matchCount: matches.length,
-  });
-
+  // [2026-09-13 삭제 — 비용] 여기서 "게재됨"으로 기록을 한 번 더 덮어쓰고
+  // 있었는데(메시지 한 건당 Redis 쓰기 2회), 사실 그 정보는 이미 /health의
+  // "뉴스 피드" 항목(마지막 글 시각)에 그대로 나와 있어서 중복이었음.
+  // 위쪽 "수신" 기록 하나만 남기면, 두 값을 나란히 보는 것만으로
+  // "메시지는 들어오는데 게재가 안 된다"와 "게재까지 잘 되고 있다"를
+  // 똑같이 구분할 수 있음 — 메시지당 Redis 쓰기가 2회에서 1회로 줄어듦.
   return Response.json(result);
 }

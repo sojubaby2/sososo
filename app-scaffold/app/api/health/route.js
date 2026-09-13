@@ -18,7 +18,7 @@
 
 import { getRedis } from "../../../lib/redis";
 import { getStoredDayCount, getStoredDatesAscending, HISTORY_LOOKBACK_DAYS } from "../../../lib/priceHistory";
-import { RESULTS_CACHE_KEY } from "../../../lib/patternsScan";
+import { RESULTS_CACHE_KEY, RESULTS_CACHE_TTL_SECONDS } from "../../../lib/patternsScan";
 import { listDailyReviewDates } from "../../../lib/dailyReview";
 import { getCachedDailyOutlook } from "../../../lib/dailyOutlook";
 import { readRun, RUN_POLL, RUN_TELEGRAM, RUN_DAILY_REVIEW, RUN_DAILY_OUTLOOK } from "../../../lib/runStatus";
@@ -137,23 +137,26 @@ export async function GET(request) {
   }
 
   // ── 4) 패턴검색 결과 캐시 ───────────────────────────────────────
+  // [2026-09-13 수정 — 비용] 처음엔 redis.get(RESULTS_CACHE_KEY)로 캐시를
+  // 통째로 읽어서 그 안의 generatedAt만 꺼내 썼는데, 이 캐시는 전 종목 ×
+  // 24개 패턴 스캔 결과라 수백 KB짜리임 — 날짜 한 줄 보려고 그 큰 덩어리를
+  // 매번 내려받는 건 Upstash 대역폭 낭비(재성님이 예전에 대역폭 급증으로
+  // 고생했던 것과 똑같은 종류의 실수). 대신 TTL(남은 유효시간)만 물어보면
+  // 되는데, 이 캐시는 저장할 때 항상 같은 유효기간(3시간)으로 넣으므로
+  // "지난 시간 = 3시간 - 남은 시간" 으로 나이를 정확히 계산할 수 있음.
+  // ttl 호출은 응답이 숫자 하나뿐이라 사실상 공짜.
   try {
-    const [cached, ttl] = await Promise.all([
-      redis.get(RESULTS_CACHE_KEY),
-      redis.ttl(RESULTS_CACHE_KEY).catch(() => null),
-    ]);
-    const data = typeof cached === "string" ? JSON.parse(cached) : cached;
-    const generatedAt = data?.generatedAt || null;
-    const mins = minutesAgo(generatedAt);
+    const ttl = await redis.ttl(RESULTS_CACHE_KEY);
+    // Upstash: -2 = 키 없음, -1 = 유효기간 없음
+    const hasCache = typeof ttl === "number" && ttl > 0;
+    const mins = hasCache ? Math.round((RESULTS_CACHE_TTL_SECONDS - ttl) / 60) : null;
     report.checks.push({
       key: "patterns",
       label: "패턴검색 결과",
       level: level(mins, 60 * 6, 60 * 24),
-      latestAt: generatedAt,
       minutesAgo: mins,
       cacheKey: RESULTS_CACHE_KEY,
       ttlSeconds: typeof ttl === "number" ? ttl : null,
-      patternCount: data?.patterns ? Object.keys(data.patterns).length : 0,
       hint: "30분 자동작업(/api/poll)이 이 값을 갱신합니다. 여기가 오래됐으면 위 3번을 먼저 보세요.",
     });
   } catch (err) {
@@ -162,9 +165,13 @@ export async function GET(request) {
 
   // ── 5) 시세 히스토리(일봉) 쌓인 정도 ────────────────────────────
   try {
+    // [2026-09-13 수정 — 비용] 예전엔 저장된 날짜를 750개 전부 받아와서
+    // 마지막 하나만 썼음. limit을 1로 주면 가장 최신 하루치만 돌려주므로
+    // (lib/priceHistory.js의 getStoredDatesAscending 구현 참고) 결과는
+    // 똑같고 주고받는 양만 750분의 1이 됨.
     const [days, newestList] = await Promise.all([
       getStoredDayCount(redis).catch(() => 0),
-      getStoredDatesAscending(redis, HISTORY_LOOKBACK_DAYS).catch(() => []),
+      getStoredDatesAscending(redis, 1).catch(() => []),
     ]);
     const newest = newestList.length ? newestList[newestList.length - 1] : null;
     report.checks.push({

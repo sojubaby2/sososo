@@ -80,14 +80,39 @@ async function fetchTopMovers(limit = 8) {
   return { gainers: toRows(data?.top_gainers), losers: toRows(data?.top_losers) };
 }
 
+// [2026-09-13 추가] 주말(토·일)인지 판정 — 한국 시간 기준.
+// 왜 필요한가: 재성님 리포트 — 금요일 저녁부터 월요일 아침까지 홈 화면의
+// 전망 배너가 통째로 비어 있었음. 원인은 두 가지가 겹친 것이었는데,
+// ① 예약 호출이 평일에만 돌아서 주말엔 갱신 자체가 없었고,
+// ② 주말에 수동으로 돌려봐도 미국장이 쉬는 바람에 "technology,earnings"
+//    뉴스가 거의 안 나와서 AI가 근거 없음 → 빈 결과를 냈음.
+// 재성님 요청: "주말에는 꼭 주식 뉴스가 아니더라도 미국의 굵직한 뉴스
+// (경제지표 발표, 전쟁 상황 등)를 가져와서 배치해달라." 그래서 주말에는
+// 뉴스 수집 범위를 거시경제·정책·에너지·지정학 쪽까지 넓히고, 프롬프트도
+// "오늘 장"이 아니라 "다음 거래일"을 예측하도록 바꿈.
+function isWeekendKst(d = new Date()) {
+  const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
+  const day = kst.getUTCDay(); // 0=일, 6=토
+  return day === 0 || day === 6;
+}
+
+// 평일: 기술·실적 위주(원래대로). 주말: 거시경제·정책·금융시장·에너지까지
+// 넓혀서, 장이 쉬어도 "굵직한 재료"는 잡히게 함.
+const NEWS_TOPICS_WEEKDAY = "technology,earnings";
+const NEWS_TOPICS_WEEKEND =
+  "economy_macro,economy_monetary,economy_fiscal,financial_markets,energy_transportation,technology,manufacturing";
+
 // 기술/실적 관련 최신 뉴스 — 젠슨 황·일론 머스크·트럼프·팀 쿡 등 유명 인사
 // 발언이 섞여 있을 만한 소스. 관련도(relevance)·감성(sentiment) 점수도
 // 같이 오지만, 실제로 어떤 걸 쓸지 최종 판단은 아래 synthesizeOutlook에서
 // Claude에게 맡기고 여기서는 제목/요약만 추림.
-async function fetchTechNews(limit = 15) {
+//
+// [2026-09-13 변경] 주말에는 limit을 늘려서(장이 쉬는 대신 뉴스 한 건
+// 한 건의 밀도가 낮으므로) 더 많이 훑어봄.
+async function fetchTechNews(limit = 15, topics = NEWS_TOPICS_WEEKDAY) {
   const data = await fetchAlphaVantage({
     function: "NEWS_SENTIMENT",
-    topics: "technology,earnings",
+    topics,
     sort: "LATEST",
     limit: String(limit),
   });
@@ -112,11 +137,27 @@ function toKoreanDateLabel(d) {
   return `${kst.getUTCMonth() + 1}월 ${kst.getUTCDate()}일`;
 }
 
-const SYNTH_SYSTEM_PROMPT = `너는 한국 개인 투자자를 위한 아침 시황 브리핑을 짧게 써주는 애널리스트야.
+// [2026-09-13 변경] 평일용/주말용 두 가지로 갈라짐 — 주말에는 미국장이
+// 쉬어서 "상위 상승 종목" 자료가 사실상 금요일 것 하나뿐이고 기술·실적
+// 뉴스도 거의 안 올라오기 때문에, 거시경제·정책·지정학 뉴스를 근거로
+// "다음 거래일"을 내다보게 지시함.
+function buildSynthSystemPrompt(weekend) {
+  const intro = weekend
+    ? `너는 한국 개인 투자자를 위한 주말 브리핑을 짧게 써주는 애널리스트야.
 
-너한테는 미국 증시(나스닥 포함) 상위 상승 종목·상위 하락 종목 목록과 최근 기술/실적 관련 뉴스 제목·요약 목록이 주어져. 이 정보를 바탕으로, 오늘 한국 증시에서 강세 또는 약세가 예상되는 테마를 최대 10개까지 짧게 예측해줘.
+지금은 주말이라 미국·한국 증시 모두 쉬는 중이야. 너한테는 직전 거래일(금요일) 미국 증시 상위 상승·하락 종목 목록과, 주말 사이에 나온 해외 뉴스(경제지표 발표, 통화·재정 정책, 지정학·전쟁 상황, 에너지·원자재, 기술·산업 등) 제목·요약 목록이 주어져. 이 정보를 바탕으로, **다음 거래일** 한국 증시에서 강세 또는 약세가 예상되는 테마를 최대 10개까지 짧게 예측해줘.`
+    : `너는 한국 개인 투자자를 위한 아침 시황 브리핑을 짧게 써주는 애널리스트야.
 
-**작성 규칙**:
+너한테는 미국 증시(나스닥 포함) 상위 상승 종목·상위 하락 종목 목록과 최근 기술/실적 관련 뉴스 제목·요약 목록이 주어져. 이 정보를 바탕으로, 오늘 한국 증시에서 강세 또는 약세가 예상되는 테마를 최대 10개까지 짧게 예측해줘.`;
+
+  const weekendExtraRule = weekend
+    ? `
+- 지금은 주말이라 주식 시장 뉴스 자체는 적을 수 있어. 그래도 주어진 뉴스 중에 굵직한 재료(금리·물가·고용 지표, 관세·규제 정책, 전쟁·분쟁, 유가·원자재 급변, 대형 기업 이슈 등)가 하나라도 있으면 그걸 근거로 **최소 1개 이상**은 만들어줘. 주식 전문 뉴스가 아니어도 괜찮아 — 국내 증시 테마에 영향을 줄 만한 내용이면 근거로 써도 돼.`
+    : "";
+
+  return `${intro}
+
+**작성 규칙**:${weekendExtraRule}
 - 나스닥이 전반적으로 강세면 강세(up) 예측 위주로, 전반적으로 약세면 약세(down) 예측 위주로 만들어도 되지만, 테마별로 방향이 명확히 갈리면(예: 반도체는 호재, 원전은 악재) 억지로 방향을 통일시키지 말고 각각 따로 만들어. 상승·하락이 섞여 나와도 전혀 문제 없어 — 오히려 더 정확해.
 - theme은 반드시 아래 [허용된 테마 목록]에 있는 이름 중 하나를 토씨 하나 안 틀리고 그대로 써야 해. 목록에 없는 이름을 새로 만들어내지 마 — 나스닥 뉴스가 이 목록의 여러 테마와 관련될 수 있으니, 그중 가장 관련 있는 걸 골라 써(예: 엔비디아·AI 반도체 관련 뉴스면 "반도체" 또는 "반도체 제품(비메모리)", 데이터센터 뉴스면 "데이터 센터", 오픈AI 등 AI 서비스 뉴스면 "인공지능(AI)"). 이 목록과 관련된 근거가 하나도 없는 뉴스는 그냥 씀.
 - 각 예측 항목은 세 가지: theme([허용된 테마 목록] 중 정확히 하나), direction("up" 또는 "down" 중 하나), reason(그 방향으로 예상하는 구체적 근거).
@@ -129,6 +170,7 @@ ${ALLOWED_THEME_NAMES.join(", ")}
 
 응답은 반드시 아래 JSON 형식 하나만, 다른 텍스트 없이:
 {"picks":[{"theme":"반도체","direction":"up","reason":"엔비디아 급등과 젠슨 황 'AI 수요 견조' 발언"},{"theme":"원자력발전(SMR)","direction":"down","reason":"관련 종목 실적 부진 우려"}]}`;
+}
 
 function extractJsonObject(text) {
   let depth = 0;
@@ -142,7 +184,13 @@ function extractJsonObject(text) {
   return text;
 }
 
-async function synthesizeOutlook(gainers, losers, news) {
+// [2026-09-13 변경] 반환값이 picks 배열 하나에서 { picks, debug }로 바뀜.
+// 이유: 재성님이 수동으로 돌려봤을 때 `AI 요약 생성 실패(근거 부족 또는
+// 파싱 실패)` 라는 메시지만 나와서, 셋 중 무엇이 원인인지(AI가 애초에 빈
+// 결과를 냈는지 / JSON 파싱이 깨졌는지 / 테마명이 정식 목록에 없어서
+// 전부 걸러졌는지) 전혀 알 수 없었음. 이제 원인을 debug에 담아서
+// /api/daily-outlook/refresh?debug=1 로 바로 확인할 수 있게 함.
+async function synthesizeOutlook(gainers, losers, news, weekend) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY 환경변수가 설정되지 않았습니다.");
 
@@ -157,7 +205,7 @@ async function synthesizeOutlook(gainers, losers, news) {
     body: JSON.stringify({
       model: "claude-haiku-4-5-20251001",
       max_tokens: 400,
-      system: SYNTH_SYSTEM_PROMPT,
+      system: buildSynthSystemPrompt(weekend),
       messages: [
         {
           role: "user",
@@ -171,30 +219,55 @@ async function synthesizeOutlook(gainers, losers, news) {
   if (!res.ok) throw new Error("Claude API 오류: " + JSON.stringify(data));
   const continuation = data?.content?.find((c) => c.type === "text")?.text || '"picks":[]}';
 
+  const debug = {
+    weekend: !!weekend,
+    gainerCount: gainers.length,
+    loserCount: losers.length,
+    newsCount: news.length,
+    responsePreview: ("{" + continuation).slice(0, 400),
+    parseFailed: false,
+    rawPickCount: 0,
+    rejected: [],
+  };
+
   let parsed;
   try {
     parsed = JSON.parse(extractJsonObject("{" + continuation));
   } catch {
-    return [];
+    debug.parseFailed = true;
+    return { picks: [], debug };
   }
 
   const rawPicks = Array.isArray(parsed.picks) ? parsed.picks : [];
-  return rawPicks
-    .filter(
-      (p) =>
-        p &&
-        typeof p.theme === "string" &&
-        p.theme.trim() &&
-        // [2026-09-08 추가] theme이 /themes 페이지가 아는 정식 테마명이
-        // 아니면(프롬프트로 강제했지만 모델이 가끔 벗어날 수 있음) 링크가
-        // 깨지므로 통째로 버림 — 어설프게 보여주느니 그 pick만 빼는 게 나음.
-        ALLOWED_THEME_SET.has(p.theme.trim()) &&
-        (p.direction === "up" || p.direction === "down") &&
-        typeof p.reason === "string" &&
-        p.reason.trim()
-    )
+  debug.rawPickCount = rawPicks.length;
+
+  const picks = rawPicks
+    .filter((p) => {
+      if (!p || typeof p.theme !== "string" || !p.theme.trim()) {
+        debug.rejected.push({ theme: null, why: "theme 없음" });
+        return false;
+      }
+      // [2026-09-08 추가] theme이 /themes 페이지가 아는 정식 테마명이
+      // 아니면(프롬프트로 강제했지만 모델이 가끔 벗어날 수 있음) 링크가
+      // 깨지므로 통째로 버림 — 어설프게 보여주느니 그 pick만 빼는 게 나음.
+      if (!ALLOWED_THEME_SET.has(p.theme.trim())) {
+        debug.rejected.push({ theme: p.theme.trim(), why: "정식 테마명 목록에 없음" });
+        return false;
+      }
+      if (p.direction !== "up" && p.direction !== "down") {
+        debug.rejected.push({ theme: p.theme.trim(), why: "direction이 up/down이 아님" });
+        return false;
+      }
+      if (typeof p.reason !== "string" || !p.reason.trim()) {
+        debug.rejected.push({ theme: p.theme.trim(), why: "reason 없음" });
+        return false;
+      }
+      return true;
+    })
     .slice(0, 10)
     .map((p) => ({ theme: p.theme.trim(), direction: p.direction, reason: p.reason.trim() }));
+
+  return { picks, debug };
 }
 
 const OUTLOOK_REDIS_KEY = "dailyOutlook:latest";
@@ -208,20 +281,43 @@ export async function refreshDailyOutlook(redis) {
   // 남 — Alpha Vantage 무료 키는 같은 순간에 여러 요청이 들어오는 걸
   // 허용 안 하는 초당 호출 제한이 있어서(하루 25회 한도와는 별개 문제).
   // 그래서 동시 호출 대신 순서대로 호출하고, 사이에 1.2초씩 쉬어감.
+  const weekend = isWeekendKst();
+
   const movers = await fetchTopMovers();
   await new Promise((resolve) => setTimeout(resolve, 1200));
-  const news = await fetchTechNews();
-  const picks = await synthesizeOutlook(movers.gainers, movers.losers, news);
-  if (picks.length === 0) throw new Error("AI 요약 생성 실패(근거 부족 또는 파싱 실패)");
+  const news = await fetchTechNews(weekend ? 30 : 15, weekend ? NEWS_TOPICS_WEEKEND : NEWS_TOPICS_WEEKDAY);
+  const { picks, debug } = await synthesizeOutlook(movers.gainers, movers.losers, news, weekend);
+
+  // [2026-09-13 변경] 예전엔 여기서 throw를 던졌는데, 그러면 이번 회차만
+  // 실패하는 게 아니라 "기존에 저장돼 있던 멀쩡한 예측을 새 걸로 못 바꾼
+  // 채 시간이 흘러 만료" → 배너가 통째로 사라지는 결과가 됐음. 이제는
+  // 에러를 던지지 않고 "이번엔 갱신 안 함(skipped)"으로 조용히 끝냄 —
+  // 저장돼 있던 직전 예측은 아래 늘어난 유효기간 덕분에 계속 보임.
+  if (picks.length === 0) {
+    return { ok: false, skipped: true, reason: "AI가 근거를 찾지 못해 예측을 만들지 못했습니다.", debug };
+  }
 
   const now = new Date();
   const record = {
     dateLabel: toKoreanDateLabel(now),
+    // [2026-09-13 추가] 배너 제목 문구. 주말에는 "나스닥 기반 국장 예측"이
+    // 말이 안 되므로(장이 쉬는 중) 다르게 씀. 이 필드가 없는 옛날 기록도
+    // 있을 수 있어서, 프론트(components/DailyOutlookBanner.js)는 이게
+    // 없으면 예전 문구를 그대로 쓰도록 해둠.
+    heading: weekend
+      ? `${toKoreanDateLabel(now)} 주말 해외뉴스 기반 다음 거래일 전망`
+      : `${toKoreanDateLabel(now)} 나스닥 기반 국장 예측`,
+    weekend,
     picks,
     generatedAt: now.toISOString(),
   };
-  await redis.set(OUTLOOK_REDIS_KEY, record, { ex: 60 * 60 * 36 }); // 36시간 — 다음날 갱신 전까지 여유
-  return record;
+
+  // [2026-09-13 변경] 36시간 → 4일. 36시간이면 금요일 아침에 만든 예측이
+  // 토요일 낮에 만료돼서, 주말 내내 홈 화면 배너가 빈칸이 됐음(재성님
+  // 리포트). 4일이면 연휴가 끼어도 직전 예측이 남아 있음 — 갱신이 정상
+  // 동작하는 한 어차피 매일 새 값으로 덮어써지므로 길게 잡아도 손해가 없음.
+  await redis.set(OUTLOOK_REDIS_KEY, record, { ex: 60 * 60 * 24 * 4 });
+  return { ok: true, record, debug };
 }
 
 // 홈페이지가 읽는 쪽 — Redis만 보고 끝냄(Alpha Vantage/Claude 재호출 없음).
