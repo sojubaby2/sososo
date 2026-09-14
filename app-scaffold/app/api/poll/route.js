@@ -88,10 +88,23 @@ export async function GET(request) {
 
   // Best-effort — 실패해도 이 엔드포인트 전체가 에러가 되진 않음. 다음
   // 사이클에 다시 시도됨.
+  // [2026-09-14 수정] 예전엔 "이미 있음"과 "KRX가 아직 안 올려줌"을 둘 다
+  // "already-had-today"로 기록해서, 오늘 시세가 하나도 안 들어온 날에도
+  // /health가 초록불로 보였음. 이제 lib/priceHistory.js가 돌려주는 reason을
+  // 그대로 사람이 읽을 수 있는 말로 옮겨 적음.
+  const SNAPSHOT_REASON_LABEL = {
+    "already-stored": "이미 오늘 치가 저장돼 있음",
+    "krx-empty": "KRX에 아직 오늘 시세가 없음(휴장일이거나 공개 전)",
+    "store-failed": "저장 실패",
+    stored: "오늘 치 새로 저장함",
+  };
+
   let snapshotResult = "skipped";
   try {
     const result = await appendTodaysSnapshotIfMissing(redis, basDt);
-    snapshotResult = result?.added ? "added" : result?.error ? "error: " + result.error : "already-had-today";
+    snapshotResult = result?.error
+      ? "error: " + result.error
+      : SNAPSHOT_REASON_LABEL[result?.reason] || String(result?.reason || "unknown");
   } catch (err) {
     snapshotResult = "error: " + String(err.message || err);
   }

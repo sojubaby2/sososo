@@ -90,9 +90,23 @@ async function fetchTopMovers(limit = 8) {
 // (경제지표 발표, 전쟁 상황 등)를 가져와서 배치해달라." 그래서 주말에는
 // 뉴스 수집 범위를 거시경제·정책·에너지·지정학 쪽까지 넓히고, 프롬프트도
 // "오늘 장"이 아니라 "다음 거래일"을 예측하도록 바꿈.
-function isWeekendKst(d = new Date()) {
-  const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
-  const day = kst.getUTCDay(); // 0=일, 6=토
+// [2026-09-14 수정 — 월요일 아침이 계속 실패하던 문제]
+// 처음엔 "한국 날짜가 토·일인가"로 판단했는데, 실제로 막힌 건 월요일이었음.
+// 2026-09-14(월) 아침 7시 50분 실행이 근거를 하나도 못 찾고 빈 결과를 냈는데
+// (/health 기록: newsCount 15, rawPickCount 0), 이유가 분명함 — 한국 시간
+// 월요일 아침 7시 50분은 세계표준시로는 아직 "일요일 밤"이라, 미국 증시는
+// 금요일 마감 이후 이틀 넘게 쉬는 중이고 기술·실적 뉴스도 주말 내내 거의
+// 안 나온 상태임. 즉 재료가 없는 게 정상인 시간대인데 평일 모드로 좁게
+// 뒤지고 있었던 것.
+//
+// 그래서 기준을 한국 요일이 아니라 세계표준시 요일로 바꿈. 이러면
+// "미국 시장이 최근에 거래를 했는가"와 정확히 맞아떨어짐:
+//   · 한국 월요일 07:50 -> UTC 일요일  -> 조용함(주말 모드) ← 이번에 고친 경우
+//   · 한국 일요일 07:50 -> UTC 토요일  -> 조용함(주말 모드)
+//   · 한국 토요일 07:50 -> UTC 금요일  -> 평일 모드(금요일 장이 막 끝나 재료가 있음)
+//   · 한국 화~금 07:50 -> UTC 월~목   -> 평일 모드
+function isUsMarketQuiet(d = new Date()) {
+  const day = d.getUTCDay(); // 0=일, 6=토 (세계표준시 기준)
   return day === 0 || day === 6;
 }
 
@@ -281,12 +295,29 @@ export async function refreshDailyOutlook(redis) {
   // 남 — Alpha Vantage 무료 키는 같은 순간에 여러 요청이 들어오는 걸
   // 허용 안 하는 초당 호출 제한이 있어서(하루 25회 한도와는 별개 문제).
   // 그래서 동시 호출 대신 순서대로 호출하고, 사이에 1.2초씩 쉬어감.
-  const weekend = isWeekendKst();
+  const weekend = isUsMarketQuiet();
 
   const movers = await fetchTopMovers();
   await new Promise((resolve) => setTimeout(resolve, 1200));
   const news = await fetchTechNews(weekend ? 30 : 15, weekend ? NEWS_TOPICS_WEEKEND : NEWS_TOPICS_WEEKDAY);
-  const { picks, debug } = await synthesizeOutlook(movers.gainers, movers.losers, news, weekend);
+  let { picks, debug } = await synthesizeOutlook(movers.gainers, movers.losers, news, weekend);
+
+  // [2026-09-14 추가] 평일 모드로 돌렸는데 근거를 하나도 못 찾은 경우,
+  // 포기하기 전에 딱 한 번만 넓은 범위(거시경제·정책·에너지 등)로 다시
+  // 시도함. 미국 공휴일이나 재료가 유난히 없는 날에도 배너가 비지 않게
+  // 하려는 안전장치. 실패했을 때만 도는 경로라 평소 비용은 그대로이고,
+  // 하루 최대 한 번 더(Alpha Vantage 1회 + AI 1회)만 늘어남.
+  if (picks.length === 0 && !weekend) {
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+    const wideNews = await fetchTechNews(30, NEWS_TOPICS_WEEKEND);
+    const retry = await synthesizeOutlook(movers.gainers, movers.losers, wideNews, true);
+    if (retry.picks.length > 0) {
+      picks = retry.picks;
+      debug = { ...retry.debug, retriedWithWideTopics: true, firstAttempt: debug };
+    } else {
+      debug = { ...debug, retriedWithWideTopics: true, retryDebug: retry.debug };
+    }
+  }
 
   // [2026-09-13 변경] 예전엔 여기서 throw를 던졌는데, 그러면 이번 회차만
   // 실패하는 게 아니라 "기존에 저장돼 있던 멀쩡한 예측을 새 걸로 못 바꾼

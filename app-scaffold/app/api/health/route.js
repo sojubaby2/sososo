@@ -70,7 +70,12 @@ export async function GET(request) {
   const report = { generatedAt: new Date().toISOString(), checks: [] };
   const { day: kstDay, hour: kstHour } = kstNow();
   const isWeekend = kstDay === 0 || kstDay === 6;
-  const isQuietHours = kstHour < 7 || kstHour >= 23; // 새벽·심야엔 뉴스가 원래 거의 없음
+  // [2026-09-14 수정] 예전엔 23시 이후만 "조용한 시간"으로 봤는데, 장이
+  // 15시 30분에 끝나고 나면 저녁에도 새 뉴스가 뜸해짐 — 그래서 평일 밤마다
+  // 멀쩡한 피드가 노란불로 뜨는 일이 반복됐음(2026-09-14 확인: 마지막 글이
+  // 저녁 7시 28분인데 밤 10시 반에 경고). 장 마감 이후(18시~)부터 다음 날
+  // 아침 7시까지를 조용한 시간으로 넓힘.
+  const isQuietHours = kstHour < 7 || kstHour >= 18;
 
   // ── 1) 뉴스 피드 ────────────────────────────────────────────────
   try {

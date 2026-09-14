@@ -414,18 +414,28 @@ export async function backfillHistory(redis, { maxNewDaysPerRun = 20, targetDays
 // cycle where that basDt isn't captured yet (KRX's daily settlement data
 // doesn't change intraday, so this fires roughly once per trading day, not
 // once a minute).
+// [2026-09-14 수정 — 진단이 거짓말을 하고 있던 문제] 예전에는 "이미 저장돼
+// 있음"과 "KRX가 아직 그날 데이터를 안 올려줌(빈 응답)"을 둘 다 그냥
+// { added: false }로 똑같이 돌려줬음. 그래서 이걸 받아 쓰는
+// app/api/poll/route.js가 두 경우를 구분하지 못하고 전부 "already-had-today"
+// 라고 기록했고, 실제로는 오늘 시세가 하나도 안 들어왔는데 /health에는
+// 30분 자동작업이 멀쩡한 것처럼 초록불로 떴음(2026-09-14 확인: poll은
+// "already-had-today"인데 저장된 최신 날짜는 사흘 전인 20260911이었음).
+// 이제 reason을 붙여서 어느 쪽인지 분명히 알 수 있게 함.
 export async function appendTodaysSnapshotIfMissing(redis, basDt) {
   const already = await hasSnapshot(redis, basDt);
-  if (already) return { added: false };
+  if (already) return { added: false, reason: "already-stored", basDt };
 
   let items;
   try {
     items = await fetchStockPage(basDt);
   } catch (err) {
-    return { added: false, error: "KRX 호출 실패: " + String(err.message || err) };
+    return { added: false, reason: "krx-error", error: "KRX 호출 실패: " + String(err.message || err), basDt };
   }
-  if (items.length === 0) return { added: false };
+  // KRX가 200을 주면서 목록만 비워서 돌려주는 경우 — 휴장일이거나, 거래일이라도
+  // 아직 그날 일별매매정보가 공개되기 전(장 마감 후 한참 뒤에 올라옴)임.
+  if (items.length === 0) return { added: false, reason: "krx-empty", basDt };
 
   const result = await storeDaySnapshot(redis, basDt, items);
-  return { added: result.stored, basDt };
+  return { added: result.stored, reason: result.stored ? "stored" : "store-failed", basDt };
 }
