@@ -2,7 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import Header from "../../../components/Header";
 import BlogThumbnail from "../../../components/BlogThumbnail";
-import { blogPosts } from "../../../lib/blogPosts";
+// [2026-09-14 변경] app/blog/page.js와 같은 이유로 합쳐진 목록을 읽음
+// (lib/allBlogPosts.js 주석 참고).
+import { blogPosts } from "../../../lib/allBlogPosts";
 
 // 빌드 시점에 이 페이지들을 미리 정적으로 만들어둠(force-dynamic 아님) —
 // 매번 새로 계산할 게 없는 고정 콘텐츠라, 검색엔진이 더 잘 읽어가고

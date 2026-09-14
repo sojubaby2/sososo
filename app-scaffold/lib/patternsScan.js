@@ -32,7 +32,8 @@ import { scanAllStocksForPatterns, PATTERN_DEFS } from "./patternDetection";
 // [2026-09-13] v14 -> v15. "52주 신고가 근접" 패턴을 새로 추가했기 때문
 // (재성님 요청). 패턴을 추가·삭제하거나 판정 기준을 바꿀 때마다 이 번호를
 // 올려야 예전 결과가 안 남고 바로 새로 계산됨.
-export const RESULTS_CACHE_KEY = "patterns:results:v15";
+// [2026-09-14] v15 -> v16. "52주 신저가 근접"도 추가함.
+export const RESULTS_CACHE_KEY = "patterns:results:v16";
 
 // [2026-09-07] 예전엔 30분이었는데, 이제 이 캐시를 채우는 쪽(poll)이
 // 백필(과거 데이터 쌓기)과 시간 예산을 나눠 쓰다 보니 어떤 사이클엔

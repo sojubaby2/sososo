@@ -1,7 +1,10 @@
 import Link from "next/link";
 import Header from "../../components/Header";
 import BlogThumbnail from "../../components/BlogThumbnail";
-import { blogPosts } from "../../lib/blogPosts";
+// [2026-09-14 변경] 칼럼 글을 lib/blogPosts.js 한 파일에만 쌓지 않고
+// lib/blogPostsModern.js로 나눴기 때문에, 둘을 합쳐주는 lib/allBlogPosts.js를
+// 읽도록 바꿈 (자세한 이유는 그 파일 주석 참고).
+import { blogPosts } from "../../lib/allBlogPosts";
 
 export const metadata = {
   title: "칼럼 | 뉴스매매",

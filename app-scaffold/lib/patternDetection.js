@@ -769,6 +769,63 @@ function detect52WeekLow(series, minSimilarity) {
 }
 
 // ---------------------------------------------------------------------------
+// [2026-09-14 추가] 52주 신저가 근접 — 재성님 요청. 위 detect52WeekNearHigh를
+// 그대로 뒤집은 것. "아직 52주 최저가를 깨지는 않았지만 현재가가 그 최저가의
+// 3% 이내까지 내려온" 종목만 잡음. 오늘 장중 저가가 실제로 최저가를 깼으면
+// 그건 "52주 신저가"이므로 여기선 빠짐 — 두 목록은 서로 겹치지 않음.
+// ---------------------------------------------------------------------------
+const NEAR_FIFTY_TWO_WEEK_LOW_PCT = 3;
+
+function detect52WeekNearLow(series, minSimilarity) {
+  const n = series.length;
+  const win = series.slice(Math.max(0, n - FIFTY_TWO_WEEK_WINDOW));
+  if (win.length < FIFTY_TWO_WEEK_MIN_DAYS) return null;
+
+  const today = win[win.length - 1];
+  const prior = win.slice(0, win.length - 1);
+  const priorLows = prior.map((p) => p.l).filter((v) => v > 0);
+  if (priorLows.length === 0) return null;
+  const priorLow = Math.min(...priorLows);
+  if (!(priorLow > 0) || !(today.c > 0) || !(today.l > 0)) return null;
+
+  // 이미 신저가를 깬 날은 "52주 신저가" 쪽에서 잡히므로 여기선 제외.
+  if (today.l < priorLow) return null;
+
+  const abovePct = ((today.c - priorLow) / priorLow) * 100;
+  if (abovePct < 0 || abovePct > NEAR_FIFTY_TWO_WEEK_LOW_PCT) return null;
+
+  let daysSincePriorLow = prior.length;
+  let priorLowDate = prior[0]?.date || null;
+  for (let i = prior.length - 1; i >= 0; i--) {
+    if (prior[i].l > 0 && prior[i].l <= priorLow * 1.001) {
+      daysSincePriorLow = prior.length - i;
+      priorLowDate = prior[i].date;
+      break;
+    }
+  }
+
+  const closeness = 1 - abovePct / NEAR_FIFTY_TWO_WEEK_LOW_PCT; // 1 = 최저가 바로 위
+  const coverageScore = Math.min(1, win.length / FIFTY_TWO_WEEK_WINDOW);
+  const similarity = Math.min(100, Math.round(55 + closeness * 35 + coverageScore * 10));
+  if (similarity < minSimilarity) return null;
+
+  return {
+    patternId: "fifty_two_week_near_low",
+    label: "52주 신저가 근접",
+    similarity,
+    window: win.length,
+    asOfDate: today.date,
+    detail: {
+      priorLow: Math.round(priorLow),
+      priorLowDate,
+      todayClose: Math.round(today.c),
+      aboveLowPct: Math.round(abovePct * 10) / 10,
+      daysSincePriorLow,
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // 이동평균 교차(이평선형) — 골든크로스/데드크로스: 단기(20일) 이동평균이
 // 장기(60일) 이동평균을 뚫고 올라가면(골든크로스)/내려가면(데드크로스)
 // 잡히는, 국내 개인투자자들에게 가장 익숙한 추세전환 시그널 중 하나.
@@ -986,6 +1043,14 @@ export const PATTERN_DEFS = [
       "오늘 장중 저가가 직전 52주(약 252거래일) 최저가를 실제로 밑돈 종목만 보여줍니다. 데이터가 1년치(240거래일) 이상 쌓인 종목만 판정합니다.",
   },
   {
+    id: "fifty_two_week_near_low",
+    label: "52주 신저가 근접",
+    category: "하락형",
+    window: FIFTY_TWO_WEEK_WINDOW,
+    description:
+      "아직 52주 최저가를 깨지는 않았지만, 현재가가 그 최저가의 3% 이내까지 내려온 종목입니다. 바닥 근처에서 버티고 있는 자리를 미리 보려는 용도이며, 실제로 깨고 내려간 종목은 '52주 신저가'에 따로 나옵니다.",
+  },
+  {
     id: "pullback",
     label: "눌림목",
     category: "조정형",
@@ -1106,6 +1171,7 @@ export function detectPatternsForStock(series, { minSimilarity = 55 } = {}) {
     detect52WeekHigh(series, minSimilarity),
     detect52WeekNearHigh(series, minSimilarity),
     detect52WeekLow(series, minSimilarity),
+    detect52WeekNearLow(series, minSimilarity),
     detectMovingAverageCross(series, minSimilarity),
   ];
   for (const e of extras) if (e) results.push(e);

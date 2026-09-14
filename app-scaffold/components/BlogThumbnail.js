@@ -165,6 +165,145 @@ function FootprintsIcon() {
   );
 }
 
+// ---------------------------------------------------------------------------
+// [2026-09-14 추가] "현대편" 칼럼 10편(lib/blogPostsModern.js)용 아이콘.
+// 위 아이콘들과 같은 규칙 — viewBox 64x64, currentColor만 사용, 기존 애니메이션
+// 클래스(demo-fade-in / demo-dot-pop / demo-draw-line) 재사용.
+// ---------------------------------------------------------------------------
+
+// 드비어스 다이아몬드 — 잘린 보석
+function DiamondIcon() {
+  return (
+    <svg viewBox="0 0 64 64" fill="none">
+      <path className="demo-fade-in" d="M14 14 H50 L58 26 L32 55 L6 26 Z" stroke="currentColor" strokeWidth="3" strokeLinejoin="round" />
+      <line className="demo-dot-pop" x1="6" y1="26" x2="58" y2="26" stroke="currentColor" strokeWidth="2.5" style={{ animationDelay: "140ms" }} />
+      <line className="demo-dot-pop" x1="22" y1="26" x2="32" y2="55" stroke="currentColor" strokeWidth="2.5" style={{ animationDelay: "220ms" }} />
+      <line className="demo-dot-pop" x1="42" y1="26" x2="32" y2="55" stroke="currentColor" strokeWidth="2.5" style={{ animationDelay: "300ms" }} />
+      <line className="demo-dot-pop" x1="14" y1="14" x2="22" y2="26" stroke="currentColor" strokeWidth="2.5" opacity="0.6" style={{ animationDelay: "380ms" }} />
+      <line className="demo-dot-pop" x1="50" y1="14" x2="42" y2="26" stroke="currentColor" strokeWidth="2.5" opacity="0.6" style={{ animationDelay: "440ms" }} />
+    </svg>
+  );
+}
+
+// 리먼 브라더스 — 기둥이 무너지는 은행 건물
+function CollapsingBankIcon() {
+  return (
+    <svg viewBox="0 0 64 64" fill="none">
+      <path className="demo-fade-in" d="M10 22 L32 11 L54 22" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+      <line className="demo-dot-pop" x1="18" y1="27" x2="18" y2="45" stroke="currentColor" strokeWidth="3" strokeLinecap="round" style={{ animationDelay: "120ms" }} />
+      <line className="demo-dot-pop" x1="30" y1="27" x2="30" y2="45" stroke="currentColor" strokeWidth="3" strokeLinecap="round" style={{ animationDelay: "200ms" }} />
+      <line className="demo-dot-pop" x1="42" y1="28" x2="47" y2="44" stroke="currentColor" strokeWidth="3" strokeLinecap="round" opacity="0.55" style={{ animationDelay: "280ms" }} />
+      <rect className="demo-dot-pop" x="9" y="47" width="46" height="6" rx="3" fill="currentColor" style={{ animationDelay: "360ms" }} />
+    </svg>
+  );
+}
+
+// 닷컴 버블 — 커서가 찍힌 비눗방울
+function DotcomBubbleIcon() {
+  return (
+    <svg viewBox="0 0 64 64" fill="none">
+      <circle className="demo-fade-in" cx="28" cy="28" r="17" stroke="currentColor" strokeWidth="3" />
+      <path className="demo-dot-pop" d="M21 20 Q25 16 30 16" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" opacity="0.6" style={{ animationDelay: "140ms" }} />
+      <circle className="demo-dot-pop" cx="48" cy="15" r="4" stroke="currentColor" strokeWidth="2" style={{ animationDelay: "220ms" }} />
+      <circle className="demo-dot-pop" cx="12" cy="50" r="3" stroke="currentColor" strokeWidth="2" opacity="0.7" style={{ animationDelay: "300ms" }} />
+      <path className="demo-dot-pop" d="M36 36 L52 44 L44 47 L48 55 L44 57 L40 49 L34 53 Z" fill="currentColor" style={{ animationDelay: "380ms" }} />
+    </svg>
+  );
+}
+
+// 엔론 — 뒤집힌 장부(가려진 숫자)
+function CookedBooksIcon() {
+  return (
+    <svg viewBox="0 0 64 64" fill="none">
+      <path className="demo-fade-in" d="M12 14 h26 a6 6 0 0 1 6 6 v30 h-26 a6 6 0 0 1 -6 -6 Z" stroke="currentColor" strokeWidth="3" strokeLinejoin="round" />
+      <line className="demo-dot-pop" x1="19" y1="24" x2="37" y2="24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{ animationDelay: "140ms" }} />
+      <line className="demo-dot-pop" x1="19" y1="31" x2="37" y2="31" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" opacity="0.55" style={{ animationDelay: "220ms" }} />
+      <line className="demo-dot-pop" x1="19" y1="38" x2="30" y2="38" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" opacity="0.35" style={{ animationDelay: "300ms" }} />
+      <path className="demo-draw-line" d="M40 18 L56 52" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" style={{ animationDelay: "400ms" }} />
+    </svg>
+  );
+}
+
+// 베어링스 / 닉 리슨 — 숨긴 서랍
+function HiddenDrawerIcon() {
+  return (
+    <svg viewBox="0 0 64 64" fill="none">
+      <rect className="demo-fade-in" x="11" y="13" width="42" height="38" rx="4" stroke="currentColor" strokeWidth="3" />
+      <line className="demo-dot-pop" x1="11" y1="26" x2="53" y2="26" stroke="currentColor" strokeWidth="2.5" style={{ animationDelay: "140ms" }} />
+      <circle className="demo-dot-pop" cx="32" cy="20" r="2.4" fill="currentColor" style={{ animationDelay: "200ms" }} />
+      <rect className="demo-dot-pop" x="16" y="31" width="36" height="15" rx="3" fill="currentColor" opacity="0.9" style={{ animationDelay: "300ms" }} />
+      <line className="demo-dot-pop" x1="27" y1="38" x2="41" y2="38" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" opacity="0.25" style={{ animationDelay: "400ms" }} />
+    </svg>
+  );
+}
+
+// LTCM — 매끄러운 곡선이 한 점에서 꺾이는 모형
+function BrokenModelIcon() {
+  return (
+    <svg viewBox="0 0 64 64" fill="none">
+      <path className="demo-fade-in" d="M8 46 Q20 40 30 34 Q38 29 44 26" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+      <path className="demo-draw-line" d="M44 26 L50 54" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" style={{ animationDelay: "240ms" }} />
+      <circle className="demo-dot-pop" cx="44" cy="26" r="4.5" fill="currentColor" style={{ animationDelay: "360ms" }} />
+      <path className="demo-fade-in" d="M8 14 L8 56 L56 56" stroke="currentColor" strokeWidth="2" strokeLinecap="round" opacity="0.35" style={{ animationDelay: "120ms" }} />
+      <path className="demo-dot-pop" d="M44 26 Q50 22 56 20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeDasharray="3 4" opacity="0.5" style={{ animationDelay: "440ms" }} />
+    </svg>
+  );
+}
+
+// 폭스바겐 숏스퀴즈 — 위로 솟구치는 막대 + 눌린 화살표
+function SqueezeIcon() {
+  return (
+    <svg viewBox="0 0 64 64" fill="none">
+      <rect className="demo-dot-pop" x="13" y="42" width="8" height="12" rx="2" fill="currentColor" opacity="0.45" />
+      <rect className="demo-dot-pop" x="26" y="34" width="8" height="20" rx="2" fill="currentColor" opacity="0.65" style={{ animationDelay: "120ms" }} />
+      <rect className="demo-dot-pop" x="39" y="10" width="9" height="44" rx="3" fill="currentColor" style={{ animationDelay: "260ms" }} />
+      <path className="demo-draw-line" d="M55 26 L55 14" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{ animationDelay: "380ms" }} />
+      <path className="demo-dot-pop" d="M51 18 L55 12 L59 18 Z" fill="currentColor" style={{ animationDelay: "440ms" }} />
+    </svg>
+  );
+}
+
+// 나이트 캐피털 — 45분을 가리키는 시계
+function StopwatchIcon() {
+  return (
+    <svg viewBox="0 0 64 64" fill="none">
+      <circle className="demo-fade-in" cx="32" cy="36" r="18" stroke="currentColor" strokeWidth="3" />
+      <line className="demo-dot-pop" x1="26" y1="11" x2="38" y2="11" stroke="currentColor" strokeWidth="3" strokeLinecap="round" style={{ animationDelay: "120ms" }} />
+      <line className="demo-dot-pop" x1="32" y1="11" x2="32" y2="18" stroke="currentColor" strokeWidth="3" strokeLinecap="round" style={{ animationDelay: "180ms" }} />
+      <line className="demo-draw-line" x1="32" y1="36" x2="32" y2="24" stroke="currentColor" strokeWidth="3" strokeLinecap="round" style={{ animationDelay: "280ms" }} />
+      <line className="demo-draw-line" x1="32" y1="36" x2="21" y2="36" stroke="currentColor" strokeWidth="3" strokeLinecap="round" style={{ animationDelay: "380ms" }} />
+      <circle className="demo-dot-pop" cx="32" cy="36" r="3" fill="currentColor" style={{ animationDelay: "460ms" }} />
+    </svg>
+  );
+}
+
+// 비트코인 피자데이 — 한 조각 빠진 피자
+function PizzaSliceIcon() {
+  return (
+    <svg viewBox="0 0 64 64" fill="none">
+      <circle className="demo-fade-in" cx="32" cy="32" r="20" stroke="currentColor" strokeWidth="3" />
+      <path className="demo-dot-pop" d="M32 32 L52 32 A20 20 0 0 0 44 15 Z" fill="currentColor" opacity="0.9" style={{ animationDelay: "180ms" }} />
+      <circle className="demo-dot-pop" cx="24" cy="26" r="2.8" fill="currentColor" style={{ animationDelay: "260ms" }} />
+      <circle className="demo-dot-pop" cx="22" cy="39" r="2.8" fill="currentColor" style={{ animationDelay: "330ms" }} />
+      <circle className="demo-dot-pop" cx="35" cy="43" r="2.8" fill="currentColor" style={{ animationDelay: "400ms" }} />
+      <path className="demo-draw-line" d="M32 6 L32 12 M32 52 L32 58" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" opacity="0.5" style={{ animationDelay: "460ms" }} />
+    </svg>
+  );
+}
+
+// 블랙 먼데이 — 절벽처럼 떨어지는 선
+function CliffDropIcon() {
+  return (
+    <svg viewBox="0 0 64 64" fill="none">
+      <path className="demo-fade-in" d="M8 12 L8 54 L56 54" stroke="currentColor" strokeWidth="2" strokeLinecap="round" opacity="0.35" />
+      <path className="demo-draw-line" d="M12 24 L20 20 L28 23 L34 18" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+      <path className="demo-draw-line" d="M34 18 L38 48" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" style={{ animationDelay: "280ms" }} />
+      <path className="demo-dot-pop" d="M33 42 L38 52 L43 42 Z" fill="currentColor" style={{ animationDelay: "420ms" }} />
+      <path className="demo-dot-pop" d="M44 46 L52 44" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" opacity="0.5" style={{ animationDelay: "480ms" }} />
+    </svg>
+  );
+}
+
 // slug -> { Icon, tone } — tone은 배경색 톤(사이트 기존 색상 토큰 재사용).
 const THUMBNAILS = {
   "big-mac-index": { Icon: BigMacIcon, tone: "amber" },
@@ -180,6 +319,18 @@ const THUMBNAILS = {
   "cobra-effect": { Icon: SnakeIcon, tone: "green" },
   "soviet-glass-quota": { Icon: GlassPaneIcon, tone: "amber" },
   "gandhi-salt-march": { Icon: FootprintsIcon, tone: "green" },
+
+  // [2026-09-14 추가] 현대편 10편 (lib/blogPostsModern.js)
+  "de-beers-diamond": { Icon: DiamondIcon, tone: "amber" },
+  "lehman-brothers": { Icon: CollapsingBankIcon, tone: "bad" },
+  "dotcom-bubble": { Icon: DotcomBubbleIcon, tone: "down" },
+  "enron-scandal": { Icon: CookedBooksIcon, tone: "bad" },
+  "nick-leeson-barings": { Icon: HiddenDrawerIcon, tone: "amber" },
+  "ltcm-collapse": { Icon: BrokenModelIcon, tone: "down" },
+  "volkswagen-short-squeeze": { Icon: SqueezeIcon, tone: "up" },
+  "knight-capital-45-minutes": { Icon: StopwatchIcon, tone: "amber" },
+  "bitcoin-pizza-day": { Icon: PizzaSliceIcon, tone: "green" },
+  "black-monday-1987": { Icon: CliffDropIcon, tone: "bad" },
 };
 
 export default function BlogThumbnail({ slug, size = "small" }) {
