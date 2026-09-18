@@ -11,7 +11,7 @@
 // stripHtml, WATCHED_KEYWORDS) stays in poll/route.js since it's not shared.
 
 import rawThemeData from "./themeData.json";
-import { buildSubsidiaryPromptBlock } from "./subsidiaryMap";
+import { SUBSIDIARY_MAP } from "./subsidiaryMap";
 import { fetchLatestAvailable } from "./krxOpenApi";
 
 const MAX_STOCKS_PER_PRIMARY_THEME = 6;
@@ -151,6 +151,145 @@ const THEME_MEMBERSHIP = (() => {
   return map;
 })();
 
+// ---------------------------------------------------------------------------
+// [2026-09-18 추가 — AI 비용 90% 절감] 후보 추리기
+//
+// 왜 만들었나: 예전에는 뉴스 한 건을 매칭할 때마다 AI에게 "상장 종목 2,800개
+// 전체 + 테마 157개 + 테마별 소속 종목 1,514줄 + 계열사 매핑"을 통째로
+// 보냈습니다. 한 번에 9만 6천 자(약 44,000 토큰)라, 뉴스 한 건 붙이자고 매번
+// 사전 한 권을 읽히는 꼴이었고 이것 때문에 API 크레딧이 며칠 만에 소진됐습니다
+// (2026-09-18 확인).
+//
+// 고친 방법: 종목 이름을 찾는 일은 AI가 아니라 그냥 글자 비교로 공짜로 할 수
+// 있습니다. 그래서 먼저 여기서
+//   ① 제목·요약에 이름이 그대로 등장하는 종목
+//   ② 제목·요약에 테마 이름(또는 그 일부)이 등장하는 테마 + ①의 종목이 속한 테마
+//   ③ 그 후보 테마들에 등록된 소속 종목
+// 을 추려내고, AI에게는 그 후보만 보냅니다. 보통 수십~200개 수준이라
+// 보내는 양이 6분의 1 아래로 줄어듭니다.
+//
+// 화면에 나오는 결과는 그대로입니다 — AI가 하는 일("이 중 진짜 관련 있는 것만
+// 골라라")은 똑같고, 고를 대상만 미리 좁혀줄 뿐입니다.
+//
+// 트레이드오프(정직하게): 후보에 아예 없는 종목은 AI가 고를 수 없습니다.
+// 그래서 후보 그물을 일부러 넓게 칩니다 — 이름이 직접 나온 종목뿐 아니라
+// "관련 있어 보이는 테마"의 소속 종목을 통째로 후보에 넣습니다. 그래도
+// 후보가 하나도 안 잡히면 애초에 붙일 관련주가 없다는 뜻이므로, 그 메시지는
+// AI를 아예 부르지 않고 건너뜁니다(=공짜).
+// ---------------------------------------------------------------------------
+
+const CANDIDATE_MAX_STOCKS = 220; // 후보 종목 상한 (프롬프트 크기 안전장치)
+const CANDIDATE_MAX_THEMES = 8; // 후보 테마 상한
+const CANDIDATE_MAX_STOCKS_PER_THEME = 40; // 테마 하나에서 가져올 종목 상한
+
+// 테마 이름을 쪼갤 때 너무 흔해서 아무 테마나 걸리게 만드는 조각들은 제외.
+// (예: "반도체 소재(불화수소)"의 "소재"만 보고 반도체 테마를 몽땅 후보로
+//  올리면 후보를 좁히는 의미가 없어짐)
+const GENERIC_THEME_TOKENS = new Set([
+  "제품", "소재", "장비", "기술", "서비스", "관련주", "테마주", "업종", "산업",
+]);
+
+// 테마명 -> 검색용 조각들. 모듈 로드 때 한 번만 만듦.
+const THEME_SEARCH_TOKENS = (() => {
+  const out = [];
+  for (const theme of new Set(rawThemeData.map((r) => r.theme))) {
+    const tokens = new Set();
+    const compact = theme.replace(/\s+/g, "");
+    if (compact.length >= 2) tokens.add(compact);
+    for (const piece of theme.split(/[\s()\/·,]+/)) {
+      const t = piece.trim();
+      if (t.length >= 2 && !GENERIC_THEME_TOKENS.has(t)) tokens.add(t);
+      // [2026-09-18] 붙여 쓴 합성어 테마명 보정 — "자동차부품" 같은 이름은
+      // 쪼갤 구분자가 없어서 통째로 한 조각이 되는데, 기사에는 보통
+      // "자동차"까지만 나옵니다. 그러면 후보 테마를 못 찾아서 관련주가
+      // 아예 안 붙는 일이 생기므로, 4글자 이상 한글 조각은 앞 3글자도
+      // 검색어로 같이 넣습니다("원자력발전"->"원자력", "반도체부품"->"반도체").
+      // 조금 넓게 걸리더라도 어차피 "후보"일 뿐이고, 최종 판단은 AI가 합니다.
+      if (t.length >= 4 && /^[가-힣]+$/.test(t)) {
+        const head = t.slice(0, 3);
+        if (!GENERIC_THEME_TOKENS.has(head)) tokens.add(head);
+      }
+    }
+    if (tokens.size > 0) out.push({ theme, tokens: Array.from(tokens) });
+  }
+  return out;
+})();
+
+// "code|name|market" 줄들을 다시 객체로. (getCachedUniverse가 문자열로
+// 들고 다니기 때문에 여기서 한 번 풀어줌 — 2,800줄 쪼개기는 공짜.)
+function parseUniverseRows(universeCompanyList) {
+  const rows = [];
+  for (const line of String(universeCompanyList || "").split("\n")) {
+    const [code, name, market] = line.split("|");
+    if (code && name) rows.push({ code: code.trim(), name: name.trim(), market: (market || "").trim() });
+  }
+  return rows;
+}
+
+// 뉴스 한 건에 대해 "AI에게 보여줄 후보"를 만들어냄.
+// 반환: { stockBlock, themeBlock, subsidiaryBlock, stockCount, themeCount, mentionedNames }
+export function extractMatchCandidates(title, summary, universeCompanyList) {
+  const text = `${title || ""}\n${summary || ""}`;
+  const rows = parseUniverseRows(universeCompanyList);
+
+  // ① 이름이 본문에 그대로 등장하는 종목
+  const mentioned = rows.filter((r) => r.name.length >= 2 && text.includes(r.name));
+  const mentionedCodes = new Set(mentioned.map((r) => r.code));
+
+  // ② 후보 테마 — 점수가 높을수록(더 긴 조각이 걸릴수록) 확실한 후보
+  const themeScore = new Map();
+  for (const { theme, tokens } of THEME_SEARCH_TOKENS) {
+    let best = 0;
+    for (const tk of tokens) if (text.includes(tk)) best = Math.max(best, tk.length);
+    if (best > 0) themeScore.set(theme, best);
+  }
+  // 본문에 이름이 나온 종목이 속한 테마도 후보로(이름 매칭은 아주 강한 신호라 가산점)
+  for (const row of rawThemeData) {
+    if (!mentionedCodes.has(row.code)) continue;
+    themeScore.set(row.theme, Math.max(themeScore.get(row.theme) || 0, 6));
+  }
+  const candidateThemes = Array.from(themeScore.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, CANDIDATE_MAX_THEMES)
+    .map(([theme]) => theme);
+
+  // ③ 후보 종목 = 이름이 나온 종목 + 후보 테마 소속 종목
+  const universeByCode = new Map(rows.map((r) => [r.code, r]));
+  const picked = new Map(); // code -> {code,name,market}
+  for (const r of mentioned) picked.set(r.code, r);
+
+  const themeLines = [];
+  for (const theme of candidateThemes) {
+    const members = rawThemeData.filter((r) => r.theme === theme).slice(0, CANDIDATE_MAX_STOCKS_PER_THEME);
+    if (members.length === 0) continue;
+    themeLines.push(`${theme}: ${members.map((m) => `${m.code}|${m.name}`).join(", ")}`);
+    for (const m of members) {
+      if (picked.size >= CANDIDATE_MAX_STOCKS) break;
+      if (picked.has(m.code)) continue;
+      const u = universeByCode.get(m.code);
+      picked.set(m.code, u || { code: m.code, name: m.name, market: m.market || "" });
+    }
+  }
+
+  // 계열사 매핑도 본문에 이름이 나온 것만
+  const subsidiaryBlock = SUBSIDIARY_MAP.filter((r) => r.subsidiary && text.includes(r.subsidiary))
+    .map((r) => `${r.subsidiary} → ${r.parentName}(${r.parentCode}|${r.parentMarket})`)
+    .join("\n");
+
+  const stockBlock = Array.from(picked.values())
+    .map((r) => `${r.code}|${r.name}|${r.market}`)
+    .join("\n");
+
+  return {
+    stockBlock,
+    themeBlock: themeLines.join("\n"),
+    subsidiaryBlock,
+    stockCount: picked.size,
+    themeCount: candidateThemes.length,
+    mentionedNames: mentioned.map((r) => r.name),
+  };
+}
+
 // "테마명: code|name, code|name, ..." — one line per theme, given to Claude
 // as [테마별 소속 종목 목록] so it can pick individual companion stocks
 // within a matched theme instead of blindly getting the whole bucket
@@ -227,22 +366,22 @@ function extractJsonObject(prefilledText) {
 const SYSTEM_PROMPT = `너는 한국 주식 뉴스와 종목/테마를 연결하는 분석가야.
 
 너한테는 네 가지 목록이 주어져:
-1. [전체 상장 종목]: 코스피·코스닥에 상장된 전체 종목 (코드|이름|시장 형식)
-2. [테마 목록]: 우리가 관리하는 투자 테마 이름들
-3. [테마별 소속 종목 목록]: 각 테마에 미리 등록해둔 종목들 (테마명: 코드|이름, 코드|이름, ... 형식) — 이 목록은 사람이 미리 정리해둔 것이라 완벽하지 않아. 같은 테마 이름 안에 실제로는 서로 다른 사업을 하는 회사가 섞여 있는 경우가 있어(예: "수소차" 테마에 자동차 회사(현대차·기아)와 발전·선박용 연료전지 회사가 같이 등록돼 있던 적이 있었는데, 이 둘은 완전히 다른 산업이라 한쪽 뉴스가 다른 쪽 주가에 영향을 주지 않아). 그러니까 이 목록에 등록돼 있다는 사실 자체를 "관련 있다"는 증거로 그대로 믿지 말고, 너의 판단으로 한 번 더 걸러야 해 (자세한 건 아래 theme_stocks 설명 참고).
+1. [후보 종목]: 이 기사와 관련이 있을 만한 종목만 미리 추려놓은 목록 (코드|이름|시장 형식). 기사 제목·요약에 이름이 그대로 등장하는 종목과, 관련 있어 보이는 테마에 등록된 종목들을 모아둔 것이야. 여기 없는 종목·코드는 절대 지어내면 안 돼 — 반드시 이 목록 안에서만 골라.
+2. [테마 목록]: 우리가 관리하는 투자 테마 이름들 (전체)
+3. [후보 테마별 소속 종목 목록]: 위 후보와 관련 있어 보이는 테마들에 미리 등록해둔 종목들 (테마명: 코드|이름, 코드|이름, ... 형식) — 이 목록은 사람이 미리 정리해둔 것이라 완벽하지 않아. 같은 테마 이름 안에 실제로는 서로 다른 사업을 하는 회사가 섞여 있는 경우가 있어(예: "수소차" 테마에 자동차 회사(현대차·기아)와 발전·선박용 연료전지 회사가 같이 등록돼 있던 적이 있었는데, 이 둘은 완전히 다른 산업이라 한쪽 뉴스가 다른 쪽 주가에 영향을 주지 않아). 그러니까 이 목록에 등록돼 있다는 사실 자체를 "관련 있다"는 증거로 그대로 믿지 말고, 너의 판단으로 한 번 더 걸러야 해 (자세한 건 아래 theme_stocks 설명 참고).
 4. [계열사-모회사 매핑]: 비상장(또는 우리 시스템에 코드가 없는) 자회사 이름 → 그 자회사를 소유한 상장 모회사
 
 뉴스 기사 하나가 주어지면, 네 가지를 판단해:
 
-**A. 직접 관련 종목 (matches)**: [전체 상장 종목] 중에서, 이 기사와 실제로 관련 있는 종목을 찾아. 목록에 없는 종목·코드는 절대 지어내면 안 돼.
+**A. 직접 관련 종목 (matches)**: [후보 종목] 중에서, 이 기사와 실제로 관련 있는 종목을 찾아. 목록에 없는 종목·코드는 절대 지어내면 안 돼.
 
 **관련 종목이 하나도 없는 게 정상일 수 있어**: 모든 기사에 관련주가 있어야 하는 게 아니야. 확신이 안 서면 억지로 뭐라도 채워넣지 말고 matches를 빈 배열로 둬 — 이게 잘못된 답이 아니라 오히려 맞는 답인 경우가 많아. "그나마 제일 비슷해 보이는" 종목을 낮은 확신으로 끼워넣는 것보다, 정직하게 "관련 종목 없음"이라고 답하는 게 훨씬 나아.
 
-[전체 상장 종목]에는 [테마 목록]에서 다루는 회사들보다 훨씬 많은 회사가 들어있어. 테마 목록에 없는 회사라도 절대 무시하지 마 — 네가 원래 알고 있는 배경지식(그 회사가 실제로 어떤 사업을 하는지, 무슨 제품을 만드는지)을 적극적으로 활용해서 [전체 상장 종목] 전체를 대상으로 판단해. 익숙한 대기업이 아니거나 우리가 미리 분류해두지 않은 회사라는 이유로 후보에서 제외하지 마 — 실제로 관련 있다면 반드시 포함시켜.
+[후보 종목]에는 테마에 등록되지 않은 회사도 섞여 있어. 네가 원래 알고 있는 배경지식(그 회사가 실제로 어떤 사업을 하는지, 무슨 제품을 만드는지)을 적극적으로 활용해서 [후보 종목] 전체를 대상으로 판단해. 익숙한 대기업이 아니라는 이유로 빼지 마 — 실제로 관련 있다면 반드시 포함시켜. 다만 [후보 종목]에 없는 회사는 아무리 관련 있어 보여도 넣을 수 없어(코드를 지어내게 되니까).
 
-**비상장 자회사 처리 규칙**: 기사에 [계열사-모회사 매핑]에 있는 자회사 이름이 나오고, 그 자회사에 대한 사업적으로 의미 있는 소식(계약, 투자, 신사업, 실적 등)이 있다면, 그 자회사 자체는 [전체 상장 종목]에 없더라도 매핑에 적힌 모회사를 "confirmed"로 포함시켜. reason에는 "자회사 OOO 관련 소식"이라고 명시해서, 직접 언급이 아니라 자회사를 통한 연결이라는 걸 알 수 있게 해.
+**비상장 자회사 처리 규칙**: 기사에 [계열사-모회사 매핑]에 있는 자회사 이름이 나오고, 그 자회사에 대한 사업적으로 의미 있는 소식(계약, 투자, 신사업, 실적 등)이 있다면, 그 자회사 자체는 [후보 종목]에 없더라도 매핑에 적힌 모회사를 "confirmed"로 포함시켜. reason에는 "자회사 OOO 관련 소식"이라고 명시해서, 직접 언급이 아니라 자회사를 통한 연결이라는 걸 알 수 있게 해.
 
-**주의**: 기사에 나온 회사 이름이 [계열사-모회사 매핑]에는 없지만 [전체 상장 종목]에 자기 자신의 코드로 이미 있다면(예: 삼성SDI, LG에너지솔루션처럼 자체 상장된 계열사), 그건 모회사로 연결하지 말고 반드시 그 회사 자신의 코드로 매칭해. 모회사 연결은 오직 [계열사-모회사 매핑] 목록에 있는, 자체 코드가 없는 회사에만 적용해.
+**주의**: 기사에 나온 회사 이름이 [계열사-모회사 매핑]에는 없지만 [후보 종목]에 자기 자신의 코드로 이미 있다면(예: 삼성SDI, LG에너지솔루션처럼 자체 상장된 계열사), 그건 모회사로 연결하지 말고 반드시 그 회사 자신의 코드로 매칭해. 모회사 연결은 오직 [계열사-모회사 매핑] 목록에 있는, 자체 코드가 없는 회사에만 적용해.
 
 - "confirmed" (사업근거 확인): 그 회사명·제품명이 기사에 직접 언급되거나, 정부 정책·규제·계약·사고 등이 그 회사의 실제 사업 영역에 직접 영향을 미치는 경우.
 - "rumor" (시장 추정): 구체적으로 존재하는 연결고리(특정 인물과의 동창·지연 관계, 커뮤니티에 도는 특정 소문)가 있을 때만. 막연한 업종 추측은 여기 넣지 말고 아예 빼.
@@ -273,7 +412,7 @@ const SYSTEM_PROMPT = `너는 한국 주식 뉴스와 종목/테마를 연결하
 
 **[2026-09-09 추가] 제목에 테마 이름이 그대로 등장하면 그 테마를 반드시 채택**: 기사 제목에 [테마 목록] 중 하나의 이름이 (띄어쓰기 차이 정도는 무시하고) 그대로 등장하면 — 예를 들어 제목에 "사이버보안"이라는 단어가 있으면 — 정작 어느 상장사가 그 일을 하는지 요약문에 구체적으로 안 나와 있어도 "사이버 보안"을 반드시 primary_theme 또는 secondary_themes에 포함시키고, theme_stocks에서 그 테마의 동반 종목도 실제로 골라 넣어(빈 배열로 남겨두지 마). 재성님 리포트 — "오픈AI, 한국서 사이버보안 파트너 5곳 뽑는다"는 기사가, 그 5곳이 구체적으로 어느 회사인지 요약문에 안 나온다는 이유만으로 관련주가 하나도 안 뜨고 통째로 걸러진 적이 있었음. 이건 위쪽 "관련 종목이 하나도 없는 게 정상일 수 있어" 원칙이나 "명확한 핵심이 없으면 null" 원칙보다 이 규칙이 우선해 — 기사 제목에 테마 이름이 명시적으로 쓰였다는 것 자체가 이미 충분히 강한 관련성 신호이기 때문이야.
 
-**[2026-09-09 추가] 해외 대기업이 주어인 기사는 뒤에 나오는 산업 키워드로 테마를 매칭**: 기사의 핵심 행위자(주어)가 오픈AI·구글·엔비디아·애플·테슬라·마이크로소프트·TSMC·아마존·메타처럼 이름값 있는 해외 대기업이면(FILTER 단계에서 이런 기사는 이미 대부분 통과시키도록 되어 있음), 그 대기업 자신은 [전체 상장 종목]에 없으니 matches에 넣을 순 없지만, 그 대기업의 행위 뒤에 붙는 산업·기술 키워드(예: "사이버보안 파트너", "반도체 장비 발주", "데이터센터 투자", "AI 서버", "배터리 공급" 등)를 보고 [테마 목록] 중 가장 가까운 테마를 primary_theme 또는 secondary_themes로 채택해. 굳이 그 테마 이름이 제목에 토씨 하나 안 틀리고 등장하지 않아도 돼(위 규칙보다 좀 더 느슨하게 적용) — 키워드가 그 테마의 사업 영역을 가리키기만 하면 충분해. 그 다음 theme_stocks에서 그 테마의 동반 종목(국내 관련 부품·장비·서비스 회사들)을 실제로 채워 넣어. 재성님 판단 — 해외 대기업의 사업 확장·투자·파트너십 소식은 국내 관련 공급망 회사들에 대부분 호재로 작용하기 때문에, 이런 기사는 최대한 적극적으로 관련 테마를 찾아 매칭해야 해.
+**[2026-09-09 추가] 해외 대기업이 주어인 기사는 뒤에 나오는 산업 키워드로 테마를 매칭**: 기사의 핵심 행위자(주어)가 오픈AI·구글·엔비디아·애플·테슬라·마이크로소프트·TSMC·아마존·메타처럼 이름값 있는 해외 대기업이면(FILTER 단계에서 이런 기사는 이미 대부분 통과시키도록 되어 있음), 그 대기업 자신은 [후보 종목]에 없으니 matches에 넣을 순 없지만, 그 대기업의 행위 뒤에 붙는 산업·기술 키워드(예: "사이버보안 파트너", "반도체 장비 발주", "데이터센터 투자", "AI 서버", "배터리 공급" 등)를 보고 [테마 목록] 중 가장 가까운 테마를 primary_theme 또는 secondary_themes로 채택해. 굳이 그 테마 이름이 제목에 토씨 하나 안 틀리고 등장하지 않아도 돼(위 규칙보다 좀 더 느슨하게 적용) — 키워드가 그 테마의 사업 영역을 가리키기만 하면 충분해. 그 다음 theme_stocks에서 그 테마의 동반 종목(국내 관련 부품·장비·서비스 회사들)을 실제로 채워 넣어. 재성님 판단 — 해외 대기업의 사업 확장·투자·파트너십 소식은 국내 관련 공급망 회사들에 대부분 호재로 작용하기 때문에, 이런 기사는 최대한 적극적으로 관련 테마를 찾아 매칭해야 해.
 
 **C. 부가 테마 (secondary_themes)**: 핵심만큼은 아니지만 함께 언급되거나 부차적으로 관련된 테마들. 최대 2개까지만, 배열로. 없으면 빈 배열.
 
@@ -383,13 +522,20 @@ export async function matchStocks(title, summary, universeCompanyList) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY 환경변수가 설정되지 않았습니다.");
 
-  // The company/theme list is identical across every call in a poll cycle
-  // (and usually across cycles within the same trading day, since KRX data
-  // doesn't change intraday). Putting it in a cached system block means we
-  // only pay full price once per cache window — every other call within
-  // that hour reads it back at 10% of the normal input price instead of
-  // resending ~2,800 companies at full price every single time.
-  const staticContext = `${SYSTEM_PROMPT}\n\n[전체 상장 종목]\n${universeCompanyList}\n\n[테마 목록]\n${buildThemeList()}\n\n[테마별 소속 종목 목록]\n${buildThemeMembershipBlock()}\n\n[계열사-모회사 매핑]\n${buildSubsidiaryPromptBlock()}`;
+  // [2026-09-18 변경] 캐시에 넣는 고정 블록은 이제 "지시문 + 테마 이름 목록"
+  // 뿐입니다(약 1만 자). 예전에는 여기에 상장 종목 2,800개 전체와 테마별
+  // 소속 종목 1,514줄까지 통째로 들어가서 9만 6천 자였는데, 그게 비용의
+  // 대부분이었습니다. 기사마다 달라지는 후보 목록은 아래 user 메시지로
+  // 내려보냅니다 — 캐시는 고정 블록에만 걸리므로 이렇게 나누는 게 맞습니다.
+  const staticContext = `${SYSTEM_PROMPT}\n\n[테마 목록]\n${buildThemeList()}`;
+
+  // 기사별 후보 — 이 부분만 매번 새로 보냄(보통 수천 자).
+  const candidates = extractMatchCandidates(title, summary, universeCompanyList);
+  const candidateContext = [
+    `[후보 종목]\n${candidates.stockBlock || "(없음)"}`,
+    `[후보 테마별 소속 종목 목록]\n${candidates.themeBlock || "(없음)"}`,
+    `[계열사-모회사 매핑]\n${candidates.subsidiaryBlock || "(이 기사와 관련된 항목 없음)"}`,
+  ].join("\n\n");
 
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -409,7 +555,7 @@ export async function matchStocks(title, summary, universeCompanyList) {
         },
       ],
       messages: [
-        { role: "user", content: `뉴스 제목: ${title}\n뉴스 요약: ${summary}` },
+        { role: "user", content: `${candidateContext}\n\n뉴스 제목: ${title}\n뉴스 요약: ${summary}` },
         { role: "assistant", content: "{" },
       ],
     }),

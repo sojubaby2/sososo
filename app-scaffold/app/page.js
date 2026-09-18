@@ -45,6 +45,23 @@ function playAlertBeep() {
 }
 
 // Turns a saved /api/poll feed item into the shape NewsCard expects.
+// [2026-09-18 추가] UTC ISO 문자열 -> 한국 시간 표기.
+function formatKoreanDateTime(iso) {
+  if (!iso) return "";
+  const ms = Date.parse(iso);
+  if (!Number.isFinite(ms)) return String(iso);
+  const kst = new Date(ms + 9 * 60 * 60 * 1000);
+  const nowKst = new Date(Date.now() + 9 * 60 * 60 * 1000);
+  const hh = String(kst.getUTCHours()).padStart(2, "0");
+  const mm = String(kst.getUTCMinutes()).padStart(2, "0");
+  const sameDay =
+    kst.getUTCFullYear() === nowKst.getUTCFullYear() &&
+    kst.getUTCMonth() === nowKst.getUTCMonth() &&
+    kst.getUTCDate() === nowKst.getUTCDate();
+  if (sameDay) return `${hh}:${mm}`;
+  return `${kst.getUTCMonth() + 1}월 ${kst.getUTCDate()}일 ${hh}:${mm}`;
+}
+
 function toCardShape(item) {
   const hasLegitimate = item.matches.some((m) => m.confidence === "confirmed" || m.confidence === "theme");
   const reason = item.matches
@@ -52,6 +69,12 @@ function toCardShape(item) {
     .filter(Boolean)
     .slice(0, 3)
     .join(" / ");
+  // [2026-09-18 추가] 뉴스에 붙어 오는 시각은 세계표준시(UTC) ISO 문자열
+  // ("2026-09-17T23:12:00+00:00")인데, 그대로 화면에 뿌리니 읽기가 힘들다는
+  // 재성님 피드백. 한국 시간(UTC+9)으로 옮겨서 "9월 18일 08:12"로 보여줌.
+  // - 오늘 뉴스는 날짜를 빼고 "08:12"만 보여줌(같은 날짜가 반복되면 지저분해서).
+  // - 시각을 못 읽으면 원본을 그대로 둠(빈칸으로 만드는 것보다 나음).
+
   // Any match Claude tagged with a confirmed negative-catalyst type (유상증자
   // 등) — surfaced once at the card level for the "악재" badge, and again
   // per-chip so it's clear exactly which stock it's about.
@@ -59,7 +82,11 @@ function toCardShape(item) {
 
   return {
     id: item.id,
-    time: item.pubDate || "",
+    // [2026-09-18 수정] 재성님 리포트 — 카드에 시간이
+    // "2026-09-17T23:12:00+00:00" 처럼 세계표준시 원본 그대로 떠서 읽기가
+    // 힘들었음. 이제 한국 시간 기준으로 "9월 18일 08:12" 형태로 바꿔서 보여줌
+    // (formatKoreanDateTime 참고).
+    time: formatKoreanDateTime(item.pubDate),
     source: item.keyword,
     headline: item.title,
     summary: item.summary,
