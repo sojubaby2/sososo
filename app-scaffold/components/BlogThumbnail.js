@@ -304,6 +304,136 @@ function CliffDropIcon() {
   );
 }
 
+// ---------------------------------------------------------------------------
+// [2026-09-18 추가] 현대·근현대편 2차 10편용 아이콘.
+// ---------------------------------------------------------------------------
+
+// IMF 외환위기 — 바닥을 드러낸 금고
+function EmptyVaultIcon() {
+  return (
+    <svg viewBox="0 0 64 64" fill="none">
+      <rect className="demo-fade-in" x="10" y="14" width="44" height="38" rx="4" stroke="currentColor" strokeWidth="3" />
+      <circle className="demo-dot-pop" cx="32" cy="31" r="9" stroke="currentColor" strokeWidth="2.5" style={{ animationDelay: "140ms" }} />
+      <line className="demo-dot-pop" x1="32" y1="31" x2="32" y2="23" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{ animationDelay: "220ms" }} />
+      <line className="demo-dot-pop" x1="32" y1="31" x2="39" y2="36" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{ animationDelay: "290ms" }} />
+      <path className="demo-draw-line" d="M16 46 L28 46" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" opacity="0.4" style={{ animationDelay: "380ms" }} />
+    </svg>
+  );
+}
+
+// 사토시 — 물음표가 들어간 사람 실루엣
+function AnonymousIcon() {
+  return (
+    <svg viewBox="0 0 64 64" fill="none">
+      <circle className="demo-fade-in" cx="32" cy="23" r="11" stroke="currentColor" strokeWidth="3" />
+      <path className="demo-dot-pop" d="M13 52 C13 41 21 36 32 36 C43 36 51 41 51 52" stroke="currentColor" strokeWidth="3" strokeLinecap="round" style={{ animationDelay: "160ms" }} />
+      <path className="demo-dot-pop" d="M28 20 Q28 15 32 15 Q36 15 36 19 Q36 22 32 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{ animationDelay: "300ms" }} />
+      <circle className="demo-dot-pop" cx="32" cy="28" r="1.8" fill="currentColor" style={{ animationDelay: "400ms" }} />
+    </svg>
+  );
+}
+
+// 동인도회사 — 돛을 올린 범선
+function TallShipIcon() {
+  return (
+    <svg viewBox="0 0 64 64" fill="none">
+      <path className="demo-dot-pop" d="M12 44 L52 44 L46 53 L18 53 Z" fill="currentColor" />
+      <line className="demo-fade-in" x1="32" y1="10" x2="32" y2="44" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+      <path className="demo-dot-pop" d="M34 13 L48 24 L34 27 Z" fill="currentColor" style={{ animationDelay: "160ms" }} />
+      <path className="demo-dot-pop" d="M34 30 L46 38 L34 40 Z" fill="currentColor" opacity="0.8" style={{ animationDelay: "240ms" }} />
+      <path className="demo-dot-pop" d="M30 16 L19 26 L30 28 Z" fill="currentColor" opacity="0.6" style={{ animationDelay: "320ms" }} />
+    </svg>
+  );
+}
+
+// 워털루 전설 — 소문이 퍼지는 모양(말풍선 + 물음표)
+function RumorIcon() {
+  return (
+    <svg viewBox="0 0 64 64" fill="none">
+      <path className="demo-fade-in" d="M10 16 h38 a4 4 0 0 1 4 4 v18 a4 4 0 0 1 -4 4 h-20 l-10 8 v-8 h-8 a4 4 0 0 1 -4 -4 v-18 a4 4 0 0 1 4 -4 z" stroke="currentColor" strokeWidth="3" strokeLinejoin="round" />
+      <path className="demo-dot-pop" d="M25 25 Q25 21 29 21 Q33 21 33 25 Q33 28 29 29" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{ animationDelay: "200ms" }} />
+      <circle className="demo-dot-pop" cx="29" cy="34" r="1.8" fill="currentColor" style={{ animationDelay: "300ms" }} />
+      <circle className="demo-dot-pop" cx="55" cy="49" r="3" stroke="currentColor" strokeWidth="2" opacity="0.6" style={{ animationDelay: "380ms" }} />
+    </svg>
+  );
+}
+
+// 신용카드 — 카드 한 장
+function CreditCardIcon() {
+  return (
+    <svg viewBox="0 0 64 64" fill="none">
+      <rect className="demo-fade-in" x="7" y="17" width="50" height="31" rx="4" stroke="currentColor" strokeWidth="3" />
+      <rect className="demo-dot-pop" x="7" y="24" width="50" height="7" fill="currentColor" style={{ animationDelay: "150ms" }} />
+      <rect className="demo-dot-pop" x="14" y="36" width="14" height="6" rx="1.5" stroke="currentColor" strokeWidth="2" style={{ animationDelay: "260ms" }} />
+      <line className="demo-dot-pop" x1="35" y1="42" x2="50" y2="42" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" opacity="0.6" style={{ animationDelay: "340ms" }} />
+    </svg>
+  );
+}
+
+// 조개 화폐 — 조개껍데기
+function SeashellIcon() {
+  return (
+    <svg viewBox="0 0 64 64" fill="none">
+      <path className="demo-fade-in" d="M32 50 C16 50 8 38 8 27 C8 18 14 12 20 12 C25 12 28 16 32 16 C36 16 39 12 44 12 C50 12 56 18 56 27 C56 38 48 50 32 50 Z" stroke="currentColor" strokeWidth="3" strokeLinejoin="round" />
+      <path className="demo-draw-line" d="M32 18 L32 49" stroke="currentColor" strokeWidth="2" strokeLinecap="round" opacity="0.6" style={{ animationDelay: "200ms" }} />
+      <path className="demo-draw-line" d="M22 16 L17 44" stroke="currentColor" strokeWidth="2" strokeLinecap="round" opacity="0.45" style={{ animationDelay: "290ms" }} />
+      <path className="demo-draw-line" d="M42 16 L47 44" stroke="currentColor" strokeWidth="2" strokeLinecap="round" opacity="0.45" style={{ animationDelay: "380ms" }} />
+    </svg>
+  );
+}
+
+// 연준 탄생 — 기둥 있는 관청 건물 + 자물쇠
+function CentralBankIcon() {
+  return (
+    <svg viewBox="0 0 64 64" fill="none">
+      <path className="demo-fade-in" d="M8 23 L32 11 L56 23" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+      <line className="demo-dot-pop" x1="17" y1="28" x2="17" y2="44" stroke="currentColor" strokeWidth="3" strokeLinecap="round" style={{ animationDelay: "130ms" }} />
+      <line className="demo-dot-pop" x1="32" y1="28" x2="32" y2="44" stroke="currentColor" strokeWidth="3" strokeLinecap="round" style={{ animationDelay: "210ms" }} />
+      <line className="demo-dot-pop" x1="47" y1="28" x2="47" y2="44" stroke="currentColor" strokeWidth="3" strokeLinecap="round" style={{ animationDelay: "290ms" }} />
+      <rect className="demo-dot-pop" x="8" y="47" width="48" height="6" rx="3" fill="currentColor" style={{ animationDelay: "370ms" }} />
+    </svg>
+  );
+}
+
+// 케인스 vs 하이에크 — 마주 보는 두 화살표
+function DebateIcon() {
+  return (
+    <svg viewBox="0 0 64 64" fill="none">
+      <circle className="demo-fade-in" cx="18" cy="22" r="8" stroke="currentColor" strokeWidth="3" />
+      <circle className="demo-fade-in" cx="46" cy="22" r="8" stroke="currentColor" strokeWidth="3" style={{ animationDelay: "120ms" }} />
+      <path className="demo-draw-line" d="M14 44 L30 44" stroke="currentColor" strokeWidth="3" strokeLinecap="round" style={{ animationDelay: "240ms" }} />
+      <path className="demo-dot-pop" d="M26 40 L32 44 L26 48 Z" fill="currentColor" style={{ animationDelay: "320ms" }} />
+      <path className="demo-draw-line" d="M50 52 L34 52" stroke="currentColor" strokeWidth="3" strokeLinecap="round" style={{ animationDelay: "400ms" }} />
+      <path className="demo-dot-pop" d="M38 48 L32 52 L38 56 Z" fill="currentColor" style={{ animationDelay: "470ms" }} />
+    </svg>
+  );
+}
+
+// 그리스 위기 — 금 간 그리스 기둥
+function CrackedColumnIcon() {
+  return (
+    <svg viewBox="0 0 64 64" fill="none">
+      <rect className="demo-fade-in" x="16" y="10" width="32" height="6" rx="2" stroke="currentColor" strokeWidth="3" />
+      <rect className="demo-dot-pop" x="14" y="48" width="36" height="6" rx="2" fill="currentColor" style={{ animationDelay: "320ms" }} />
+      <line className="demo-dot-pop" x1="23" y1="18" x2="23" y2="46" stroke="currentColor" strokeWidth="3" strokeLinecap="round" style={{ animationDelay: "140ms" }} />
+      <line className="demo-dot-pop" x1="41" y1="18" x2="41" y2="46" stroke="currentColor" strokeWidth="3" strokeLinecap="round" style={{ animationDelay: "220ms" }} />
+      <path className="demo-draw-line" d="M32 18 L28 28 L36 34 L31 46" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ animationDelay: "420ms" }} />
+    </svg>
+  );
+}
+
+// 그레셤의 법칙 — 좋은 동전과 나쁜 동전
+function TwoCoinsIcon() {
+  return (
+    <svg viewBox="0 0 64 64" fill="none">
+      <circle className="demo-fade-in" cx="23" cy="28" r="14" stroke="currentColor" strokeWidth="3" />
+      <circle className="demo-dot-pop" cx="23" cy="28" r="6" fill="currentColor" style={{ animationDelay: "160ms" }} />
+      <circle className="demo-dot-pop" cx="42" cy="39" r="14" stroke="currentColor" strokeWidth="3" strokeDasharray="5 4" opacity="0.65" style={{ animationDelay: "280ms" }} />
+      <path className="demo-dot-pop" d="M37 39 L47 39" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" opacity="0.65" style={{ animationDelay: "400ms" }} />
+    </svg>
+  );
+}
+
 // slug -> { Icon, tone } — tone은 배경색 톤(사이트 기존 색상 토큰 재사용).
 const THUMBNAILS = {
   "big-mac-index": { Icon: BigMacIcon, tone: "amber" },
@@ -331,6 +461,18 @@ const THUMBNAILS = {
   "knight-capital-45-minutes": { Icon: StopwatchIcon, tone: "amber" },
   "bitcoin-pizza-day": { Icon: PizzaSliceIcon, tone: "green" },
   "black-monday-1987": { Icon: CliffDropIcon, tone: "bad" },
+
+  // [2026-09-18 추가] 현대·근현대편 2차 10편
+  "asian-financial-crisis-imf": { Icon: EmptyVaultIcon, tone: "bad" },
+  "satoshi-nakamoto": { Icon: AnonymousIcon, tone: "amber" },
+  "dutch-east-india-company": { Icon: TallShipIcon, tone: "green" },
+  "rothschild-waterloo": { Icon: RumorIcon, tone: "amber" },
+  "diners-club-credit-card": { Icon: CreditCardIcon, tone: "up" },
+  "shell-money": { Icon: SeashellIcon, tone: "green" },
+  "federal-reserve-jekyll-island": { Icon: CentralBankIcon, tone: "amber" },
+  "keynes-vs-hayek": { Icon: DebateIcon, tone: "down" },
+  "greece-debt-crisis": { Icon: CrackedColumnIcon, tone: "bad" },
+  "greshams-law": { Icon: TwoCoinsIcon, tone: "down" },
 };
 
 export default function BlogThumbnail({ slug, size = "small" }) {
