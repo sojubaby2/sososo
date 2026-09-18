@@ -13,6 +13,14 @@ import { saveDailyReview, getDailyReview, listDailyReviews } from "../../../lib/
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
+// [2026-09-18 추가 — 비용 안전장치] 목록 조회는 글 본문까지 전부 읽어오기
+// 때문에 글이 쌓일수록 무거워집니다. 마감시황은 하루 한 번만 바뀌므로,
+// 방문자가 아무리 많아도 Redis 읽기가 5분에 한 번으로 고정되도록 엣지
+// 캐시를 붙입니다(app/api/patterns/route.js와 같은 이유).
+const CACHE_HEADERS = {
+  "Cache-Control": "public, max-age=0, s-maxage=300, stale-while-revalidate=600",
+};
+
 export async function GET(request) {
   const redis = getRedis();
   if (!redis) {
@@ -25,13 +33,13 @@ export async function GET(request) {
   if (date) {
     const post = await getDailyReview(redis, date);
     if (!post) return Response.json({ error: "해당 날짜의 마감시황이 없습니다." }, { status: 404 });
-    return Response.json({ post });
+    return Response.json({ post }, { headers: CACHE_HEADERS });
   }
 
   const limitParam = Number(searchParams.get("limit"));
   const limit = Number.isFinite(limitParam) && limitParam > 0 ? Math.min(limitParam, 100) : 30;
   const posts = await listDailyReviews(redis, limit);
-  return Response.json({ posts });
+  return Response.json({ posts }, { headers: CACHE_HEADERS });
 }
 
 // 인증: 다른 자동화 엔드포인트(app/api/poll 등)와 동일하게 CRON_SECRET을

@@ -38,6 +38,21 @@ import { RESULTS_CACHE_KEY, runPatternsScanAndCache } from "../../../lib/pattern
 // 일반 경로(캐시 읽기)는 훨씬 빨리 끝남.
 export const maxDuration = 60;
 
+// [2026-09-18 추가 — 방문자가 늘어날 때를 대비한 비용 안전장치]
+// 이 라우트는 전 종목 × 25개 패턴 스캔 결과를 통째로 내려주기 때문에 응답
+// 하나가 수백 KB나 됩니다. 그런데 캐시 헤더가 없어서, 패턴검색 화면을 여는
+// 사람이 한 명 늘 때마다 Redis에서 그 수백 KB를 새로 읽어오고 있었습니다
+// (방문자 5,000명이면 하루 1GB가 넘어가는 규모 — Upstash 대역폭 요금이
+// 여기서 가장 먼저 터집니다).
+//
+// 아래 엣지 캐시를 붙이면 방문자가 몇 명이든 Redis 읽기는 5분에 한 번으로
+// 고정됩니다. 화면에 보이는 내용은 그대로입니다 — 이 결과 자체가 30분마다
+// 한 번(30분 자동작업 주기)만 바뀌므로 5분 캐시로는 전혀 늦지 않습니다.
+// 관리자용 강제 재계산(?refresh=1)에는 캐시를 붙이지 않습니다.
+const CACHE_HEADERS = {
+  "Cache-Control": "public, max-age=0, s-maxage=300, stale-while-revalidate=600",
+};
+
 export async function GET(request) {
   const redis = getRedis();
   if (!redis) {
@@ -69,7 +84,11 @@ export async function GET(request) {
     if (cached) {
       const data = typeof cached === "string" ? JSON.parse(cached) : cached;
       if (data?.patterns) {
-        return Response.json({ ...data, patternDefs: PATTERN_DEFS, historyDays, historyTarget });
+        return Response.json(
+          { ...data, patternDefs: PATTERN_DEFS, historyDays, historyTarget },
+          // 관리자가 ?refresh=1로 방금 새로 계산시킨 응답은 캐시하지 않음
+          force ? undefined : { headers: CACHE_HEADERS }
+        );
       }
     }
   } catch {
@@ -81,11 +100,15 @@ export async function GET(request) {
   // 직접 스캔을 돌리지 않고(그러면 다시 사용자가 기다리게 됨), 빈 결과 +
   // warming 플래그만 내려줌 — 프론트가 "곧 채워집니다" 안내를 보여주고,
   // 실제로는 다음 poll 사이클(최대 30분 이내)에 자동으로 채워짐.
-  return Response.json({
-    patternDefs: PATTERN_DEFS,
-    patterns: {},
-    historyDays,
-    historyTarget,
-    warming: true,
-  });
+  // 아직 한 번도 계산이 안 된 상태(배포 직후 등) — 곧 채워질 테니 짧게만 캐시
+  return Response.json(
+    {
+      patternDefs: PATTERN_DEFS,
+      patterns: {},
+      historyDays,
+      historyTarget,
+      warming: true,
+    },
+    { headers: { "Cache-Control": "public, max-age=0, s-maxage=60" } }
+  );
 }
