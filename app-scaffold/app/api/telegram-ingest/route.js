@@ -24,6 +24,7 @@
 import { getRedis } from "../../../lib/redis";
 import { recordRun, RUN_TELEGRAM } from "../../../lib/runStatus";
 import {
+  extractMatchCandidates,
   getCachedUniverse,
   isMarketMovingHeadline,
   matchStocks,
@@ -341,24 +342,27 @@ export async function POST(request) {
     return Response.json({ error: "Redis(Upstash) 환경변수가 아직 설정되지 않았습니다." }, { status: 500 });
   }
 
-  // [2026-09-11 추가] 여기까지 왔다는 건 "오라클 서버의 수집기가 살아서
-  // 메시지를 보내왔다"는 뜻 — 이 메시지가 결국 게재되든 필터링되든 상관없이
-  // 기록해둠(수집기 생사 확인이 목적이라서).
-  await recordRun(redis, RUN_TELEGRAM, {
-    stage: "수신",
-    channel,
-    messageId,
-    preview: rawText.replace(/\s+/g, " ").trim().slice(0, 80),
-  });
+  // [2026-09-18 변경 — 게재가 막혔을 때 원인을 못 찾던 문제]
+  // 예전에는 여기서 "수신했다"는 사실만 기록하고 끝냈습니다. 그래서 2026-09-18
+  // 처럼 "텔레그램 수집은 3분 전(정상)인데 뉴스 피드는 7시간째 멈춤" 상태가
+  // 되면, 메시지가 어느 단계에서 왜 버려지는지 알 방법이 전혀 없었습니다.
+  // 이제는 처리가 끝나는 모든 갈래에서 이 함수를 통해 결과까지 같이 남깁니다
+  // — 메시지 한 건당 Redis 쓰기는 예전과 똑같이 1회입니다(각 갈래에서 딱
+  // 한 번만 호출되므로).
+  const preview = rawText.replace(/\s+/g, " ").trim().slice(0, 80);
+  const logIngest = (outcome) =>
+    recordRun(redis, RUN_TELEGRAM, { channel, messageId, preview, ...outcome });
 
   const key = telegramMessageKey(channel, messageId);
   const alreadySeen = await redis.get(key);
   if (alreadySeen) {
+    await logIngest({ stage: "중복", reason: "이미 처리된 메시지" });
     return Response.json({ published: false, reason: "이미 처리된 메시지" });
   }
 
   if (isAdTaggedMessage(cleanLeadingNoise(rawText))) {
     await redis.set(key, "1", { ex: SEEN_TTL_SECONDS });
+    await logIngest({ stage: "제외", reason: "광고성 태그" });
     return Response.json({ published: false, reason: "광고성 태그로 제외됨" });
   }
 
@@ -370,6 +374,7 @@ export async function POST(request) {
   const articleUrl = extractArticleUrl(rawText);
   if (!articleUrl) {
     await redis.set(key, "1", { ex: SEEN_TTL_SECONDS });
+    await logIngest({ stage: "제외", reason: "뉴스 링크 없음" });
     return Response.json({ published: false, reason: "뉴스 링크 없음" });
   }
 
@@ -400,30 +405,49 @@ export async function POST(request) {
     if (!summary) summary = meta.summary || "";
   }
 
+  // [2026-09-18 추가 — AI 비용 절감] AI를 부르기 전에, 이 기사에 붙일 만한
+  // 종목 후보가 하나라도 있는지 공짜로 먼저 확인합니다. 후보가 아예 없으면
+  // 어차피 관련주를 못 붙여서 게재되지 않을 메시지이므로, AI를 한 번도 부르지
+  // 않고 여기서 끝냅니다(잡담·공지·해외 일반뉴스 등이 여기서 걸러집니다).
+  const universe = await getCachedUniverse(redis);
+  if (!universe) {
+    await logIngest({ stage: "오류", step: "시세 목록(KRX) 가져오기", error: "getCachedUniverse가 null을 반환" });
+    return Response.json(
+      { error: "시세 데이터를 가져오지 못했습니다 (KRX 시세 목록을 만들지 못함)." },
+      { status: 500 }
+    );
+  }
+
+  const candidates = extractMatchCandidates(title, summary, universe.companyList);
+  if (candidates.stockCount === 0) {
+    await redis.set(key, "1", { ex: SEEN_TTL_SECONDS });
+    await logIngest({
+      stage: "제외",
+      reason: "후보 종목 없음(AI 호출 안 함)",
+      title: String(title).slice(0, 80),
+    });
+    return Response.json({ published: false, reason: "관련 종목 후보 없음" });
+  }
+
   let passesFilter = false;
   try {
     passesFilter = await isMarketMovingHeadline(title, summary);
   } catch (err) {
+    await logIngest({ stage: "오류", step: "재료성 판단(AI 호출)", error: String(err.message || err).slice(0, 300) });
     return Response.json({ error: "필터링 실패: " + String(err.message || err) }, { status: 500 });
   }
 
   if (!passesFilter) {
     await redis.set(key, "1", { ex: SEEN_TTL_SECONDS });
+    await logIngest({ stage: "제외", reason: "재료성 부족", title: String(title).slice(0, 80) });
     return Response.json({ published: false, reason: "재료성 부족으로 필터링됨" });
-  }
-
-  const universe = await getCachedUniverse(redis);
-  if (!universe) {
-    return Response.json(
-      { error: "시세 데이터를 가져오지 못했습니다 (네이버 시세 페이지 응답 오류)." },
-      { status: 500 }
-    );
   }
 
   let rawMatches = [];
   try {
     rawMatches = await matchStocks(title, summary, universe.companyList);
   } catch (err) {
+    await logIngest({ stage: "오류", step: "종목 매칭(AI 호출)", error: String(err.message || err).slice(0, 300) });
     return Response.json({ error: String(err.message || err) }, { status: 500 });
   }
 
@@ -431,6 +455,7 @@ export async function POST(request) {
   const matches = finalizeMatches(rawMatches, universe.priceMap);
 
   if (matches.length === 0) {
+    await logIngest({ stage: "제외", reason: "관련 종목/테마 없음", title: String(title).slice(0, 80) });
     return Response.json({ published: false, reason: "관련 종목/테마 없음" });
   }
 
@@ -454,11 +479,6 @@ export async function POST(request) {
     []
   );
 
-  // [2026-09-13 삭제 — 비용] 여기서 "게재됨"으로 기록을 한 번 더 덮어쓰고
-  // 있었는데(메시지 한 건당 Redis 쓰기 2회), 사실 그 정보는 이미 /health의
-  // "뉴스 피드" 항목(마지막 글 시각)에 그대로 나와 있어서 중복이었음.
-  // 위쪽 "수신" 기록 하나만 남기면, 두 값을 나란히 보는 것만으로
-  // "메시지는 들어오는데 게재가 안 된다"와 "게재까지 잘 되고 있다"를
-  // 똑같이 구분할 수 있음 — 메시지당 Redis 쓰기가 2회에서 1회로 줄어듦.
+  await logIngest({ stage: "게재", title: String(title).slice(0, 80), matchCount: matches.length });
   return Response.json(result);
 }

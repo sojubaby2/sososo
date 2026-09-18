@@ -50,8 +50,14 @@ function summarize(check) {
       return `마지막 수신: ${formatKst(check.latestAt)} ${formatAgo(check.minutesAgo)}`;
     case "poll":
       return `마지막 실행: ${formatKst(check.latestAt)} ${formatAgo(check.minutesAgo)}`;
+    // [2026-09-18 수정] 화면에 "계산 시각: 기록 없음 · 패턴 0종"이라고 잘못
+    // 뜨던 문제. 서버 쪽에서 이 항목을 가볍게 바꾸면서(수백 KB짜리 캐시를
+    // 통째로 읽지 않고 남은 유효시간만 물어보도록) latestAt·patternCount를
+    // 더 이상 안 내려주는데, 화면은 그 두 값을 계속 쓰고 있었음.
     case "patterns":
-      return `계산 시각: ${formatKst(check.latestAt)} (${formatAgo(check.minutesAgo)}) · 패턴 ${check.patternCount ?? 0}종`;
+      return check.minutesAgo === null || check.minutesAgo === undefined
+        ? "저장된 결과가 없습니다 — 다음 30분 자동작업에서 새로 계산됩니다"
+        : `${formatAgo(check.minutesAgo)} 계산됨`;
     case "history":
       return `${check.storedDays ?? 0}일 / 목표 ${check.targetDays ?? "?"}일 · 최신 데이터: ${check.newestBasDt || "없음"}`;
     case "dailyReview":
