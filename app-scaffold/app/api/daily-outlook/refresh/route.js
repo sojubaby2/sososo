@@ -56,13 +56,32 @@ export async function GET(request) {
     const result = await refreshDailyOutlook(redis);
 
     if (!result.ok) {
+      // [2026-09-22 확대] 예전엔 newsCount·rawPickCount만 남겼는데, 그걸로는
+      // "AI가 왜 빈 결과를 냈는지"를 끝까지 좁힐 수 없었습니다(2026-09-14,
+      // 09-22 두 번 연속 같은 기록만 남고 원인을 못 찾음). 그래서 판단에
+      // 필요한 값을 전부 같이 남깁니다:
+      //  · gainerCount/loserCount = Alpha Vantage에서 미국장 등락 종목을
+      //    실제로 받아왔는지 (0이면 재료 자체가 없었다는 뜻 — AI 문제가 아님)
+      //  · parseFailed = AI 응답이 JSON으로 안 읽힌 것인지
+      //  · rejectedCount/rejectedSample = 테마명이 정식 목록과 안 맞아서
+      //    걸러진 것인지 (이게 원인이면 프롬프트를 고쳐야 함)
+      //  · retriedWithWideTopics = 넓은 범위로 한 번 더 시도했는지
+      //  · responsePreview = AI가 실제로 뭐라고 답했는지 앞부분
+      const d = result.debug || {};
       await recordRun(redis, RUN_DAILY_OUTLOOK, {
         ok: false,
         skipped: true,
         reason: result.reason || null,
-        weekend: result.debug?.weekend ?? null,
-        newsCount: result.debug?.newsCount ?? null,
-        rawPickCount: result.debug?.rawPickCount ?? null,
+        weekend: d.weekend ?? null,
+        gainerCount: d.gainerCount ?? null,
+        loserCount: d.loserCount ?? null,
+        newsCount: d.newsCount ?? null,
+        rawPickCount: d.rawPickCount ?? null,
+        parseFailed: d.parseFailed ?? null,
+        rejectedCount: Array.isArray(d.rejected) ? d.rejected.length : null,
+        rejectedSample: Array.isArray(d.rejected) ? d.rejected.slice(0, 3) : null,
+        retriedWithWideTopics: d.retriedWithWideTopics ?? false,
+        responsePreview: typeof d.responsePreview === "string" ? d.responsePreview.slice(0, 200) : null,
       });
       return Response.json({
         ok: false,

@@ -19,9 +19,8 @@
 import { getRedis } from "../../../lib/redis";
 import { getStoredDayCount, getStoredDatesAscending, HISTORY_LOOKBACK_DAYS } from "../../../lib/priceHistory";
 import { RESULTS_CACHE_KEY, RESULTS_CACHE_TTL_SECONDS } from "../../../lib/patternsScan";
-import { listDailyReviewDates } from "../../../lib/dailyReview";
 import { getCachedDailyOutlook } from "../../../lib/dailyOutlook";
-import { readRun, RUN_POLL, RUN_TELEGRAM, RUN_DAILY_REVIEW, RUN_DAILY_OUTLOOK } from "../../../lib/runStatus";
+import { readRun, RUN_POLL, RUN_TELEGRAM, RUN_DAILY_OUTLOOK } from "../../../lib/runStatus";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -192,26 +191,11 @@ export async function GET(request) {
     report.checks.push({ key: "history", label: "시세 히스토리", level: "red", error: String(err?.message || err) });
   }
 
-  // ── 6) 마감시황 ─────────────────────────────────────────────────
-  try {
-    const [dates, run] = await Promise.all([
-      listDailyReviewDates(redis, 999).catch(() => []),
-      readRun(redis, RUN_DAILY_REVIEW),
-    ]);
-    report.checks.push({
-      key: "dailyReview",
-      label: "마감시황",
-      level: dates.length > 0 ? "ok" : "red",
-      postCount: dates.length,
-      latestDate: dates[0] || null,
-      lastRun: run || null,
-      hint: "글이 0건이면 cron-job.org의 /api/daily-review/refresh 작업(평일 저녁 9시)이 등록 안 됐거나 실패하고 있습니다.",
-    });
-  } catch (err) {
-    report.checks.push({ key: "dailyReview", label: "마감시황", level: "red", error: String(err?.message || err) });
-  }
+  // [2026-09-22] 여기에 "마감시황" 점검이 있었는데, 기능 자체를 없애면서
+  // 같이 제거했습니다(KRX가 그날 시세를 저녁까지 안 올려줘서 글이 제대로
+  // 쌓이지 않았고, 재성님 결정으로 기능을 통째로 걷어냈습니다).
 
-  // ── 7) 오늘의 전망 ──────────────────────────────────────────────
+  // ── 6) 오늘의 전망 ──────────────────────────────────────────────
   try {
     const [outlook, run] = await Promise.all([
       getCachedDailyOutlook(redis).catch(() => null),
@@ -232,7 +216,7 @@ export async function GET(request) {
     report.checks.push({ key: "dailyOutlook", label: "오늘의 전망", level: "red", error: String(err?.message || err) });
   }
 
-  // ── 8) 환경변수 (secret을 붙였을 때만) ──────────────────────────
+  // ── 7) 환경변수 (secret을 붙였을 때만) ──────────────────────────
   if (showEnv) {
     const names = [
       "KV_REST_API_URL",

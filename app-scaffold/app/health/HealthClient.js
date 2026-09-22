@@ -60,8 +60,6 @@ function summarize(check) {
         : `${formatAgo(check.minutesAgo)} 계산됨`;
     case "history":
       return `${check.storedDays ?? 0}일 / 목표 ${check.targetDays ?? "?"}일 · 최신 데이터: ${check.newestBasDt || "없음"}`;
-    case "dailyReview":
-      return `글 ${check.postCount ?? 0}건 · 최신: ${check.latestDate || "없음"}`;
     case "dailyOutlook":
       return `${check.dateLabel || "-"} · 생성 시각: ${formatKst(check.latestAt)} (${formatAgo(check.minutesAgo)})`;
     default:

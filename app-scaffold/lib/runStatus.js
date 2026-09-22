@@ -27,10 +27,10 @@ const TTL_SECONDS = 60 * 60 * 24 * 14;
 // 작업 이름(=Redis 키 이름) 상수. 오타로 다른 키에 쓰는 걸 막으려고 모아둠.
 export const RUN_POLL = "poll";
 export const RUN_TELEGRAM = "telegram";
-export const RUN_DAILY_REVIEW = "daily-review";
 export const RUN_DAILY_OUTLOOK = "daily-outlook";
 
-export const ALL_RUN_NAMES = [RUN_POLL, RUN_TELEGRAM, RUN_DAILY_REVIEW, RUN_DAILY_OUTLOOK];
+// [2026-09-22] 마감시황(RUN_DAILY_REVIEW)은 기능 자체를 없애면서 같이 뺐습니다.
+export const ALL_RUN_NAMES = [RUN_POLL, RUN_TELEGRAM, RUN_DAILY_OUTLOOK];
 
 // name: 위 상수 중 하나. detail: 자유로운 객체(결과 요약, 에러 메시지 등).
 // 항상 현재 시각(at)을 같이 넣어줌.
