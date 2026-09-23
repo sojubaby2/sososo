@@ -695,6 +695,231 @@ function UnsplitShareIcon() {
   );
 }
 
+// [2026-09-23 추가] 4차 20편용 아이콘.
+
+function InvisibleHandIcon() {
+  return (
+    <svg viewBox="0 0 64 64" fill="none">
+      <path className="demo-fade-in" d="M22 44 L22 26 a3 3 0 0 1 6 0 l0 -6 a3 3 0 0 1 6 0 l0 4 a3 3 0 0 1 6 0 l0 5 a3 3 0 0 1 5 2 l0 9 a10 10 0 0 1 -10 10 l-6 0 a9 9 0 0 1 -7 -4 Z" stroke="currentColor" strokeWidth="2.4" strokeLinejoin="round" strokeDasharray="4 4" opacity="0.7" />
+      <circle className="demo-dot-pop" cx="18" cy="17" r="2.6" fill="currentColor" style={{ animationDelay: "160ms" }} />
+      <circle className="demo-dot-pop" cx="48" cy="15" r="2.2" fill="currentColor" opacity="0.7" style={{ animationDelay: "250ms" }} />
+      <circle className="demo-dot-pop" cx="52" cy="44" r="2.2" fill="currentColor" opacity="0.55" style={{ animationDelay: "340ms" }} />
+    </svg>
+  );
+}
+
+function NobelMedalIcon() {
+  return (
+    <svg viewBox="0 0 64 64" fill="none">
+      <path className="demo-fade-in" d="M24 10 L28 28 M40 10 L36 28" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+      <circle className="demo-dot-pop" cx="32" cy="40" r="15" stroke="currentColor" strokeWidth="3" style={{ animationDelay: "140ms" }} />
+      <circle className="demo-dot-pop" cx="32" cy="40" r="7" fill="currentColor" opacity="0.85" style={{ animationDelay: "260ms" }} />
+      <path className="demo-draw-line" d="M14 12 L18 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" opacity="0.5" style={{ animationDelay: "360ms" }} />
+    </svg>
+  );
+}
+
+function GoldChainBreakIcon() {
+  return (
+    <svg viewBox="0 0 64 64" fill="none">
+      <path className="demo-fade-in" d="M12 34 L22 26 L48 26 L52 34 L42 42 L16 42 Z" stroke="currentColor" strokeWidth="2.8" strokeLinejoin="round" />
+      <path className="demo-dot-pop" d="M24 16 a6 6 0 0 1 8 0" stroke="currentColor" strokeWidth="3" strokeLinecap="round" style={{ animationDelay: "160ms" }} />
+      <path className="demo-dot-pop" d="M38 16 a6 6 0 0 0 -3 -2" stroke="currentColor" strokeWidth="3" strokeLinecap="round" opacity="0.5" style={{ animationDelay: "250ms" }} />
+      <path className="demo-draw-line" d="M40 48 L52 56" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" opacity="0.6" style={{ animationDelay: "340ms" }} />
+    </svg>
+  );
+}
+
+function MediciCrestIcon() {
+  return (
+    <svg viewBox="0 0 64 64" fill="none">
+      <path className="demo-fade-in" d="M16 12 L48 12 L48 34 a16 18 0 0 1 -16 18 a16 18 0 0 1 -16 -18 Z" stroke="currentColor" strokeWidth="2.8" strokeLinejoin="round" />
+      <circle className="demo-dot-pop" cx="26" cy="24" r="4" fill="currentColor" style={{ animationDelay: "150ms" }} />
+      <circle className="demo-dot-pop" cx="38" cy="24" r="4" fill="currentColor" style={{ animationDelay: "230ms" }} />
+      <circle className="demo-dot-pop" cx="32" cy="35" r="4" fill="currentColor" opacity="0.8" style={{ animationDelay: "310ms" }} />
+    </svg>
+  );
+}
+
+function CoffeeHouseIcon() {
+  return (
+    <svg viewBox="0 0 64 64" fill="none">
+      <path className="demo-fade-in" d="M14 26 L44 26 L42 46 a6 6 0 0 1 -6 5 L22 51 a6 6 0 0 1 -6 -5 Z" stroke="currentColor" strokeWidth="2.8" strokeLinejoin="round" />
+      <path className="demo-dot-pop" d="M44 30 L50 30 a6 6 0 0 1 0 12 L43 42" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" style={{ animationDelay: "170ms" }} />
+      <path className="demo-draw-line" d="M24 18 q3 -4 0 -8 M32 18 q3 -4 0 -8 M40 18 q3 -4 0 -8" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" opacity="0.6" style={{ animationDelay: "290ms" }} />
+    </svg>
+  );
+}
+
+function PickaxeRivetIcon() {
+  return (
+    <svg viewBox="0 0 64 64" fill="none">
+      <path className="demo-fade-in" d="M14 20 q18 -10 36 0" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+      <line className="demo-draw-line" x1="32" y1="15" x2="32" y2="50" stroke="currentColor" strokeWidth="3" strokeLinecap="round" style={{ animationDelay: "160ms" }} />
+      <circle className="demo-dot-pop" cx="18" cy="44" r="3.4" fill="currentColor" style={{ animationDelay: "260ms" }} />
+      <circle className="demo-dot-pop" cx="46" cy="44" r="3.4" fill="currentColor" opacity="0.75" style={{ animationDelay: "340ms" }} />
+    </svg>
+  );
+}
+
+function RailTrackIcon() {
+  return (
+    <svg viewBox="0 0 64 64" fill="none">
+      <path className="demo-fade-in" d="M22 54 L28 14 M42 54 L36 14" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+      <line className="demo-dot-pop" x1="20" y1="46" x2="44" y2="46" stroke="currentColor" strokeWidth="3" strokeLinecap="round" style={{ animationDelay: "140ms" }} />
+      <line className="demo-dot-pop" x1="23" y1="34" x2="41" y2="34" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" opacity="0.75" style={{ animationDelay: "230ms" }} />
+      <line className="demo-dot-pop" x1="26" y1="23" x2="38" y2="23" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" opacity="0.5" style={{ animationDelay: "320ms" }} />
+    </svg>
+  );
+}
+
+function SplitBarrelIcon() {
+  return (
+    <svg viewBox="0 0 64 64" fill="none">
+      <path className="demo-fade-in" d="M22 14 q-8 18 0 36 L28 50 L28 14 Z" stroke="currentColor" strokeWidth="2.8" strokeLinejoin="round" />
+      <path className="demo-fade-in" d="M42 14 q8 18 0 36 L36 50 L36 14 Z" stroke="currentColor" strokeWidth="2.8" strokeLinejoin="round" style={{ animationDelay: "120ms" }} />
+      <line className="demo-draw-line" x1="32" y1="8" x2="32" y2="56" stroke="currentColor" strokeWidth="2" strokeDasharray="4 4" opacity="0.6" style={{ animationDelay: "260ms" }} />
+    </svg>
+  );
+}
+
+function OilTankIcon() {
+  return (
+    <svg viewBox="0 0 64 64" fill="none">
+      <path className="demo-fade-in" d="M14 18 L50 18 L50 48 a4 4 0 0 1 -4 4 L18 52 a4 4 0 0 1 -4 -4 Z" stroke="currentColor" strokeWidth="2.8" strokeLinejoin="round" />
+      <rect className="demo-dot-pop" x="15" y="24" width="34" height="5" rx="2" fill="currentColor" style={{ animationDelay: "160ms" }} />
+      <path className="demo-dot-pop" d="M16 36 q8 -4 16 0 q8 4 16 0" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" opacity="0.6" style={{ animationDelay: "260ms" }} />
+      <path className="demo-dot-pop" d="M16 44 q8 -4 16 0 q8 4 16 0" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" opacity="0.45" style={{ animationDelay: "340ms" }} />
+    </svg>
+  );
+}
+
+function PoundBreakIcon() {
+  return (
+    <svg viewBox="0 0 64 64" fill="none">
+      <circle className="demo-fade-in" cx="32" cy="32" r="21" stroke="currentColor" strokeWidth="2.6" opacity="0.6" />
+      <path className="demo-dot-pop" d="M37 20 a7 7 0 0 0 -11 6 L26 42 L22 42 M22 33 L34 33 M22 42 L42 42" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ animationDelay: "160ms" }} />
+      <path className="demo-draw-line" d="M46 12 L38 26 L48 30 L40 46" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" opacity="0.55" style={{ animationDelay: "320ms" }} />
+    </svg>
+  );
+}
+
+function WhaleIcon() {
+  return (
+    <svg viewBox="0 0 64 64" fill="none">
+      <path className="demo-fade-in" d="M10 38 q10 -14 26 -14 q16 0 18 12 q-6 8 -18 8 q-16 0 -26 -6 Z" stroke="currentColor" strokeWidth="2.8" strokeLinejoin="round" />
+      <path className="demo-dot-pop" d="M54 36 L60 28 L60 46 Z" fill="currentColor" opacity="0.8" style={{ animationDelay: "180ms" }} />
+      <circle className="demo-dot-pop" cx="22" cy="34" r="2.4" fill="currentColor" style={{ animationDelay: "280ms" }} />
+      <path className="demo-draw-line" d="M32 22 q2 -6 6 -8" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" opacity="0.55" style={{ animationDelay: "360ms" }} />
+    </svg>
+  );
+}
+
+function HiddenStakeIcon() {
+  return (
+    <svg viewBox="0 0 64 64" fill="none">
+      <rect className="demo-fade-in" x="12" y="40" width="12" height="14" rx="2" fill="currentColor" opacity="0.85" />
+      <rect className="demo-dot-pop" x="26" y="30" width="12" height="24" rx="2" fill="currentColor" opacity="0.6" style={{ animationDelay: "140ms" }} />
+      <rect className="demo-dot-pop" x="40" y="16" width="12" height="38" rx="2" stroke="currentColor" strokeWidth="2.6" strokeDasharray="4 4" style={{ animationDelay: "240ms" }} />
+      <path className="demo-draw-line" d="M10 12 L54 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" opacity="0.4" style={{ animationDelay: "340ms" }} />
+    </svg>
+  );
+}
+
+function SaltedSampleIcon() {
+  return (
+    <svg viewBox="0 0 64 64" fill="none">
+      <path className="demo-fade-in" d="M26 10 L26 34 L18 50 a4 4 0 0 0 4 6 L42 56 a4 4 0 0 0 4 -6 L38 34 L38 10" stroke="currentColor" strokeWidth="2.8" strokeLinejoin="round" />
+      <line className="demo-dot-pop" x1="23" y1="10" x2="41" y2="10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" style={{ animationDelay: "140ms" }} />
+      <circle className="demo-dot-pop" cx="30" cy="48" r="2.6" fill="currentColor" style={{ animationDelay: "240ms" }} />
+      <circle className="demo-dot-pop" cx="37" cy="45" r="2" fill="currentColor" opacity="0.7" style={{ animationDelay: "320ms" }} />
+      <circle className="demo-dot-pop" cx="33" cy="53" r="1.8" fill="currentColor" opacity="0.5" style={{ animationDelay: "400ms" }} />
+    </svg>
+  );
+}
+
+function TooSmoothLineIcon() {
+  return (
+    <svg viewBox="0 0 64 64" fill="none">
+      <path className="demo-fade-in" d="M10 48 L54 18" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" />
+      <path className="demo-dot-pop" d="M10 52 q10 -4 16 -10 q8 -8 12 -6 q8 4 16 -12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeDasharray="4 4" opacity="0.5" style={{ animationDelay: "200ms" }} />
+      <circle className="demo-dot-pop" cx="54" cy="18" r="3.4" fill="currentColor" style={{ animationDelay: "320ms" }} />
+      <path className="demo-draw-line" d="M8 56 L56 56" stroke="currentColor" strokeWidth="2" strokeLinecap="round" opacity="0.4" style={{ animationDelay: "400ms" }} />
+    </svg>
+  );
+}
+
+function BloodDropIcon() {
+  return (
+    <svg viewBox="0 0 64 64" fill="none">
+      <path className="demo-fade-in" d="M32 10 q14 18 14 26 a14 14 0 0 1 -28 0 q0 -8 14 -26 Z" stroke="currentColor" strokeWidth="2.8" strokeLinejoin="round" />
+      <path className="demo-dot-pop" d="M24 38 a8 8 0 0 0 8 8" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" opacity="0.6" style={{ animationDelay: "180ms" }} />
+      <path className="demo-draw-line" d="M44 14 L56 26 M56 14 L44 26" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" opacity="0.55" style={{ animationDelay: "300ms" }} />
+    </svg>
+  );
+}
+
+function EmptyLedgerIcon() {
+  return (
+    <svg viewBox="0 0 64 64" fill="none">
+      <rect className="demo-fade-in" x="12" y="12" width="40" height="40" rx="4" stroke="currentColor" strokeWidth="2.8" />
+      <line className="demo-dot-pop" x1="20" y1="24" x2="44" y2="24" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" opacity="0.6" style={{ animationDelay: "150ms" }} />
+      <line className="demo-dot-pop" x1="20" y1="32" x2="36" y2="32" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" opacity="0.4" style={{ animationDelay: "230ms" }} />
+      <circle className="demo-dot-pop" cx="38" cy="42" r="8" stroke="currentColor" strokeWidth="2.8" style={{ animationDelay: "310ms" }} />
+      <line className="demo-draw-line" x1="33" y1="47" x2="43" y2="37" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" style={{ animationDelay: "400ms" }} />
+    </svg>
+  );
+}
+
+function SharedDeskIcon() {
+  return (
+    <svg viewBox="0 0 64 64" fill="none">
+      <line className="demo-fade-in" x1="8" y1="34" x2="56" y2="34" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" />
+      <line className="demo-dot-pop" x1="16" y1="34" x2="16" y2="50" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" style={{ animationDelay: "140ms" }} />
+      <line className="demo-dot-pop" x1="48" y1="34" x2="48" y2="50" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" style={{ animationDelay: "220ms" }} />
+      <circle className="demo-dot-pop" cx="22" cy="22" r="5" stroke="currentColor" strokeWidth="2.6" style={{ animationDelay: "300ms" }} />
+      <circle className="demo-dot-pop" cx="40" cy="22" r="5" stroke="currentColor" strokeWidth="2.6" opacity="0.6" style={{ animationDelay: "380ms" }} />
+    </svg>
+  );
+}
+
+function CandyBarPhoneIcon() {
+  return (
+    <svg viewBox="0 0 64 64" fill="none">
+      <rect className="demo-fade-in" x="20" y="8" width="24" height="48" rx="5" stroke="currentColor" strokeWidth="2.8" />
+      <rect className="demo-dot-pop" x="25" y="14" width="14" height="10" rx="2" fill="currentColor" opacity="0.8" style={{ animationDelay: "150ms" }} />
+      <circle className="demo-dot-pop" cx="27" cy="33" r="2" fill="currentColor" style={{ animationDelay: "230ms" }} />
+      <circle className="demo-dot-pop" cx="32" cy="33" r="2" fill="currentColor" style={{ animationDelay: "280ms" }} />
+      <circle className="demo-dot-pop" cx="37" cy="33" r="2" fill="currentColor" style={{ animationDelay: "330ms" }} />
+      <circle className="demo-dot-pop" cx="27" cy="41" r="2" fill="currentColor" opacity="0.6" style={{ animationDelay: "380ms" }} />
+      <circle className="demo-dot-pop" cx="32" cy="41" r="2" fill="currentColor" opacity="0.6" style={{ animationDelay: "420ms" }} />
+      <circle className="demo-dot-pop" cx="37" cy="41" r="2" fill="currentColor" opacity="0.6" style={{ animationDelay: "460ms" }} />
+    </svg>
+  );
+}
+
+function FilmCameraIcon() {
+  return (
+    <svg viewBox="0 0 64 64" fill="none">
+      <path className="demo-fade-in" d="M10 22 L22 22 L26 16 L38 16 L42 22 L54 22 a3 3 0 0 1 3 3 L57 47 a3 3 0 0 1 -3 3 L10 50 a3 3 0 0 1 -3 -3 L7 25 a3 3 0 0 1 3 -3 Z" stroke="currentColor" strokeWidth="2.6" strokeLinejoin="round" />
+      <circle className="demo-dot-pop" cx="32" cy="35" r="10" stroke="currentColor" strokeWidth="2.8" style={{ animationDelay: "170ms" }} />
+      <circle className="demo-dot-pop" cx="32" cy="35" r="4" fill="currentColor" opacity="0.8" style={{ animationDelay: "280ms" }} />
+      <rect className="demo-dot-pop" x="46" y="27" width="6" height="4" rx="1.5" fill="currentColor" opacity="0.6" style={{ animationDelay: "360ms" }} />
+    </svg>
+  );
+}
+
+function SodaCanIcon() {
+  return (
+    <svg viewBox="0 0 64 64" fill="none">
+      <path className="demo-fade-in" d="M22 14 L42 14 L40 50 a3 3 0 0 1 -3 3 L27 53 a3 3 0 0 1 -3 -3 Z" stroke="currentColor" strokeWidth="2.8" strokeLinejoin="round" />
+      <ellipse className="demo-dot-pop" cx="32" cy="14" rx="10" ry="3.4" stroke="currentColor" strokeWidth="2.6" style={{ animationDelay: "150ms" }} />
+      <path className="demo-dot-pop" d="M24 28 q8 -5 16 0" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" style={{ animationDelay: "250ms" }} />
+      <path className="demo-dot-pop" d="M25 36 q7 -5 14 0" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" opacity="0.55" style={{ animationDelay: "340ms" }} />
+    </svg>
+  );
+}
+
 // slug -> { Icon, tone } — tone은 배경색 톤(사이트 기존 색상 토큰 재사용).
 const THUMBNAILS = {
   "big-mac-index": { Icon: BigMacIcon, tone: "amber" },
@@ -758,6 +983,28 @@ const THUMBNAILS = {
   "hunt-brothers-silver-thursday": { Icon: SilverBarsIcon, tone: "down" },
   "dogecoin-was-a-joke": { Icon: DogeCoinIcon, tone: "up" },
   "berkshire-hathaway-no-stock-split": { Icon: UnsplitShareIcon, tone: "green" },
+
+  // [2026-09-23 추가] 4차 20편
+  "adam-smith-invisible-hand": { Icon: InvisibleHandIcon, tone: "green" },
+  "nobel-economics-prize": { Icon: NobelMedalIcon, tone: "amber" },
+  "gold-standard-collapse": { Icon: GoldChainBreakIcon, tone: "down" },
+  "medici-bank": { Icon: MediciCrestIcon, tone: "green" },
+  "lloyds-coffeehouse": { Icon: CoffeeHouseIcon, tone: "amber" },
+  "california-gold-rush-levis": { Icon: PickaxeRivetIcon, tone: "amber" },
+  "railway-mania": { Icon: RailTrackIcon, tone: "down" },
+  "standard-oil-breakup": { Icon: SplitBarrelIcon, tone: "green" },
+  "salad-oil-swindle": { Icon: OilTankIcon, tone: "bad" },
+  "soros-black-wednesday": { Icon: PoundBreakIcon, tone: "down" },
+  "london-whale-2012": { Icon: WhaleIcon, tone: "down" },
+  "archegos-2021": { Icon: HiddenStakeIcon, tone: "bad" },
+  "bre-x-gold-fraud": { Icon: SaltedSampleIcon, tone: "bad" },
+  "madoff-ponzi": { Icon: TooSmoothLineIcon, tone: "bad" },
+  "theranos-blood-test": { Icon: BloodDropIcon, tone: "bad" },
+  "wirecard-scandal": { Icon: EmptyLedgerIcon, tone: "bad" },
+  "wework-ipo": { Icon: SharedDeskIcon, tone: "down" },
+  "nokia-fall": { Icon: CandyBarPhoneIcon, tone: "amber" },
+  "kodak-digital-camera": { Icon: FilmCameraIcon, tone: "amber" },
+  "new-coke-1985": { Icon: SodaCanIcon, tone: "up" },
 };
 
 export default function BlogThumbnail({ slug, size = "small" }) {
