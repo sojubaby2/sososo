@@ -46,8 +46,17 @@ function summarize(check) {
   switch (check.key) {
     case "feed":
       return `저장된 글 ${check.count ?? "?"}건 · 가장 최근 글: ${formatKst(check.latestAt)} (${formatAgo(check.minutesAgo)})`;
-    case "telegram":
-      return `마지막 수신: ${formatKst(check.latestAt)} ${formatAgo(check.minutesAgo)}`;
+    // [2026-09-28 수정] 예전엔 "마지막 수신 시각"만 보여줬는데, 그러면
+    // 메시지는 잘 들어오는데 그 다음 처리에서 전부 실패하는 상황(API 키 만료
+    // 등)이 화면에 전혀 안 나타났습니다. 이제 마지막 기록이 오류면 어느
+    // 단계에서 무슨 에러가 났는지를 바로 같이 보여줍니다.
+    case "telegram": {
+      const base = `마지막 수신: ${formatKst(check.latestAt)} ${formatAgo(check.minutesAgo)}`;
+      if (!check.lastError) {
+        return check.lastStage ? `${base} · 처리 결과: ${check.lastStage}` : base;
+      }
+      return `${base}\n실패한 단계: ${check.lastStep || "알 수 없음"}\n마지막 오류: ${check.lastError}`;
+    }
     case "poll":
       return `마지막 실행: ${formatKst(check.latestAt)} ${formatAgo(check.minutesAgo)}`;
     // [2026-09-18 수정] 화면에 "계산 시각: 기록 없음 · 패턴 0종"이라고 잘못
@@ -206,7 +215,10 @@ export default function HealthClient() {
               <span style={{ fontSize: 12, color: s.text, opacity: 0.8, marginLeft: "auto" }}>{s.label}</span>
             </div>
 
-            <div style={{ fontSize: 13, color: "#444", marginTop: 8, lineHeight: 1.6 }}>
+            {/* whiteSpace: pre-line — 위 summarize()가 줄바꿈을 넣어 돌려주는
+                경우(텔레그램 수집 오류 등)에 그 줄바꿈이 화면에도 그대로
+                보이게 하기 위함입니다. */}
+            <div style={{ fontSize: 13, color: "#444", marginTop: 8, lineHeight: 1.6, whiteSpace: "pre-line" }}>
               {check.error ? `오류: ${check.error}` : summarize(check)}
             </div>
 
@@ -271,6 +283,36 @@ export default function HealthClient() {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* [2026-09-28 추가] ?secret=... 을 붙여서 들어왔을 때만 나옵니다.
+          지금 서비스가 실제로 쓰고 있는 Claude API 키의 "지문"(앞뒤 몇 글자,
+          길이, 공백 여부)을 보여줘서, Vercel에 새 키가 제대로 반영됐는지를
+          눈으로 확인할 수 있게 합니다. 키 값 자체는 표시하지 않습니다. */}
+      {data?.anthropicKeyShape && (
+        <div
+          style={{
+            marginTop: 16,
+            padding: "14px 16px",
+            border: "1px solid #e5e5e5",
+            borderRadius: 12,
+            background: "#fafafa",
+          }}
+        >
+          <strong style={{ fontSize: 15}}>지금 서비스가 쓰고 있는 Claude API 키</strong>
+          <div style={{ fontSize: 13, marginTop: 10, lineHeight: 1.9 }}>
+            {Object.entries(data.anthropicKeyShape).map(([name, value]) => (
+              <div key={name} style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                <span>{name}</span>
+                <code style={{ fontSize: 12 }}>{String(value)}</code>
+              </div>
+            ))}
+          </div>
+          <p style={{ fontSize: 12, color: "#888", marginTop: 10, lineHeight: 1.6 }}>
+            미리보기가 앤트로픽 콘솔에 있는 새 키와 다르면 Vercel에 새 키가 아직 반영되지 않은 것입니다.
+            공백있음이 true면 붙여넣을 때 공백·줄바꿈이 같이 들어간 것입니다.
+          </p>
         </div>
       )}
 

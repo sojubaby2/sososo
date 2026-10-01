@@ -105,19 +105,35 @@ export async function GET(request) {
   }
 
   // ── 2) 텔레그램 수집 (마지막으로 메시지가 도착한 시각) ──────────
+  //
+  // [2026-09-28 수정] 재성님이 겪은 문제 — API 키가 죽어서 뉴스가 하루 넘게
+  // 한 건도 안 올라가는 동안에도 이 칸은 계속 초록불("정상")이었습니다.
+  // 판정 기준이 "메시지가 최근에 도착했는가" 하나뿐이었기 때문입니다.
+  // 메시지는 잘 도착했고, 그 다음 AI 처리 단계에서 전부 터지고 있었는데
+  // 그게 겉으로 안 보였습니다(자세한 값을 펼쳐야만 보였음).
+  //
+  // 그래서 마지막 기록의 stage가 "오류"면 무조건 빨간불로 바꾸고, 그 에러
+  // 문구를 lastError로 겉에 같이 내려줍니다 — 이제 /health를 열면 펼쳐보지
+  // 않아도 "무엇이 왜 실패했는지"가 바로 보입니다.
   try {
     const run = await readRun(redis, RUN_TELEGRAM);
     const mins = minutesAgo(run?.at);
     const okMax = isWeekend || isQuietHours ? 60 * 24 * 3 : 180;
     const warnMax = isWeekend || isQuietHours ? 60 * 24 * 4 : 60 * 8;
+    const hadError = run?.stage === "오류";
     report.checks.push({
       key: "telegram",
       label: "텔레그램 수집",
-      level: level(mins, okMax, warnMax),
+      level: hadError ? "red" : level(mins, okMax, warnMax),
       latestAt: run?.at || null,
       minutesAgo: mins,
+      lastStage: run?.stage || null,
+      lastStep: run?.step || null,
+      lastError: hadError ? String(run?.error || "").slice(0, 300) : null,
       detail: run || null,
-      hint: "여기 시각이 안 움직이면 사이트가 아니라 오라클 서버 쪽 문제입니다. (이 기록은 2026-09-11 이후 배포분부터 쌓입니다)",
+      hint: hadError
+        ? "메시지는 잘 도착했는데 그 다음 처리에서 실패했습니다. 위 '마지막 오류' 문구를 보세요 — API key is invalid 계열이면 Vercel의 ANTHROPIC_API_KEY 값 문제입니다."
+        : "여기 시각이 안 움직이면 사이트가 아니라 오라클 서버 쪽 문제입니다. (이 기록은 2026-09-11 이후 배포분부터 쌓입니다)",
     });
   } catch (err) {
     report.checks.push({ key: "telegram", label: "텔레그램 수집", level: "red", error: String(err?.message || err) });
@@ -232,6 +248,31 @@ export async function GET(request) {
     ];
     report.env = {};
     for (const n of names) report.env[n] = process.env[n] ? "설정됨" : "없음";
+
+    // [2026-09-28 추가] "키를 새로 바꿨는데도 계속 같은 에러가 난다"를 끝내기
+    // 위한 확인용입니다. 실제 서비스가 지금 손에 쥐고 있는 ANTHROPIC_API_KEY가
+    // 진짜로 새 키인지, 아니면 예전 키 그대로인지를 눈으로 확인할 수 있게
+    // "지문"만 보여줍니다.
+    //
+    // 키 값 자체는 절대 안 보여줍니다 — 앞 15자리와 뒤 4자리만 남기고 가운데는
+    // 가립니다(앤트로픽 콘솔 화면이 키를 보여주는 방식과 같습니다). 이 정보는
+    // secret을 붙였을 때만 나옵니다.
+    //
+    // 무엇을 보면 되나:
+    //  · 미리보기(앞·뒤 글자)가 앤트로픽 콘솔의 새 키와 다르면 → Vercel에 새
+    //    키가 아직 반영되지 않은 것(환경 체크박스, 중복 등록, 재배포 누락)
+    //  · 공백있음 = true 이면 → 붙여넣을 때 앞뒤에 공백·줄바꿈이 딸려 들어간 것
+    //  · 길이가 콘솔 키보다 짧으면 → 키가 중간까지만 복사된 것
+    const rawKey = process.env.ANTHROPIC_API_KEY;
+    if (rawKey) {
+      const trimmed = rawKey.trim();
+      report.anthropicKeyShape = {
+        미리보기: `${trimmed.slice(0, 15)}...${trimmed.slice(-4)}`,
+        길이: trimmed.length,
+        "sk-ant-로시작": trimmed.startsWith("sk-ant-"),
+        공백있음: trimmed.length !== rawKey.length || /\s/.test(trimmed),
+      };
+    }
   } else {
     report.envNote = "환경변수 설정 여부까지 보려면 주소 뒤에 ?secret=<CRON_SECRET> 을 붙이세요.";
   }
