@@ -1,237 +1,28 @@
-"use client";
+// app/themes/page.js  (테마별 종목정리 — 서버 쪽)
+//
+// [2026-10-14 변경] 이 페이지는 홈·패턴검색만큼 심각하진 않았습니다. 테마
+// 목록 자체가 코드 안에 들어 있는 고정 데이터라, 크롤러도 테마 이름 146개는
+// 볼 수 있었습니다. 다만 두 가지가 비어 보였습니다.
+//   ① 종목 표가 "지금 펼쳐져 있는 테마" 하나만 HTML에 담겼습니다.
+//   ② 등락률이 전부 "—"로 나왔습니다(숫자는 브라우저가 나중에 불러옴).
+//   ③ 이 페이지가 무엇인지 설명하는 글이 한 줄도 없었습니다.
+//
+// 그래서 화면 코드는 app/themes/ThemesClient.js로 옮기고, 이 파일에서는
+// 검색엔진용 제목·설명(metadata)만 붙입니다. 설명 글과 전체 테마 목록은
+// ThemesClient.js 안에 고정 글로 넣어뒀습니다 — 고정 글이라 서버가 보내는
+// 첫 HTML에 그대로 담깁니다.
+//
+// 등락률 숫자는 그대로 브라우저가 불러옵니다. 숫자는 검색 노출에 중요하지
+// 않고, 매번 서버에서 계산하면 비용만 늘기 때문입니다.
 
-// This page fetches live data client-side, so it can't be meaningfully
-// prerendered at build time — see the matching note in app/page.js.
-export const dynamic = "force-dynamic";
+import ThemesClient from "./ThemesClient";
 
-import { Fragment, useEffect, useMemo, useState } from "react";
-import { Search, ShieldAlert, TrendingUp, TrendingDown, Minus } from "lucide-react";
-import Header from "../../components/Header";
-import { getThemesGrouped, isPoliticalTheme } from "../../lib/themeData";
-
-const THEMES = getThemesGrouped(); // [{ theme, stocks: [{theme,name,code,market}] }, ...]
-
-function ChangeTag({ value }) {
-  if (typeof value !== "number") return <span className="flat mono">—</span>;
-  const isUp = value > 0, isDown = value < 0;
-  const cls = isUp ? "up" : isDown ? "down" : "flat";
-  const Icon = isUp ? TrendingUp : isDown ? TrendingDown : Minus;
-  return (
-    <span className={`mono ${cls}`} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontWeight: 600 }}>
-      <Icon size={14} strokeWidth={2.5} />
-      {isUp ? "+" : ""}
-      {value.toFixed(1)}%
-    </span>
-  );
-}
+export const metadata = {
+  title: "테마별 종목정리 — 테마에 묶인 종목 한눈에 보기 | 뉴스매매",
+  description:
+    "반도체·2차전지·바이오 등 국내 증시 테마별로 어떤 종목이 묶여 있는지와 기간별 등락률을 정리했습니다. 테마 이름으로 검색해 관련 종목을 바로 확인할 수 있습니다.",
+};
 
 export default function ThemesPage() {
-  const [query, setQuery] = useState("");
-  const [selected, setSelected] = useState(THEMES[0]?.theme ?? "");
-  // 모바일 드롭다운이 "펼쳐져 있는지"만 따로 관리 — selected(데스크톱 오른쪽
-  // 패널/좌측 강조 표시용)는 항상 마지막으로 누른 테마를 유지하지만,
-  // 모바일에서는 같은 테마를 한 번 더 누르면 드롭다운만 접히고 selected는
-  // 그대로 둠(다시 열면 바로 그 테마가 보이도록).
-  const [expanded, setExpanded] = useState(THEMES[0]?.theme ?? "");
-  const [rawThemeChanges, setRawThemeChanges] = useState([]); // [{theme, change1W, change1M}, ...]
-  const [stockChanges1W, setStockChanges1W] = useState({}); // code -> change1W
-  const [stockChanges1M, setStockChanges1M] = useState({}); // code -> change1M
-  const [loadState, setLoadState] = useState("loading"); // loading | ready | error
-  const [range, setRange] = useState("1W"); // "1W" | "1M" — 재성님 요청으로 기본값을 1주일로 변경
-
-  // [2026-09-08 추가] 홈페이지 "국장 예측" 배너(components/DailyOutlookBanner.js)
-  // 에서 특정 테마 줄을 누르면 /themes?theme=반도체 처럼 쿼리스트링을 달고
-  // 들어오는데, 그 값이 있으면 처음부터 그 테마가 선택된 채로 보여줌(useState
-  // 함수를 그냥 window.location.search가 아니라 useEffect에서 나중에 읽는
-  // 이유: 이 페이지가 "use client"라 Next.js의 useSearchParams()를 쓰려면
-  // Suspense 경계가 필요한데, 그냥 브라우저 기본 API로 읽으면 그럴 필요가 없음).
-  useEffect(() => {
-    const themeParam = new URLSearchParams(window.location.search).get("theme");
-    if (themeParam && THEMES.some((t) => t.theme === themeParam)) {
-      setSelected(themeParam);
-      setExpanded(themeParam);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetch("/api/theme-momentum")
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.error || !data.themeChanges) {
-          setLoadState("error");
-          return;
-        }
-        setRawThemeChanges(data.themeChanges);
-        setStockChanges1W(data.stockChanges1W || {});
-        setStockChanges1M(data.stockChanges1M || {});
-        setLoadState("ready");
-      })
-      .catch(() => setLoadState("error"));
-  }, []);
-
-  const themeField = range === "1W" ? "change1W" : "change1M";
-  const rangeLabel = range === "1W" ? "1주일" : "1개월";
-
-  const themeChangeMap = useMemo(() => {
-    const map = {};
-    for (const t of rawThemeChanges) map[t.theme] = t[themeField];
-    return map;
-  }, [rawThemeChanges, themeField]);
-
-  const stockChangeMap = range === "1W" ? stockChanges1W : stockChanges1M;
-
-  const filteredThemes = useMemo(
-    () => THEMES.filter((t) => t.theme.toLowerCase().includes(query.toLowerCase())),
-    [query]
-  );
-
-  const selectedGroup = THEMES.find((t) => t.theme === selected) ?? THEMES[0];
-
-  // 종목 테이블 하나를 데스크톱 오른쪽 패널과 모바일 인라인 드롭다운
-  // 양쪽에서 그대로 재사용하기 위한 렌더 함수.
-  function renderThemeDetail(group, stocks) {
-    return (
-      <>
-        <div className="theme-heading">
-          <h2>{group.theme}</h2>
-          <span className="text-xs" style={{ color: "var(--ink-muted)", fontSize: 12 }}>{rangeLabel} 누적 등락률 기준</span>
-          {isPoliticalTheme(group.theme) && (
-            <span className="political-tag">
-              <ShieldAlert size={12} />정치테마주 — 사업 실적과 무관한 인맥 기반 편입, 투자 주의
-            </span>
-          )}
-        </div>
-
-        <table className="stock-table">
-          <thead>
-            <tr>
-              <th>종목명</th>
-              <th>코드</th>
-              <th>시장</th>
-              <th>{rangeLabel} 등락률</th>
-            </tr>
-          </thead>
-          <tbody>
-            {stocks.map((s) => (
-              <tr key={s.code}>
-                <td style={{ fontWeight: 500 }}>{s.name}</td>
-                <td className="mono" style={{ color: "var(--ink-muted)" }}>{s.code}</td>
-                <td><span className="market-tag">{s.market}</span></td>
-                <td><ChangeTag value={stockChangeMap[s.code]} /></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </>
-    );
-  }
-
-  function sortStocksFor(group) {
-    return [...group.stocks].sort((a, b) => {
-      const ca = stockChangeMap[a.code];
-      const cb = stockChangeMap[b.code];
-      const na = typeof ca === "number", nb = typeof cb === "number";
-      if (!na && !nb) return 0;
-      if (!na) return 1;
-      if (!nb) return -1;
-      return cb - ca;
-    });
-  }
-
-  // Hottest themes (highest change in the selected range) float to the top.
-  const sortedThemes = useMemo(() => {
-    return [...filteredThemes].sort((a, b) => {
-      const ca = themeChangeMap[a.theme];
-      const cb = themeChangeMap[b.theme];
-      const na = typeof ca === "number", nb = typeof cb === "number";
-      if (!na && !nb) return 0;
-      if (!na) return 1;
-      if (!nb) return -1;
-      return cb - ca;
-    });
-  }, [filteredThemes, themeChangeMap]);
-
-  // Within the selected theme, sort stocks by the same range's change — this
-  // is what stands in for a "대장주" leaderboard now that we don't show a
-  // same-day price/change (which looked live but wasn't). sortStocksFor is
-  // the same sort, reused for whichever theme's accordion is open on mobile.
-  const sortedStocks = useMemo(() => (selectedGroup ? sortStocksFor(selectedGroup) : []), [selectedGroup, stockChangeMap]);
-
-  return (
-    <div>
-      <Header />
-      <main className="container-wide" style={{ paddingTop: 32, paddingBottom: 32 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
-          <div className="search-box" style={{ marginBottom: 0 }}>
-            <Search size={16} />
-            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="테마 검색 (예: 반도체, 위고비, 호르무즈)" />
-          </div>
-          <div className="range-toggle">
-            <button
-              type="button"
-              className={`range-toggle-btn ${range === "1W" ? "active" : ""}`}
-              onClick={() => setRange("1W")}
-            >
-              1주일
-            </button>
-            <button
-              type="button"
-              className={`range-toggle-btn ${range === "1M" ? "active" : ""}`}
-              onClick={() => setRange("1M")}
-            >
-              1개월
-            </button>
-          </div>
-        </div>
-
-        {loadState === "error" && (
-          <p style={{ fontSize: 13, color: "var(--amber-tint-ink)", background: "var(--amber-tint)", padding: "8px 12px", borderRadius: 8, marginBottom: 16 }}>
-            시세 데이터를 잠시 불러오지 못했습니다. 잠시 후 새로고침해주세요. (테마·종목 목록은 정상 표시됩니다)
-          </p>
-        )}
-
-        <div className="theme-layout">
-          <aside>
-            <h2 className="section-title">전체 테마 ({sortedThemes.length}) · 🔥 {rangeLabel} 등락률 높은 순</h2>
-            <div className="theme-list">
-              {sortedThemes.map((t) => {
-                const isActive = selected === t.theme;
-                const isOpen = expanded === t.theme;
-                return (
-                  <Fragment key={t.theme}>
-                    <button
-                      onClick={() => {
-                        setSelected(t.theme);
-                        setExpanded((prev) => (prev === t.theme ? "" : t.theme));
-                      }}
-                      className={`theme-item ${isActive ? "active" : ""}`}
-                    >
-                      <span className="theme-item-name">
-                        {isPoliticalTheme(t.theme) && <ShieldAlert size={14} style={{ color: "var(--amber)" }} />}
-                        {t.theme}
-                      </span>
-                      <ChangeTag value={themeChangeMap[t.theme]} />
-                    </button>
-                    {/* 모바일 전용 인라인 드롭다운 — 데스크톱(768px 이상)에서는 CSS로 숨기고
-                        오른쪽 <section> 패널을 대신 씀. 화면 폭과 상관없이 항상 렌더는 되지만
-                        .open 클래스가 있어도 768px 이상에서는 globals.css가 display:none 처리함.
-                        같은 테마를 다시 누르면 isOpen만 꺼지고(접힘) selected는 유지됨. */}
-                    {isOpen && (
-                      <div className="theme-item-accordion open">
-                        {renderThemeDetail(t, sortStocksFor(t))}
-                      </div>
-                    )}
-                  </Fragment>
-                );
-              })}
-            </div>
-          </aside>
-
-          <section className="theme-detail-desktop">
-            {selectedGroup && renderThemeDetail(selectedGroup, sortedStocks)}
-          </section>
-        </div>
-      </main>
-    </div>
-  );
+  return <ThemesClient />;
 }
