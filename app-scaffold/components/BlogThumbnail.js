@@ -1092,6 +1092,97 @@ function MissingCoinsIcon() {
   );
 }
 
+// [2026-10-17 추가] 6차 8편(최근 사건편)용 아이콘.
+
+function CarryUnwindIcon() {
+  return (
+    <svg viewBox="0 0 64 64" fill="none">
+      <path className="demo-fade-in" d="M8 16 q10 2 18 8 q8 6 14 4 q8 -2 16 -14" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" opacity="0.5" />
+      <path className="demo-dot-pop" d="M8 26 L20 30 L30 26 L40 40 L52 56" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" style={{ animationDelay: "160ms" }} />
+      <circle className="demo-dot-pop" cx="52" cy="56" r="3.4" fill="currentColor" style={{ animationDelay: "300ms" }} />
+      <path className="demo-draw-line" d="M44 12 l5 -4 l0 9 Z" fill="currentColor" opacity="0.6" style={{ animationDelay: "380ms" }} />
+    </svg>
+  );
+}
+
+function LettuceClockIcon() {
+  return (
+    <svg viewBox="0 0 64 64" fill="none">
+      <path className="demo-fade-in" d="M32 14 a13 13 0 0 1 13 13 a13 13 0 0 1 -13 13 a13 13 0 0 1 -13 -13 a13 13 0 0 1 13 -13 Z" stroke="currentColor" strokeWidth="2.6" />
+      <path className="demo-dot-pop" d="M32 20 L32 27 L38 30" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" style={{ animationDelay: "160ms" }} />
+      <path className="demo-dot-pop" d="M20 46 q6 -6 12 -2 q6 -4 12 2 q-6 8 -12 8 q-6 0 -12 -8 Z" stroke="currentColor" strokeWidth="2.4" strokeLinejoin="round" opacity="0.65" style={{ animationDelay: "280ms" }} />
+      <path className="demo-draw-line" d="M32 44 L32 54" stroke="currentColor" strokeWidth="2" strokeLinecap="round" opacity="0.5" style={{ animationDelay: "380ms" }} />
+    </svg>
+  );
+}
+
+function UnfinishedTowerIcon() {
+  return (
+    <svg viewBox="0 0 64 64" fill="none">
+      <rect className="demo-fade-in" x="14" y="30" width="16" height="24" stroke="currentColor" strokeWidth="2.6" />
+      <rect className="demo-dot-pop" x="34" y="20" width="16" height="34" stroke="currentColor" strokeWidth="2.6" strokeDasharray="4 4" opacity="0.55" style={{ animationDelay: "150ms" }} />
+      <path className="demo-dot-pop" d="M18 36 L26 36 M18 42 L26 42 M18 48 L26 48" stroke="currentColor" strokeWidth="2" strokeLinecap="round" opacity="0.7" style={{ animationDelay: "250ms" }} />
+      <path className="demo-draw-line" d="M34 14 L52 14 M42 14 L42 20" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" opacity="0.6" style={{ animationDelay: "350ms" }} />
+      <line className="demo-dot-pop" x1="8" y1="54" x2="56" y2="54" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" style={{ animationDelay: "420ms" }} />
+    </svg>
+  );
+}
+
+function ChipFadeIcon() {
+  return (
+    <svg viewBox="0 0 64 64" fill="none">
+      <rect className="demo-fade-in" x="18" y="18" width="28" height="28" rx="3" stroke="currentColor" strokeWidth="2.8" />
+      <rect className="demo-dot-pop" x="27" y="27" width="10" height="10" rx="1.5" fill="currentColor" opacity="0.8" style={{ animationDelay: "160ms" }} />
+      <path className="demo-dot-pop" d="M24 18 L24 10 M32 18 L32 10 M40 18 L40 10" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" style={{ animationDelay: "250ms" }} />
+      <path className="demo-dot-pop" d="M24 46 L24 54 M32 46 L32 54 M40 46 L40 54" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" opacity="0.45" style={{ animationDelay: "320ms" }} />
+      <path className="demo-draw-line" d="M10 32 L18 32 M46 32 L54 32" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" opacity="0.6" style={{ animationDelay: "400ms" }} />
+    </svg>
+  );
+}
+
+function DeathSpiralIcon() {
+  return (
+    <svg viewBox="0 0 64 64" fill="none">
+      <path className="demo-fade-in" d="M32 10 a22 22 0 1 1 -15 38 a17 17 0 1 0 12 -29 a12 12 0 1 1 8 21 a7 7 0 1 0 -5 -12" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" />
+      <circle className="demo-dot-pop" cx="32" cy="32" r="3" fill="currentColor" style={{ animationDelay: "300ms" }} />
+    </svg>
+  );
+}
+
+function TickerTapeIcon() {
+  return (
+    <svg viewBox="0 0 64 64" fill="none">
+      <circle className="demo-fade-in" cx="32" cy="22" r="12" stroke="currentColor" strokeWidth="2.8" />
+      <circle className="demo-dot-pop" cx="32" cy="22" r="4" fill="currentColor" opacity="0.8" style={{ animationDelay: "150ms" }} />
+      <path className="demo-dot-pop" d="M22 32 q-4 10 2 14 q6 4 10 -2 q4 -6 10 -2 q6 4 2 12" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" style={{ animationDelay: "260ms" }} />
+      <path className="demo-draw-line" d="M14 50 L50 50" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeDasharray="3 4" opacity="0.4" style={{ animationDelay: "380ms" }} />
+    </svg>
+  );
+}
+
+function TurtleIcon() {
+  return (
+    <svg viewBox="0 0 64 64" fill="none">
+      <path className="demo-fade-in" d="M14 38 a18 14 0 0 1 36 0 Z" stroke="currentColor" strokeWidth="2.8" strokeLinejoin="round" />
+      <path className="demo-dot-pop" d="M32 24 L32 38 M22 30 L26 38 M42 30 L38 38" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" opacity="0.6" style={{ animationDelay: "170ms" }} />
+      <circle className="demo-dot-pop" cx="54" cy="36" r="4.5" stroke="currentColor" strokeWidth="2.4" style={{ animationDelay: "280ms" }} />
+      <path className="demo-dot-pop" d="M18 40 L18 46 M28 40 L28 46 M38 40 L38 46" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" style={{ animationDelay: "360ms" }} />
+    </svg>
+  );
+}
+
+function FiberLineIcon() {
+  return (
+    <svg viewBox="0 0 64 64" fill="none">
+      <path className="demo-fade-in" d="M6 44 L18 30 L26 36 L34 22 L46 34 L58 18" stroke="currentColor" strokeWidth="2.4" strokeLinejoin="round" opacity="0.4" />
+      <line className="demo-draw-line" x1="8" y1="32" x2="56" y2="32" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" style={{ animationDelay: "160ms" }} />
+      <circle className="demo-dot-pop" cx="8" cy="32" r="4" fill="currentColor" style={{ animationDelay: "280ms" }} />
+      <circle className="demo-dot-pop" cx="56" cy="32" r="4" fill="currentColor" style={{ animationDelay: "340ms" }} />
+      <path className="demo-dot-pop" d="M26 24 L32 32 L26 40" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" fill="none" opacity="0.7" style={{ animationDelay: "420ms" }} />
+    </svg>
+  );
+}
+
 // slug -> { Icon, tone } — tone은 배경색 톤(사이트 기존 색상 토큰 재사용).
 const THUMBNAILS = {
   "big-mac-index": { Icon: BigMacIcon, tone: "amber" },
@@ -1194,6 +1285,16 @@ const THUMBNAILS = {
   "credit-suisse-ubs-2023": { Icon: BankMergeIcon, tone: "bad" },
   "ftx-collapse-2022": { Icon: ExchangeOutflowIcon, tone: "bad" },
   "mt-gox-hack": { Icon: MissingCoinsIcon, tone: "down" },
+
+  // [2026-10-17 추가] 6차 8편(최근 사건편)
+  "yen-carry-unwind-2024": { Icon: CarryUnwindIcon, tone: "bad" },
+  "uk-mini-budget-2022": { Icon: LettuceClockIcon, tone: "down" },
+  "evergrande-collapse": { Icon: UnfinishedTowerIcon, tone: "bad" },
+  "intel-decline": { Icon: ChipFadeIcon, tone: "down" },
+  "terra-luna-collapse": { Icon: DeathSpiralIcon, tone: "bad" },
+  "jesse-livermore": { Icon: TickerTapeIcon, tone: "amber" },
+  "turtle-traders": { Icon: TurtleIcon, tone: "green" },
+  "spread-networks-microseconds": { Icon: FiberLineIcon, tone: "up" },
 };
 
 export default function BlogThumbnail({ slug, size = "small" }) {

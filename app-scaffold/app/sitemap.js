@@ -4,7 +4,7 @@
 // 만들어 줍니다. 사이트맵은 "우리 사이트에는 이런 페이지들이 있습니다"라고
 // 검색엔진에 건네주는 목차입니다.
 //
-// 왜 필요한가: 검색엔진은 링크를 타고 다니며 페이지를 찾는데, 칼럼이 88편쯤
+// 왜 필요한가: 검색엔진은 링크를 타고 다니며 페이지를 찾는데, 칼럼이 100편쯤
 // 되면 전부 찾아내는 데 시간이 오래 걸리고 일부는 영영 못 찾기도 합니다.
 // 목차를 직접 건네주면 훨씬 빨리, 빠짐없이 등록됩니다.
 //
@@ -12,9 +12,13 @@
 // 앞으로 칼럼을 더 써서 추가하면 이 파일은 손대지 않아도 사이트맵에 자동으로
 // 들어갑니다.
 //
+// [2026-10-14 변경] 새로 만든 문서 페이지 세 개(용어사전·자주 묻는 질문·
+// 면책조항)를 목록에 추가했습니다. 애드센스 심사에서 "가치 없는 콘텐츠"
+// 판정을 받은 뒤, 사람이 쓴 설명 페이지를 늘리면서 함께 등록한 것입니다.
+//
 // 만든 뒤 할 일(한 번만 하면 됩니다):
-//  · 네이버 서치어드바이저 → 요청 → 사이트맵 제출 → https://newsmeme.co.kr/sitemap.xml
-//  · 구글 서치콘솔 → Sitemaps → 같은 주소 제출
+//  · 네이버 서치어드바이저 → 요청 → 사이트맵 제출 → sitemap.xml
+//  · 구글 서치콘솔 → Sitemaps → https://newsmeme.co.kr/sitemap.xml
 
 import { blogPosts } from "../lib/allBlogPosts";
 
@@ -42,6 +46,12 @@ export default function sitemap() {
     { path: "/themes", changeFrequency: "daily", priority: 0.8 },
     { path: "/blog", changeFrequency: "daily", priority: 0.8 },
     { path: "/guide", changeFrequency: "monthly", priority: 0.6 },
+    // [2026-10-14 추가] 아래 세 페이지는 읽을거리가 들어 있어서 가이드와
+    // 비슷한 수준으로 뒀습니다. 용어사전은 "숏스퀴즈 뜻" 같은 검색으로
+    // 들어오는 길이 되므로 조금 더 높게 잡았습니다.
+    { path: "/glossary", changeFrequency: "monthly", priority: 0.7 },
+    { path: "/faq", changeFrequency: "monthly", priority: 0.6 },
+    { path: "/disclaimer", changeFrequency: "yearly", priority: 0.4 },
     { path: "/about", changeFrequency: "yearly", priority: 0.4 },
     { path: "/contact", changeFrequency: "yearly", priority: 0.4 },
     { path: "/privacy", changeFrequency: "yearly", priority: 0.3 },
@@ -53,7 +63,7 @@ export default function sitemap() {
     priority: page.priority,
   }));
 
-  // 칼럼 88편(앞으로 늘어나는 것 포함). 한 번 쓰면 내용이 거의 안 바뀌므로
+  // 칼럼 전체(앞으로 늘어나는 것 포함). 한 번 쓰면 내용이 거의 안 바뀌므로
   // changeFrequency는 monthly로 두고, lastModified에는 글에 적힌 작성일을
   // 그대로 넣습니다.
   const columnPages = blogPosts.map((post) => ({

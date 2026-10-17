@@ -40,7 +40,6 @@ import HomeClient from "./HomeClient";
 export const revalidate = 60;
 
 const SITE_URL = "https://newsmeme.co.kr";
-
 // 서버가 HTML을 만들 때 미리 가져올 기사 개수.
 // 너무 많으면 HTML이 무거워지고, 너무 적으면 크롤러가 볼 내용이 부족합니다.
 // 60개면 검색엔진이 사이트 성격을 판단하기에 충분하고, 방문자도 스크롤로
@@ -66,7 +65,23 @@ async function getInitialFeed() {
   }
 }
 
+// [2026-10-17 추가] 홈 화면 맨 위의 "오늘의 세계증시" 지도에 쓸 지수를
+// 서버가 미리 받아옵니다. 브라우저가 나중에 불러오게 하면 크롤러 눈에는
+// 또 빈 자리로 보이므로(10월에 겪은 문제) 처음부터 채워서 보냅니다.
+//
+// 실패해도 null을 넘기면 지도는 뜨고 숫자 자리만 "—"가 됩니다.
+async function getWorldIndices() {
+  try {
+    const res = await fetch(`${SITE_URL}/api/world-indices`, { next: { revalidate: 300 } });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
 export default async function HomePage() {
-  const initialItems = await getInitialFeed();
-  return <HomeClient initialItems={initialItems} />;
+  // 둘을 동시에 받아옵니다 — 순서대로 기다리면 첫 화면이 그만큼 늦어집니다.
+  const [initialItems, worldIndices] = await Promise.all([getInitialFeed(), getWorldIndices()]);
+  return <HomeClient initialItems={initialItems} worldIndices={worldIndices} />;
 }

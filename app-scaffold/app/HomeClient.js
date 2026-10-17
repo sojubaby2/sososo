@@ -16,6 +16,7 @@ import { Newspaper, Loader2, Flame, Bell, BellOff, Globe, Volume2, VolumeX, Smar
 import Header from "../components/Header";
 import NewsCard from "../components/NewsCard";
 import DailyOutlookBanner from "../components/DailyOutlookBanner";
+import WorldMarketMap from "../components/WorldMarketMap";
 import { isPoliticalTheme } from "../lib/themeData";
 
 const HOT_THEME_COUNT = 8;
@@ -376,7 +377,7 @@ function AboutSiteSection() {
   );
 }
 
-export default function HomeClient({ initialItems = [] }) {
+export default function HomeClient({ initialItems = [], worldIndices = null }) {
   // [2026-10-14 변경] 서버(app/page.js)가 미리 가져다 준 기사들로 시작합니다.
   // 예전에는 빈 배열로 시작해서 브라우저가 불러올 때까지 화면이 비어 있었고,
   // 그 빈 화면이 크롤러에게 그대로 노출됐습니다.
@@ -552,6 +553,9 @@ export default function HomeClient({ initialItems = [] }) {
     <div>
       <Header />
       <main className="container-wide" style={{ paddingTop: 32, paddingBottom: 32 }}>
+        {/* [2026-10-17 추가] 오늘의 세계증시 — 서버(app/page.js)가 미리 받아온
+            지수를 그대로 넘겨줘서, 크롤러도 첫 HTML에서 숫자를 읽습니다. */}
+        <WorldMarketMap data={worldIndices} />
         <DailyOutlookBanner />
         <InstallHintBanner />
         <div className="home-layout">
