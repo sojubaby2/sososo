@@ -23,23 +23,31 @@
 // https://newsmeme.co.kr/api/world-indices?debug=1 을 열어보면 어느 기호가
 // 실패했는지 그대로 나옵니다. 아래 MARKETS 배열의 stooq 값만 고치면 됩니다.
 
-// 지도에 표시할 나라들. x/y는 지도 SVG(가로 1000, 세로 500) 안에서의 위치라,
-// 지도 그림을 바꾸지 않는 한 건드릴 일이 없습니다.
+// 지도에 표시할 나라들.
+//
+// [2026-10-17 변경] 예전에는 지도 SVG 안의 픽셀 좌표(x/y)를 직접 적어뒀는데,
+// 재성님이 직접 만드신 세계지도 그림으로 교체하면서 경도(lon)·위도(lat)를
+// 적는 방식으로 바꿨습니다. 화면 쪽(components/WorldMarketMap.js)에서 그림의
+// 크기에 맞춰 좌표로 환산하기 때문에, 나중에 지도 그림을 바꿔도 여기는
+// 손댈 필요가 없고 환산식 한 줄만 고치면 됩니다.
+//
+// 미국은 다우와 나스닥 둘 다 표시해야 하는데 같은 자리에 겹치므로, 다우는
+// 동부(뉴욕 부근), 나스닥은 조금 서쪽 아래로 떨어뜨려 두 점이 보이게 했습니다.
 //
 // region은 화면 위쪽 탭(전체/아시아/북아메리카/남아메리카/유럽)으로 거르는 데
 // 씁니다.
 export const MARKETS = [
-  { key: "kr", label: "한국", flag: "🇰🇷", indexName: "코스피", region: "아시아", stooq: "^kospi", fred: null, x: 853, y: 146, tz: 9 },
-  { key: "jp", label: "일본", flag: "🇯🇵", indexName: "닛케이225", region: "아시아", stooq: "^nkx", fred: "NIKKEI225", x: 888, y: 151, tz: 9 },
-  { key: "cn", label: "중국", flag: "🇨🇳", indexName: "상하이종합", region: "아시아", stooq: "^shc", fred: null, x: 838, y: 163, tz: 8 },
-  { key: "hk", label: "홍콩", flag: "🇭🇰", indexName: "항셍", region: "아시아", stooq: "^hsi", fred: null, x: 817, y: 188, tz: 8 },
-  { key: "tw", label: "대만", flag: "🇹🇼", indexName: "가권", region: "아시아", stooq: "^twse", fred: null, x: 836, y: 184, tz: 8 },
-  { key: "in", label: "인도", flag: "🇮🇳", indexName: "센섹스", region: "아시아", stooq: "^snx", fred: null, x: 703, y: 197, tz: 5.5 },
-  { key: "gb", label: "영국", flag: "🇬🇧", indexName: "FTSE100", region: "유럽", stooq: "^ukx", fred: null, x: 500, y: 107, tz: 0 },
-  { key: "de", label: "독일", flag: "🇩🇪", indexName: "DAX", region: "유럽", stooq: "^dax", fred: null, x: 537, y: 104, tz: 1 },
-  { key: "us-dow", label: "미국-다우", flag: "🇺🇸", indexName: "다우존스", region: "북아메리카", stooq: "^dji", fred: "DJIA", x: 294, y: 137, tz: -5 },
-  { key: "us-nasdaq", label: "미국-나스닥", flag: "🇺🇸", indexName: "나스닥", region: "북아메리카", stooq: "^ndq", fred: "NASDAQCOM", x: 312, y: 168, tz: -5 },
-  { key: "br", label: "브라질", flag: "🇧🇷", indexName: "보베스파", region: "남아메리카", stooq: "^bvp", fred: null, x: 371, y: 315, tz: -3 },
+  { key: "kr", label: "한국", flag: "🇰🇷", indexName: "코스피", region: "아시아", stooq: "^kospi", fred: null, lon: 127.0, lat: 37.5, tz: 9 },
+  { key: "jp", label: "일본", flag: "🇯🇵", indexName: "닛케이225", region: "아시아", stooq: "^nkx", fred: "NIKKEI225", lon: 139.7, lat: 35.7, tz: 9 },
+  { key: "cn", label: "중국", flag: "🇨🇳", indexName: "상하이종합", region: "아시아", stooq: "^shc", fred: null, lon: 121.5, lat: 31.2, tz: 8 },
+  { key: "hk", label: "홍콩", flag: "🇭🇰", indexName: "항셍", region: "아시아", stooq: "^hsi", fred: null, lon: 114.2, lat: 22.3, tz: 8 },
+  { key: "tw", label: "대만", flag: "🇹🇼", indexName: "가권", region: "아시아", stooq: "^twse", fred: null, lon: 121.0, lat: 23.7, tz: 8 },
+  { key: "in", label: "인도", flag: "🇮🇳", indexName: "센섹스", region: "아시아", stooq: "^snx", fred: null, lon: 72.9, lat: 19.1, tz: 5.5 },
+  { key: "gb", label: "영국", flag: "🇬🇧", indexName: "FTSE100", region: "유럽", stooq: "^ukx", fred: null, lon: -2.0, lat: 53.5, tz: 0 },
+  { key: "de", label: "독일", flag: "🇩🇪", indexName: "DAX", region: "유럽", stooq: "^dax", fred: null, lon: 10.4, lat: 51.0, tz: 1 },
+  { key: "us-dow", label: "미국-다우", flag: "🇺🇸", indexName: "다우존스", region: "북아메리카", stooq: "^dji", fred: "DJIA", lon: -77.0, lat: 40.0, tz: -5 },
+  { key: "us-nasdaq", label: "미국-나스닥", flag: "🇺🇸", indexName: "나스닥", region: "북아메리카", stooq: "^ndq", fred: "NASDAQCOM", lon: -96.0, lat: 33.0, tz: -5 },
+  { key: "br", label: "브라질", flag: "🇧🇷", indexName: "보베스파", region: "남아메리카", stooq: "^bvp", fred: null, lon: -46.6, lat: -23.5, tz: -3 },
 ];
 
 const STOOQ_URL = "https://stooq.com/q/l/";
@@ -208,8 +216,8 @@ export async function buildWorldIndices() {
       flag: m.flag,
       indexName: m.indexName,
       region: m.region,
-      x: m.x,
-      y: m.y,
+      lon: m.lon,
+      lat: m.lat,
       close,
       changePct,
       source,

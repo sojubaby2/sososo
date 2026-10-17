@@ -3,6 +3,8 @@
 // components/WorldMarketMap.js
 //
 // [2026-10-17 신설] 홈 화면 맨 위에 들어가는 "오늘의 세계증시" 영역입니다.
+// [2026-10-17 수정] 직접 그렸던 SVG 지도를 재성님이 제공하신 세계지도
+//                   그림(public/world-map.jpg)으로 교체했습니다.
 //
 // 구성은 두 층입니다.
 //  ① 위쪽: 세계지도 위에 나라별 점을 찍고, 오르면 빨강 내리면 파랑으로
@@ -14,46 +16,48 @@
 // 겹칩니다. 숫자 상자를 올리면 모바일에서 뭉개집니다. 그래서 지도는 점으로만
 // 두고, 숫자는 아래 카드에서 보도록 나눴습니다.
 //
-// 지도 그림에 대해: 네이버 등 다른 사이트의 지도 이미지를 가져다 쓰지 않고,
-// 대륙 윤곽을 단순화해 직접 그린 SVG입니다. 저작권 문제가 없고 파일도
-// 가볍습니다. 정밀한 지도가 아니라 "어느 대륙쯤"을 보여주는 배경입니다.
-// 혹시 이 배경이 마음에 안 들면 아래 SHOW_MAP을 false로 바꾸면 카드만 남습니다.
+// 점 위치는 어떻게 정해지나 — 아래 MAP_CALIBRATION 참고.
+// lib/worldIndices.js에는 나라마다 경도(lon)·위도(lat)만 적어두고, 실제 화면
+// 좌표는 여기서 계산합니다. 그래서 지도 그림을 다른 것으로 바꾸더라도
+// MAP_CALIBRATION 숫자 네 개만 고치면 핀이 전부 따라 움직입니다.
 //
 // 데이터는 서버(app/page.js)가 미리 받아서 넘겨줍니다. 그래서 검색엔진도
 // 이 숫자들을 첫 HTML에서 바로 읽습니다.
 
 import { useMemo, useState } from "react";
 
-const SHOW_MAP = true;
+// 지도 그림의 원본 크기(픽셀). public/world-map.jpg 기준입니다.
+const MAP_WIDTH = 1024;
+const MAP_HEIGHT = 559;
+
+// 경도·위도를 그림 안의 픽셀 위치로 바꾸는 기준값입니다.
+//
+// 이 그림은 경도가 가로로 고르게 펼쳐진 형태(-180도 ~ +180도)이고,
+// 세로는 남극 대륙이 잘려 있어 위아래로 조금 늘어나 있습니다. 그래서
+// 가로와 세로의 축척이 다릅니다 — 아래 숫자는 그림 속 대륙 위치를 재서
+// 맞춘 값입니다.
+//
+// 핀이 실제 나라에서 어긋나 보이면 이 네 숫자만 조정하면 됩니다.
+//  · pxPerLon  : 경도 1도당 가로 픽셀 수
+//  · xAtLon0   : 경도 0도(영국 그리니치)의 가로 위치
+//  · pxPerLat  : 위도 1도당 세로 픽셀 수
+//  · yAtLat0   : 위도 0도(적도)의 세로 위치
+const MAP_CALIBRATION = {
+  pxPerLon: MAP_WIDTH / 360, // 2.844
+  xAtLon0: MAP_WIDTH / 2, // 512
+  pxPerLat: 3.116,
+  yAtLat0: 84 + 83 * 3.116, // 342.6 — 그림 위쪽 육지 끝(북위 83도)이 y=84인 점을 기준으로 역산
+};
+
+function toX(lon) {
+  return MAP_CALIBRATION.xAtLon0 + lon * MAP_CALIBRATION.pxPerLon;
+}
+
+function toY(lat) {
+  return MAP_CALIBRATION.yAtLat0 - lat * MAP_CALIBRATION.pxPerLat;
+}
 
 const REGION_TABS = ["전체", "아시아", "북아메리카", "남아메리카", "유럽"];
-
-// 대륙 윤곽(단순화). viewBox는 가로 1000, 세로 500이고 위도·경도를 그대로
-// 펼친 방식이라, lib/worldIndices.js의 x/y 좌표와 자리가 맞습니다.
-const CONTINENTS = [
-  // 북아메리카
-  "M150 95 L250 70 L320 85 L330 120 L300 150 L285 175 L300 200 L270 225 L250 205 L225 175 L195 160 L165 130 Z",
-  // 중앙아메리카
-  "M270 225 L300 235 L320 255 L300 262 L278 245 Z",
-  // 남아메리카
-  "M320 262 L360 255 L390 280 L395 320 L375 365 L350 400 L335 380 L330 330 L312 295 Z",
-  // 유럽
-  "M470 95 L545 88 L570 105 L560 135 L525 155 L490 150 L468 125 Z",
-  // 아프리카
-  "M490 165 L575 160 L600 190 L585 245 L560 300 L535 330 L515 300 L500 245 L488 200 Z",
-  // 아시아
-  "M570 85 L740 70 L860 90 L900 120 L880 150 L845 165 L800 180 L760 200 L720 215 L690 205 L660 185 L620 165 L588 140 L572 110 Z",
-  // 인도 반도
-  "M680 190 L720 188 L715 220 L698 235 L684 212 Z",
-  // 동남아시아 제도
-  "M790 215 L840 212 L855 232 L820 245 L792 236 Z",
-  // 오스트레일리아
-  "M835 290 L900 285 L915 320 L885 350 L845 340 L828 312 Z",
-  // 일본 열도
-  "M875 135 L895 128 L900 155 L882 168 Z",
-  // 영국
-  "M468 100 L482 96 L484 115 L470 118 Z",
-];
 
 function formatPct(value) {
   if (typeof value !== "number" || !Number.isFinite(value)) return "—";
@@ -83,12 +87,11 @@ const COLOR = {
 export default function WorldMarketMap({ data = null }) {
   const [region, setRegion] = useState("전체");
 
-  const items = useMemo(() => {
-    const all = Array.isArray(data?.items) ? data.items : [];
-    return region === "전체" ? all : all.filter((it) => it.region === region);
-  }, [data, region]);
-
   const allItems = Array.isArray(data?.items) ? data.items : [];
+
+  const items = useMemo(() => {
+    return region === "전체" ? allItems : allItems.filter((it) => it.region === region);
+  }, [allItems, region]);
 
   // 데이터를 하나도 못 받아온 경우에도 영역 자체는 보여주되, 숫자 자리에는
   // 안내를 띄웁니다(화면이 깨지는 것보다 낫습니다).
@@ -138,26 +141,47 @@ export default function WorldMarketMap({ data = null }) {
         </div>
       </div>
 
-      {SHOW_MAP && (
-        <div style={{ marginBottom: 16 }}>
-          <svg viewBox="0 0 1000 500" style={{ width: "100%", height: "auto", display: "block" }} role="img" aria-label="세계 증시 지도">
-            <rect x="0" y="0" width="1000" height="500" rx="10" fill="var(--amber-tint)" opacity="0.35" />
-            {CONTINENTS.map((d, i) => (
-              <path key={i} d={d} fill="var(--border)" opacity="0.9" />
-            ))}
-            {allItems.map((it) => {
-              const tone = toneOf(it.changePct);
-              const dim = region !== "전체" && it.region !== region;
-              return (
-                <g key={it.key} opacity={dim ? 0.25 : 1}>
-                  <circle cx={it.x} cy={it.y} r="16" fill={COLOR[tone]} opacity="0.18" />
-                  <circle cx={it.x} cy={it.y} r="6.5" fill={COLOR[tone]} />
-                </g>
-              );
-            })}
-          </svg>
-        </div>
-      )}
+      {/* 지도 그림 위에 점을 겹쳐 올립니다. 그림과 점이 같은 비율로 줄어들어야
+          핀이 제자리에 남기 때문에, 바깥 상자의 가로세로 비율을 그림과 똑같이
+          고정하고 그 안에서 퍼센트로 위치를 잡습니다. */}
+      <div
+        style={{
+          position: "relative",
+          width: "100%",
+          aspectRatio: `${MAP_WIDTH} / ${MAP_HEIGHT}`,
+          marginBottom: 16,
+          borderRadius: 10,
+          overflow: "hidden",
+          background: "var(--border)",
+        }}
+      >
+        <img
+          src="/world-map.jpg"
+          alt="세계 지도"
+          width={MAP_WIDTH}
+          height={MAP_HEIGHT}
+          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+        />
+        <svg
+          viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`}
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
+          role="img"
+          aria-label="나라별 증시 등락 표시"
+        >
+          {allItems.map((it) => {
+            const tone = toneOf(it.changePct);
+            const dim = region !== "전체" && it.region !== region;
+            const cx = toX(it.lon);
+            const cy = toY(it.lat);
+            return (
+              <g key={it.key} opacity={dim ? 0.25 : 1}>
+                <circle cx={cx} cy={cy} r="18" fill={COLOR[tone]} opacity="0.2" />
+                <circle cx={cx} cy={cy} r="7" fill={COLOR[tone]} stroke="#fff" strokeWidth="2" />
+              </g>
+            );
+          })}
+        </svg>
+      </div>
 
       {!hasAny && (
         <p style={{ fontSize: 13, color: "var(--ink-muted)", margin: "0 0 12px" }}>
