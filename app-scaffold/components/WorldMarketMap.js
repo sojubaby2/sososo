@@ -36,9 +36,13 @@ const MAP_WIDTH = 1024;
 const MAP_HEIGHT = 559;
 
 // 지도를 화면에서 최대 몇 픽셀 폭까지 키울지. 이 값이 세로 길이를 결정합니다
-// (세로 = 폭 ÷ 1.83). 480이면 세로 약 262픽셀입니다. 화면이 좁으면 알아서
+// (세로 = 폭 ÷ 1.83). 400이면 세로 약 218픽셀입니다. 화면이 좁으면 알아서
 // 줄어듭니다.
-const MAP_MAX_WIDTH = 480;
+//
+// [2026-10-17 조정] 재성님 요청으로 480 -> 400으로 한 번 더 줄였습니다.
+// 더 작게/크게 하고 싶으면 이 숫자 하나만 고치면 됩니다(핀은 지도와 같은
+// 비율로 따라 움직이므로 다른 곳은 손댈 필요 없습니다).
+const MAP_MAX_WIDTH = 400;
 
 // 나라별 핀 위치. 원본 그림(1024 x 559) 기준 픽셀입니다.
 // worldIndices.js의 key와 이름이 같아야 연결됩니다.
@@ -114,8 +118,8 @@ export default function WorldMarketMap({ data = null }) {
       style={{
         border: "1px solid var(--border)",
         borderRadius: 12,
-        padding: "14px 14px 12px",
-        marginBottom: 20,
+        padding: "12px 12px 10px",
+        marginBottom: 18,
         background: "var(--surface, #fff)",
       }}
     >
@@ -129,7 +133,7 @@ export default function WorldMarketMap({ data = null }) {
           marginBottom: 10,
         }}
       >
-        <h2 style={{ fontSize: 15, fontWeight: 700, margin: 0, color: "var(--ink)" }}>오늘의 세계증시</h2>
+        <h2 style={{ fontSize: 14, fontWeight: 700, margin: 0, color: "var(--ink)" }}>오늘의 세계증시</h2>
         <div style={{ display: "flex", gap: 3, flexWrap: "wrap" }}>
           {REGION_TABS.map((tab) => (
             <button
@@ -137,8 +141,8 @@ export default function WorldMarketMap({ data = null }) {
               type="button"
               onClick={() => setRegion(tab)}
               style={{
-                padding: "3px 9px",
-                fontSize: 11.5,
+                padding: "2px 8px",
+                fontSize: 11,
                 borderRadius: 999,
                 border: "1px solid " + (region === tab ? "var(--amber)" : "var(--border)"),
                 background: region === tab ? "var(--amber-tint)" : "transparent",
@@ -186,8 +190,8 @@ export default function WorldMarketMap({ data = null }) {
             const dim = region !== "전체" && it.region !== region;
             return (
               <g key={it.key} opacity={dim ? 0.25 : 1}>
-                <circle cx={it.px} cy={it.py} r="16" fill={COLOR[tone]} opacity="0.2" />
-                <circle cx={it.px} cy={it.py} r="7" fill={COLOR[tone]} stroke="#fff" strokeWidth="2.5" />
+                <circle cx={it.px} cy={it.py} r="18" fill={COLOR[tone]} opacity="0.2" />
+                <circle cx={it.px} cy={it.py} r="8" fill={COLOR[tone]} stroke="#fff" strokeWidth="3" />
               </g>
             );
           })}
@@ -203,8 +207,8 @@ export default function WorldMarketMap({ data = null }) {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(118px, 1fr))",
-          gap: 6,
+          gridTemplateColumns: "repeat(auto-fill, minmax(102px, 1fr))",
+          gap: 5,
         }}
       >
         {items.map((it) => {
@@ -215,18 +219,18 @@ export default function WorldMarketMap({ data = null }) {
               style={{
                 border: "1px solid var(--border)",
                 borderRadius: 8,
-                padding: "7px 9px",
+                padding: "6px 8px",
               }}
             >
-              <div style={{ fontSize: 12, fontWeight: 700, color: "var(--ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                 <span style={{ marginRight: 4 }}>{it.flag}</span>
                 {it.label}
               </div>
-              <div style={{ fontSize: 10.5, color: "var(--ink-muted)" }}>{it.indexName}</div>
-              <div className="mono" style={{ fontSize: 13.5, fontWeight: 700, marginTop: 4, color: COLOR[tone] }}>
+              <div style={{ fontSize: 10, color: "var(--ink-muted)" }}>{it.indexName}</div>
+              <div className="mono" style={{ fontSize: 12.5, fontWeight: 700, marginTop: 3, color: COLOR[tone] }}>
                 {formatPct(it.changePct)}
               </div>
-              <div className="mono" style={{ fontSize: 11, color: "var(--ink-muted)" }}>
+              <div className="mono" style={{ fontSize: 10.5, color: "var(--ink-muted)" }}>
                 {formatClose(it.close)}
               </div>
             </div>
