@@ -72,7 +72,7 @@ async function getInitialFeed() {
 // 실패해도 null을 넘기면 지도는 뜨고 숫자 자리만 "—"가 됩니다.
 async function getWorldIndices() {
   try {
-    const res = await fetch(`${SITE_URL}/api/world-indices`, { next: { revalidate: 300 } });
+    const res = await fetch(`${SITE_URL}/api/world-indices?v=2`, { next: { revalidate: 300 } });
     if (!res.ok) return null;
     return await res.json();
   } catch {

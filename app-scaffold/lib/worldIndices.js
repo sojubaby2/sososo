@@ -50,6 +50,12 @@ export const MARKETS = [
   { key: "br", label: "브라질", flag: "🇧🇷", indexName: "보베스파", region: "남아메리카", stooq: "^bvp", fred: null, lon: -46.6, lat: -23.5, tz: -3 },
 ];
 
+// [2026-10-17 추가] 코스피는 이미 이 프로젝트 안에 조회 코드가 있습니다
+// (lib/marketIndex.js — 네이버 금융의 지수 일별시세 공개 페이지를 읽어옵니다).
+// 가장 중요한 숫자인데 바깥 서비스가 막히면 비어버리는 게 말이 안 되므로,
+// 한국만큼은 이미 검증된 그 경로를 그대로 씁니다.
+import { fetchIndexTodaySummary } from "./marketIndex";
+
 const STOOQ_URL = "https://stooq.com/q/l/";
 const FRED_URL = "https://api.stlouisfed.org/fred/series/observations";
 
@@ -175,7 +181,22 @@ export async function buildWorldIndices() {
     })
   );
 
-  const debug = { stooqError: stooq.error, stooqSymbolsFound: Object.keys(stooq.rows), missing: [] };
+  // 코스피는 별도 경로(네이버 지수 일별시세)로 받아옵니다. 실패해도 조용히
+  // 넘어가고, 그 경우 아래에서 Stooq 값이 있으면 그걸 씁니다.
+  let kospi = null;
+  try {
+    kospi = await fetchIndexTodaySummary("KOSPI");
+  } catch {
+    kospi = null;
+  }
+
+  const debug = {
+    stooqError: stooq.error,
+    stooqSymbolsFound: Object.keys(stooq.rows),
+    kospiOk: !!(kospi && typeof kospi.close === "number"),
+    fredOk: Object.fromEntries(Object.entries(fredResults).map(([k, v]) => [k, !!v])),
+    missing: [],
+  };
 
   const items = MARKETS.map((m) => {
     const row = m.stooq ? stooq.rows[m.stooq.toLowerCase()] : null;
@@ -187,7 +208,13 @@ export async function buildWorldIndices() {
     let basis = null;
     let asOf = null;
 
-    if (row && row.close !== null) {
+    if (m.key === "kr" && kospi && typeof kospi.close === "number") {
+      close = kospi.close;
+      changePct = typeof kospi.changeVsPrevClosePct === "number" ? kospi.changeVsPrevClosePct : null;
+      source = "naver";
+      basis = "전일종가대비";
+      asOf = kospi.date || null;
+    } else if (row && row.close !== null) {
       close = row.close;
       source = "stooq";
       asOf = row.date || null;
