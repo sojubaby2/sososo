@@ -182,6 +182,24 @@ export async function buildWorldIndices() {
     })
   );
 
+  // [2026-10-17 추가] 한 번 더 두드려 봅니다.
+  //
+  // 왜 필요한가: 11개를 한꺼번에 던지면 야후가 그중 한두 개를 "너무 빠르다"고
+  // 튕겨내는 일이 있습니다. 실제로 배포 직후 화면을 보니 아홉 나라는 숫자가
+  // 들어왔는데 대만·인도만 비어 있었습니다(잠시 뒤 다시 부르면 멀쩡히
+  // 들어옴). 실패한 것만 0.2초씩 간격을 두고 하나씩 다시 부르면 거의 다
+  // 채워집니다. 실패가 없으면 이 구간은 그냥 지나갑니다.
+  const retryTargets = MARKETS.filter((m) => !yahooResults[m.key]);
+  for (const m of retryTargets) {
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    try {
+      yahooResults[m.key] = await fetchFromYahoo(m.yahoo);
+      if (yahooResults[m.key]) delete yahooErrors[m.key];
+    } catch (err) {
+      yahooErrors[m.key] = String(err?.message || err);
+    }
+  }
+
   // ② FRED — 야후가 실패했을 때를 대비한 예비. 세 나라만 있습니다.
   const fredResults = {};
   await Promise.all(
