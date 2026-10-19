@@ -1,24 +1,66 @@
 :root {
-  --bg: #f2f4f7;
+  /* ===================================================================
+     [2026-10-19 전면 교체] 색을 주황(amber) 계열에서 남색(navy)으로 바꿨습니다.
+     재성님 결정 — "누가 봐도 기본 사이트 같다"는 피드백에서 출발한 디자인
+     개편의 1단계입니다.
+
+     중요 — 왜 이름은 그대로 두고 값만 바꿨나:
+     이 파일은 색을 전부 변수(--amber 같은 것)로 쓰고 있고, 사이트 전체
+     (칼럼, 패턴검색, 용어사전, 홈…)가 그 변수를 참조합니다. 그래서 아래
+     스무 줄만 고치면 모든 페이지의 색이 한 번에 바뀝니다. 변수 "이름"까지
+     바꾸면 이 파일 외의 수백 군데를 전부 찾아 고쳐야 하고 하나라도 빠뜨리면
+     그 부분만 색이 안 바뀝니다. 그래서 이름은 --amber 그대로 두고 값만
+     남색으로 바꿨습니다. 이름이 amber인데 색은 남색이라 헷갈릴 수 있어
+     이 주석을 남겨둡니다.
+     =================================================================== */
+
+  /* 바탕과 면 — 흰 카드를 살짝 푸른 회색 바탕 위에 띄웁니다. */
+  --bg: #f1f4f9;
   --surface: #ffffff;
-  --ink: #14181f;
-  --ink-muted: #5b6472;
-  --border: #e1e4ea;
-  --amber: #c6862b;
-  --amber-bright: #f0b84d;
-  --amber-tint: #fbefdc;
-  --amber-tint-ink: #8a5a0f;
-  --green-tint: #eaf3e8;
-  --green-tint-ink: #2e6b3e;
-  --up: #c23b3b;
-  --down: #2e5fa3;
-  --bad: #8a1f2b;
-  --bad-tint: #f7e2e4;
-  --bad-tint-ink: #7a1b26;
-  --strip: #14181f;
+  --surface-2: #f6f8fc;
+
+  /* 글자 — 완전한 검정 대신 남색이 섞인 먹색을 씁니다. */
+  --ink: #0c2039;
+  --ink-muted: #46607e;
+  --ink-soft: #7c8fa6;
+  --border: #e1e8f1;
+
+  /* 강조색(옛 amber 자리) — 버튼·선택된 메뉴·링크에 쓰입니다. */
+  --amber: #1f5fd8;
+  --amber-bright: #5c8eff;
+  --amber-tint: #e8effc;
+  --amber-tint-ink: #1a4fb5;
+
+  /* 짙은 남색 — 헤더 띠와 앞으로 만들 브리핑 밴드에 씁니다. */
+  --deep: #081a30;
+  --deep-2: #0e2944;
+  --on-deep: #eaf2fc;
+  --on-deep-soft: #8da7c5;
+
+  --green-tint: #e9f2ec;
+  --green-tint-ink: #2b6b45;
+
+  /* 등락 색은 국내 관행 그대로 — 오르면 빨강, 내리면 파랑. */
+  --up: #d8342b;
+  --down: #1a5fd0;
+
+  /* 악재 표시 — 빨강(상승)과 헷갈리지 않게 주황 계열로 분리합니다. */
+  --bad: #a9650b;
+  --bad-tint: #fbf1e0;
+  --bad-tint-ink: #8a5309;
+
+  --strip: #081a30;
+
   --font-display: "Noto Serif KR", serif;
   --font-body: "Noto Sans KR", sans-serif;
   --font-mono: "Roboto Mono", monospace;
+
+  /* 모서리와 그림자 — 선으로 나누는 대신 여백과 옅은 그림자로 나눕니다. */
+  --r-lg: 18px;
+  --r-md: 12px;
+  --r-sm: 9px;
+  --shadow: 0 1px 2px rgba(12, 32, 57, 0.05), 0 8px 24px rgba(12, 32, 57, 0.06);
+  --shadow-hover: 0 2px 4px rgba(12, 32, 57, 0.06), 0 14px 34px rgba(12, 32, 57, 0.1);
 }
 
 * { box-sizing: border-box; }
@@ -64,7 +106,7 @@ button, input { font-family: inherit; }
 .badge { font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--amber); color: var(--amber); }
 .nav { display: flex; align-items: center; gap: 4px; font-size: 14px; }
 .nav-btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; font-weight: 500; background: transparent; border: none; color: var(--ink-muted); cursor: pointer; text-decoration: none; white-space: nowrap; }
-.nav-btn.active { background: #f6f3ea; color: var(--amber); }
+.nav-btn.active { background: var(--amber-tint); color: var(--amber); }
 .gold-tag { display: flex; align-items: center; gap: 8px; font-size: 14px; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--border); }
 
 @media (max-width: 480px) {
@@ -157,15 +199,17 @@ button, input { font-family: inherit; }
 .filter-btn.active { border-color: var(--amber); color: var(--amber); background: var(--amber-tint); }
 
 .news-list { display: flex; flex-direction: column; gap: 14px; }
+/* [2026-10-19 변경] 테두리 선을 없애고 옅은 그림자로 띄웁니다.
+   선이 많을수록 화면이 빽빽해 보여서, 선 대신 여백과 그림자로 나눕니다. */
 .news-card {
-  border-radius: 14px;
+  border-radius: var(--r-lg);
   padding: 20px 22px;
   background: var(--surface);
-  border: 1px solid var(--border);
-  box-shadow: 0 1px 2px rgba(20, 24, 31, 0.04);
+  border: 1px solid transparent;
+  box-shadow: var(--shadow);
   transition: box-shadow 180ms ease, border-color 180ms ease;
 }
-.news-card:hover { box-shadow: 0 6px 20px rgba(20, 24, 31, 0.08); }
+.news-card:hover { box-shadow: var(--shadow-hover); }
 .news-card.rumor { border: 1.5px dashed var(--amber); }
 
 .news-card.new-enter { animation: card-slide-in 900ms ease; }
@@ -177,7 +221,8 @@ button, input { font-family: inherit; }
 @media (prefers-reduced-motion: reduce) { .news-card.new-enter { animation: none; } }
 
 .news-meta { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ink-muted); margin-bottom: 10px; }
-.news-title { font-family: var(--font-display); font-size: 17px; font-weight: 700; line-height: 1.4; margin: 0 0 12px; overflow-wrap: anywhere; }
+/* [2026-10-19 변경] 제목이 카드의 주인공이 되도록 키우고 자간을 좁혔습니다. */
+.news-title { font-family: var(--font-display); font-size: 18.5px; font-weight: 700; line-height: 1.42; letter-spacing: -0.03em; margin: 0 0 12px; overflow-wrap: anywhere; }
 
 /* Credibility tag — compact pill instead of a heavy colored block */
 .credibility-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
@@ -190,7 +235,7 @@ button, input { font-family: inherit; }
 .chip-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
 .chip {
   display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px; border-radius: 999px;
-  border: 1px solid var(--border); background: var(--bg); font-size: 13px; font-weight: 500;
+  border: 1px solid var(--border); background: var(--surface-2); font-size: 13px; font-weight: 500;
   font-family: inherit; color: var(--ink); cursor: pointer; position: relative;
   transition: border-color 140ms ease, background 140ms ease;
 }
@@ -239,13 +284,13 @@ button, input { font-family: inherit; }
   background: var(--amber); padding: 7px 14px; border-radius: 999px;
   text-decoration: none;
 }
-.news-link:hover { background: #a86f22; }
+.news-link:hover { background: var(--amber-tint-ink); }
 
 /* Two-column home layout */
 .home-layout { display: grid; grid-template-columns: 1fr; gap: 28px; align-items: start; }
 @media (min-width: 900px) { .home-layout { grid-template-columns: 1fr 300px; } }
 
-.trending-panel { border-radius: 14px; border: 1px solid var(--border); background: var(--surface); padding: 18px; }
+.trending-panel { border-radius: var(--r-lg); border: 1px solid transparent; background: var(--surface); box-shadow: var(--shadow); padding: 18px; }
 .sidebar-stack { display: flex; flex-direction: column; gap: 16px; }
 .trending-panel-title { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-muted); margin: 0 0 14px; }
 .trending-panel-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 14px; }
@@ -256,7 +301,7 @@ button, input { font-family: inherit; }
    살짝 커지는 애니메이션도 넣어서 지금 뭐가 선택돼 있는지 한눈에 보이게 함. */
 .range-toggle-btn { font-size: 11px; font-weight: 600; color: var(--ink-muted); background: transparent; border: none; border-radius: 999px; padding: 4px 10px; cursor: pointer; line-height: 1.2; transition: background-color 0.15s ease, color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease; }
 .range-toggle-btn:hover:not(.active) { color: var(--amber); background: var(--amber-tint); }
-.range-toggle-btn.active { color: #fff; background: var(--amber); box-shadow: 0 2px 6px rgba(198, 134, 43, 0.4); transform: scale(1.08); }
+.range-toggle-btn.active { color: #fff; background: var(--amber); box-shadow: 0 2px 6px rgba(31, 95, 216, 0.35); transform: scale(1.08); }
 .trending-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); }
 .trending-row:last-child { border-bottom: none; }
 /* [2026-09-08 추가] HOT 테마 줄을 누르면 테마별 종목정리로 이동하는 링크로 바뀜 */
@@ -318,7 +363,7 @@ button, input { font-family: inherit; }
 }
 .theme-item { width: 100%; text-align: left; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border: none; background: transparent; border-left: 3px solid transparent; border-bottom: 1px solid var(--border); cursor: pointer; font-size: 14px; }
 .theme-item:last-of-type { border-bottom: none; }
-.theme-item.active { background: #f6f3ea; border-left-color: var(--amber); }
+.theme-item.active { background: var(--amber-tint); border-left-color: var(--amber); }
 .theme-item-name { display: flex; align-items: center; gap: 6px; font-weight: 500; }
 
 /* 모바일 전용 테마 드롭다운(app/themes/page.js) — 767px 이하에서만 눌린
@@ -367,6 +412,9 @@ button, input { font-family: inherit; }
 .footer-nav { max-width: 960px; margin: 0 auto; padding: 0 24px 16px; display: flex; gap: 16px; font-size: 12px; }
 .footer-nav a { color: var(--ink-muted); text-decoration: none; }
 .footer-nav a:hover { text-decoration: underline; color: var(--amber); }
+
+/* [2026-10-19 추가] 푸터를 흰 면으로 띄워 본문과 구분합니다. */
+.footer-nav { border-top: 1px solid var(--border); padding-top: 18px; margin-top: 8px; }
 
 /* 칼럼(블로그) */
 .blog-intro { margin-bottom: 24px; }

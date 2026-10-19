@@ -61,7 +61,9 @@ export const metadata = {
 export const viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#c6862b",
+  // [2026-10-19 변경] 휴대폰에서 브라우저 주소창 색입니다. 사이트 색을
+  // 남색으로 바꾸면서 같이 맞췄습니다(주황으로 두면 주소창만 따로 놀았음).
+  themeColor: "#081a30",
 };
 
 export default function RootLayout({ children }) {
@@ -69,7 +71,7 @@ export default function RootLayout({ children }) {
     <html lang="ko">
       <head>
         <link
-          href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@600;700&family=Noto+Sans+KR:wght@400;500;600;700&family=Roboto+Mono:wght@500;700&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@600;700&family=Noto+Sans+KR:wght@400;500;600;700;900&family=Roboto+Mono:wght@500;600;700&display=swap"
           rel="stylesheet"
         />
         {/* Google AdSense site verification / ad loader */}
