@@ -16,7 +16,8 @@ import { Newspaper, Loader2, Flame, Bell, BellOff, Globe, Volume2, VolumeX, Smar
 import Header from "../components/Header";
 import NewsCard from "../components/NewsCard";
 import DailyOutlookBanner from "../components/DailyOutlookBanner";
-import WorldMarketMap from "../components/WorldMarketMap";
+import BriefingBand from "../components/BriefingBand";
+import { extractThemes } from "../lib/todayBrief";
 import { isPoliticalTheme } from "../lib/themeData";
 
 const HOT_THEME_COUNT = 8;
@@ -79,13 +80,32 @@ function formatKoreanDateTime(iso) {
   return `${yyyy}/${MM}/${dd} ${hh}:${mm}`;
 }
 
-function toCardShape(item) {
+// 등락률 표시용 — 숫자가 없으면 "—"로 비웁니다.
+function fmtPct(value) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "—";
+  return `${value > 0 ? "+" : ""}${value.toFixed(2)}%`;
+}
+function toneOf(value) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "flat";
+  return value > 0 ? "up" : value < 0 ? "down" : "flat";
+}
+
+// [2026-10-19 변경] 세 가지를 더 넘깁니다.
+//   · reasons  — 예전엔 근거를 "/"로 이어 붙인 한 줄이었는데, 카드에서
+//                줄바꿈된 목록으로 보여주려고 배열 그대로 넘깁니다.
+//   · theme    — 테마 이름(히트맵 거르기와 카드 표시에 씁니다).
+//   · change   — 종목 등락률. 원래부터 item.matches 안에 있었는데
+//                (lib/newsPipeline.js의 finalizeMatches가 붙여줍니다)
+//                여기서 버려지고 있었습니다. liveQuotes가 있으면 지금
+//                시세로 덮어씁니다.
+function toCardShape(item, liveQuotes) {
   const hasLegitimate = item.matches.some((m) => m.confidence === "confirmed" || m.confidence === "theme");
-  const reason = item.matches
+  const reasons = item.matches
     .map((m) => m.reason)
     .filter(Boolean)
-    .slice(0, 3)
-    .join(" / ");
+    .slice(0, 3);
+  const reason = reasons.join(" / ");
+  const themes = extractThemes(item);
   // Any match Claude tagged with a confirmed negative-catalyst type (유상증자
   // 등) — surfaced once at the card level for the "악재" badge, and again
   // per-chip so it's clear exactly which stock it's about.
@@ -103,7 +123,19 @@ function toCardShape(item) {
     confidence: hasLegitimate ? "confirmed" : "rumor",
     reason: reason || "관련 근거 정보 없음",
     badCatalyst: badMatch?.catalyst || null,
-    stocks: item.matches.map((m) => ({ name: m.name, code: m.code, market: m.market, catalyst: m.catalyst || null })),
+    reasons,
+    theme: themes[0] || null,
+    themes,
+    stocks: item.matches.map((m) => {
+      const live = liveQuotes?.[m.code];
+      return {
+        name: m.name,
+        code: m.code,
+        market: m.market,
+        catalyst: m.catalyst || null,
+        change: typeof live?.changePct === "number" ? live.changePct : m.change,
+      };
+    }),
   };
 }
 
@@ -377,7 +409,7 @@ function AboutSiteSection() {
   );
 }
 
-export default function HomeClient({ initialItems = [], worldIndices = null }) {
+export default function HomeClient({ initialItems = [], worldIndices = null, brief = null, liveQuotes = {} }) {
   // [2026-10-14 변경] 서버(app/page.js)가 미리 가져다 준 기사들로 시작합니다.
   // 예전에는 빈 배열로 시작해서 브라우저가 불러올 때까지 화면이 비어 있었고,
   // 그 빈 화면이 크롤러에게 그대로 노출됐습니다.
@@ -547,66 +579,182 @@ export default function HomeClient({ initialItems = [], worldIndices = null }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const items = useMemo(() => rawItems.map(toCardShape), [rawItems]);
+  const items = useMemo(() => rawItems.map((it) => toCardShape(it, liveQuotes)), [rawItems, liveQuotes]);
+
+  // [2026-10-19 추가] 테마나 종목을 누르면 아래 속보를 그것만 남깁니다.
+  // filter: null | { kind: "theme" | "stock", value: "해운" }
+  const [filter, setFilter] = useState(null);
+
+  function toggleFilter(kind, value) {
+    setFilter((cur) => (cur && cur.kind === kind && cur.value === value ? null : { kind, value }));
+  }
+
+  const visible = useMemo(() => {
+    if (!filter) return items;
+    if (filter.kind === "theme") return items.filter((n) => n.themes?.includes(filter.value));
+    return items.filter((n) => n.stocks?.some((s) => s.name === filter.value));
+  }, [items, filter]);
+
+  // 머리기사는 걸러진 목록의 맨 위(가장 최근) 기사입니다.
+  const leadStory = visible[0] || null;
+  const restStories = visible.slice(1);
+
+  // 오늘 가장 많이 불린 종목 — 오늘 올라온 기사에서 종목이 몇 번 나왔는지 셉니다.
+  const topStocks = useMemo(() => {
+    const tally = new Map();
+    for (const n of items) {
+      for (const s of n.stocks || []) {
+        const row = tally.get(s.name) || { name: s.name, code: s.code, hits: 0, change: s.change };
+        row.hits += 1;
+        if (typeof s.change === "number") row.change = s.change;
+        tally.set(s.name, row);
+      }
+    }
+    return [...tally.values()]
+      .sort((a, b) => b.hits - a.hits || (b.change ?? -99) - (a.change ?? -99))
+      .slice(0, 8);
+  }, [items]);
 
   return (
     <div>
       <Header />
-      <main className="container-wide" style={{ paddingTop: 32, paddingBottom: 32 }}>
-        {/* [2026-10-17 추가] 오늘의 세계증시 — 서버(app/page.js)가 미리 받아온
-            지수를 그대로 넘겨줘서, 크롤러도 첫 HTML에서 숫자를 읽습니다. */}
-        <WorldMarketMap data={worldIndices} />
+
+      {/* [2026-10-19 신설] 남색 브리핑 밴드 — 오늘을 한 문장으로 요약하고,
+          테마 히트맵과 세계 지수 띠를 함께 보여줍니다. 지도는 배경입니다.
+          예전 components/WorldMarketMap.js(네모난 지도 위젯)가 여기로 흡수됐습니다. */}
+      <BriefingBand
+        brief={brief}
+        worldIndices={worldIndices}
+        activeTheme={filter?.kind === "theme" ? filter.value : null}
+        onThemeClick={(t) => toggleFilter("theme", t)}
+      />
+
+      <main className="container-wide home-main">
         <DailyOutlookBanner />
         <InstallHintBanner />
-        <div className="home-layout">
-          <div>
-            <div className="filter-row">
-              <h2 className="live-heading" style={{ margin: 0 }}>
-                <span className="live-dot" />
-                <span className="live-label">실시간 급등뉴스 감시중</span>
-                <span className="loading-dots"><span>.</span><span>.</span><span>.</span></span>
-              </h2>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <button type="button" className={`sound-toggle ${soundEnabled ? "on" : ""}`} onClick={toggleSound}>
-                  {soundEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
-                  주요 키워드 알림음 {soundEnabled ? "켜짐" : "꺼짐"}
-                </button>
-                <button type="button" className={`sound-toggle ${notifyEnabled ? "on" : ""}`} onClick={toggleNotify}>
-                  {notifyEnabled ? <Bell size={14} /> : <BellOff size={14} />}
-                  데스크톱 알림 {notifyEnabled ? "켜짐" : "꺼짐"}
-                </button>
-              </div>
-            </div>
 
-            {loadState === "loading" && (
-              <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--ink-muted)", fontSize: 14, padding: "24px 0" }}>
-                <Loader2 size={16} />
-                불러오는 중...
-              </div>
-            )}
-
-            {loadState === "error" && (
-              <p style={{ fontSize: 13, color: "var(--amber-tint-ink)", background: "var(--amber-tint)", padding: "8px 12px", borderRadius: 8 }}>
-                피드를 불러오지 못했습니다. Redis(Upstash) 환경변수 설정을 확인해주세요.
-              </p>
-            )}
-
-            {loadState === "ready" && items.length === 0 && (
-              <p style={{ fontSize: 14, color: "var(--ink-muted)", padding: "24px 0" }}>
-                아직 자동 수집된 뉴스가 없어요. /api/poll 을 한 번 호출해보시거나, 스케줄러가 연결되면 여기 자동으로 쌓이기 시작해요.
-              </p>
-            )}
-
-            <div className="news-list">
-              {items.map((n) => <NewsCard key={n.id} n={n} isNew={newIds.has(n.id)} />)}
-            </div>
+        {/* 감시 바 — 실시간 표시와 알림 토글 */}
+        <div className="watch-bar">
+          <span className="watch-live">
+            <span className="live-dot" />
+            실시간 급등뉴스 감시중
+            <span className="loading-dots"><span>.</span><span>.</span><span>.</span></span>
+          </span>
+          <div className="watch-toggles">
+            <button type="button" className={`sound-toggle ${soundEnabled ? "on" : ""}`} onClick={toggleSound}>
+              {soundEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
+              알림음 {soundEnabled ? "켜짐" : "꺼짐"}
+            </button>
+            <button type="button" className={`sound-toggle ${notifyEnabled ? "on" : ""}`} onClick={toggleNotify}>
+              {notifyEnabled ? <Bell size={14} /> : <BellOff size={14} />}
+              데스크톱 알림 {notifyEnabled ? "켜짐" : "꺼짐"}
+            </button>
           </div>
+        </div>
 
-          <div className="sidebar-stack">
-            <GlobalMarketPanel />
-            <DailyMoversPanel />
-            <HotThemePanel />
+        {loadState === "loading" && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--ink-muted)", fontSize: 14, padding: "24px 0" }}>
+            <Loader2 size={16} />
+            불러오는 중...
           </div>
+        )}
+
+        {loadState === "error" && (
+          <p style={{ fontSize: 13, color: "var(--amber-tint-ink)", background: "var(--amber-tint)", padding: "8px 12px", borderRadius: 8 }}>
+            피드를 불러오지 못했습니다. Redis(Upstash) 환경변수 설정을 확인해주세요.
+          </p>
+        )}
+
+        {loadState === "ready" && items.length === 0 && (
+          <p style={{ fontSize: 14, color: "var(--ink-muted)", padding: "24px 0" }}>
+            아직 자동 수집된 뉴스가 없어요. 스케줄러가 연결되면 여기 자동으로 쌓이기 시작해요.
+          </p>
+        )}
+
+        {/* 머리기사 — 신문 1면처럼 가장 최근 기사 하나를 크게.
+            오른쪽 칸에는 그 기사의 근거를 따로 세웁니다. */}
+        {leadStory && (
+          <section className="front">
+            <NewsCard n={leadStory} variant="lead" />
+            <aside className="front-why">
+              <div className="panel-label">왜 이 종목인가</div>
+              <ul>
+                {(leadStory.reasons || []).map((r, i) => (
+                  <li key={i}>{r}</li>
+                ))}
+              </ul>
+              {leadStory.link && (
+                <a className="front-src" href={leadStory.link} target="_blank" rel="noopener noreferrer">
+                  원문 기사 전체 보기 ↗
+                </a>
+              )}
+            </aside>
+          </section>
+        )}
+
+        {/* 오늘 많이 불린 종목 — 막대 한 칸이 속보 한 건입니다.
+            누르면 그 종목이 걸린 속보만 아래에 남습니다. */}
+        {topStocks.length > 0 && (
+          <section className="hitstrip">
+            <div className="panel-label">오늘 많이 불린 종목</div>
+            <div className="hitstrip-list">
+              {topStocks.map((st) => (
+                <button
+                  key={st.name}
+                  type="button"
+                  className="hit"
+                  aria-pressed={filter?.kind === "stock" && filter.value === st.name}
+                  onClick={() => toggleFilter("stock", st.name)}
+                >
+                  <span className="nm">{st.name}</span>
+                  <span className="bars">
+                    {Array.from({ length: Math.min(st.hits, 5) }).map((_, i) => (
+                      <span className="b" key={i} />
+                    ))}
+                  </span>
+                  <span className={`pc mono ${toneOf(st.change)}`}>{fmtPct(st.change)}</span>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {restStories.length > 0 && (
+          <>
+            <div className="stories-head">
+              <h2>그 밖의 속보</h2>
+              <span className="stories-count mono">
+                {filter ? `${visible.length}건 / 전체 ${items.length}건` : `${items.length}건`}
+              </span>
+              {filter && (
+                <button type="button" className="clear-filter" onClick={() => setFilter(null)}>
+                  필터 해제 · {filter.value} ✕
+                </button>
+              )}
+            </div>
+            <div className="stories">
+              {restStories.map((n) => (
+                <NewsCard key={n.id} n={n} isNew={newIds.has(n.id)} />
+              ))}
+            </div>
+          </>
+        )}
+
+        {filter && visible.length === 0 && (
+          <p style={{ fontSize: 14, color: "var(--ink-muted)", padding: "24px 0" }}>
+            {filter.value}에 해당하는 속보가 아직 없습니다.{" "}
+            <button type="button" className="clear-filter" onClick={() => setFilter(null)}>
+              필터 해제 ✕
+            </button>
+          </p>
+        )}
+
+        {/* 보조 패널 3개 — 예전에는 오른쪽 세로줄이었는데, 신문 구조로
+            바뀌면서 속보 아래 가로 3칸으로 옮겼습니다. */}
+        <div className="rail-row">
+          <GlobalMarketPanel />
+          <DailyMoversPanel />
+          <HotThemePanel />
         </div>
 
         <AboutSiteSection />

@@ -1,10 +1,31 @@
 "use client";
 
+// components/Header.js
+//
+// [2026-10-19 디자인 개편] 흰 바탕 + 주황 강조였던 헤더를 짙은 남색 띠로
+// 바꿨습니다. 홈 화면의 브리핑 밴드와 같은 색이라 위쪽이 하나로 이어져
+// 보입니다. 다른 페이지에서는 이 띠만 단독으로 깔립니다.
+//
+// 바뀐 점:
+//  · 배경 남색(--deep), 글자 밝은 색
+//  · 메뉴를 알약 모양으로 — 지금 보고 있는 메뉴가 확실히 드러납니다
+//  · 아이콘 제거 — 글자만 남기니 훨씬 정돈돼 보입니다. 좁은 화면에서
+//    아이콘이 차지하던 자리만큼 메뉴가 더 들어갑니다.
+//  · 로고 높이 52px -> 34px. 띠 높이를 줄여서 본문이 위로 올라옵니다.
+
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-// [2026-09-22] 마감시황 기능을 전부 걷어내면서 그 메뉴에만 쓰였던 FileText
-// 아이콘도 같이 뺐습니다(안 쓰는 import는 남겨두면 나중에 헷갈립니다).
-import { Newspaper, LayoutGrid, BookOpen, Rocket, Landmark, Activity } from "lucide-react";
+
+// 메뉴는 여기만 고치면 됩니다.
+// external: true 면 새 창으로 열리는 바깥 링크입니다.
+const MENU = [
+  { href: "/", label: "홈 · 뉴스", match: (p) => p === "/" },
+  { href: "/patterns", label: "패턴검색" },
+  { href: "/themes", label: "테마별 종목정리" },
+  { href: "https://dart.fss.or.kr/dsac008/main.do", label: "공모주 정보", external: true },
+  { href: "/guide", label: "차트 가이드" },
+  { href: "/blog", label: "칼럼" },
+];
 
 export default function Header() {
   const pathname = usePathname();
@@ -12,38 +33,27 @@ export default function Header() {
   return (
     <header className="site-header">
       <div className="container-wide site-header-inner">
-        <div className="brand">
-          {/* [2026-09-08 추가] 재성님이 만든 로고 이미지(public/logo.png).
-              "뉴스매매" 글씨는 지우지 말고 로고와 같이 표시 — 로고 크기만
-              키움. */}
+        <Link href="/" className="brand">
           <img src="/logo.png" alt="뉴스매매 로고" className="brand-logo" />
-          <h1>뉴스매매</h1>
-        </div>
-        {/* 재성님 요청으로 메뉴 순서 재배치: 홈·뉴스 - 패턴검색 - 테마별
-            종목정리(구 "테마 둘러보기") - 공모주 정보 - 차트가이드 - 칼럼
-            [2026-09-22] "마감시황" 메뉴 제거 — 아래 설명 참고.
-            KRX가 그날 시세를 저녁까지 안 올려주는 탓에 글이 제대로 쌓이지
-            않아서, 재성님 결정으로 기능을 통째로 없앴습니다. */}
+          <span className="brand-name">뉴스매매</span>
+        </Link>
+
         <nav className="nav">
-          <Link href="/" className={`nav-btn ${pathname === "/" ? "active" : ""}`}>
-            <Newspaper size={15} />홈 · 뉴스
-          </Link>
-          <Link href="/patterns" className={`nav-btn ${pathname?.startsWith("/patterns") ? "active" : ""}`}>
-            <Activity size={15} />패턴검색
-          </Link>
-          <Link href="/themes" className={`nav-btn ${pathname?.startsWith("/themes") ? "active" : ""}`}>
-            <LayoutGrid size={15} />테마별 종목정리
-          </Link>
-          {/* IPO schedule link: points to DART's own official page instead of scraping a private site. */}
-          <a href="https://dart.fss.or.kr/dsac008/main.do" target="_blank" rel="noopener noreferrer" className="nav-btn">
-            <Rocket size={15} />공모주 정보
-          </a>
-          <Link href="/guide" className={`nav-btn ${pathname?.startsWith("/guide") ? "active" : ""}`}>
-            <BookOpen size={15} />차트 가이드
-          </Link>
-          <Link href="/blog" className={`nav-btn ${pathname?.startsWith("/blog") ? "active" : ""}`}>
-            <Landmark size={15} />칼럼
-          </Link>
+          {MENU.map((m) => {
+            if (m.external) {
+              return (
+                <a key={m.href} href={m.href} target="_blank" rel="noopener noreferrer" className="nav-btn">
+                  {m.label}
+                </a>
+              );
+            }
+            const active = m.match ? m.match(pathname) : pathname?.startsWith(m.href);
+            return (
+              <Link key={m.href} href={m.href} className={`nav-btn ${active ? "active" : ""}`}>
+                {m.label}
+              </Link>
+            );
+          })}
         </nav>
       </div>
     </header>

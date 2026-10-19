@@ -10,48 +10,49 @@
 // 크롤러와 애드센스 심사 로봇은 그 "잠깐"을 기다려주지 않습니다. 처음 받은
 // HTML만 보고 판단합니다. 그래서 그들 눈에 이 사이트의 첫 화면은
 // "메뉴 + 불러오는 중..." 이 전부인 빈 페이지였습니다.
-// (2026-10-14 확인: 크롤러 방식으로 읽어보니 기사가 단 한 건도 안 보였고,
-//  구글 색인도 88편짜리 칼럼이 있는데도 1페이지뿐이었습니다.)
 //
 // 어떻게 바꿨나:
 // 파일을 둘로 나눴습니다.
-//   · app/page.js (이 파일)  = 서버에서 먼저 뉴스를 가져오는 부분
-//   · app/HomeClient.js      = 예전 화면 코드 그대로(알림음·실시간 갱신 등)
-// 서버가 뉴스를 미리 채워서 HTML을 보내주므로, 크롤러는 첫 HTML에서 바로
-// 기사 제목과 요약과 관련주를 보게 됩니다. 사람에게도 화면이 더 빨리 뜹니다.
+//   · app/page.js (이 파일)  = 서버에서 먼저 데이터를 가져오는 부분
+//   · app/HomeClient.js      = 화면 코드(알림음·실시간 갱신 등)
 //
-// 비용은 어떻게 되나:
-// 아래 revalidate 설정 덕분에 이 페이지의 결과는 60초 동안 저장(캐시)됩니다.
-// 1분 안에 들어온 방문자가 100명이어도 Redis는 한 번만 읽습니다. 예전에는
-// 방문자 한 명당 /api/feed를 한 번씩 호출했으니, 방문자가 늘수록 오히려
-// 지금 구조가 훨씬 쌉니다. Claude(AI) 비용은 이 변경과 전혀 무관합니다 —
-// AI는 텔레그램 메시지가 들어올 때만 돌고, 사람이 페이지를 보는 것과는
-// 상관이 없습니다.
+// ---------------------------------------------------------------------------
+// [2026-10-19 추가] 디자인 개편 — 서버가 챙겨야 할 것이 세 가지 늘었습니다.
 //
-// 실시간성은 그대로입니다:
-// 첫 화면만 서버가 채워주고, 그 뒤로는 예전과 똑같이 브라우저가 10초마다
-// 새 글을 확인합니다(HomeClient.js의 FEED_POLL_MS 참고).
+//   ③ 오늘 뉴스에 걸린 종목들의 "지금 시세"
+//      뉴스 카드에 붙는 등락률은 기사가 올라온 그 순간에 찍힌 값이라,
+//      아침 기사를 오후에 보면 그때 숫자가 그대로 남아 있었습니다.
+//      여기서 한 번 더 받아와 최신 값으로 덮어씁니다.
+//
+//   ④ 미국 테마 ETF 시세
+//      새벽에 들어온 방문자에게 보여줄 "밤사이 미국을 움직인 건 ○○" 문장용.
+//
+//   ⑤ 위 둘을 가지고 만든 오늘의 한 문장 + 테마 집계 (lib/todayBrief.js)
+//
+// 비용: 전부 아래 revalidate(저장 시간) 안에서 돕니다. 방문자가 몇 명이든
+// 바깥으로 나가는 요청 횟수는 똑같습니다. 종목 시세도 "홈 화면에 실제로
+// 보이는 종목"만 조회합니다(전 종목이 아닙니다).
+// ---------------------------------------------------------------------------
 
 import HomeClient from "./HomeClient";
+import { fetchDomesticQuotes, fetchEtfQuotes } from "../lib/quotes";
+import { US_ETF_SYMBOLS } from "../lib/usThemes";
+import { buildTodayBrief, todaysItems } from "../lib/todayBrief";
 
 // 이 페이지의 HTML을 60초 동안 재사용합니다(그 사이 방문자는 저장된 걸 받음).
-// force-dynamic(매번 새로 만들기)에서 바뀐 부분 — 비용과 속도 둘 다 이쪽이
-// 낫고, 실시간성은 브라우저 쪽 10초 갱신이 담당합니다.
 export const revalidate = 60;
 
 const SITE_URL = "https://newsmeme.co.kr";
+
 // 서버가 HTML을 만들 때 미리 가져올 기사 개수.
-// 너무 많으면 HTML이 무거워지고, 너무 적으면 크롤러가 볼 내용이 부족합니다.
-// 60개면 검색엔진이 사이트 성격을 판단하기에 충분하고, 방문자도 스크롤로
-// 한참 내려볼 분량입니다. 그 뒤에 올라오는 새 글은 브라우저가 알아서 위에
-// 붙여줍니다.
 const INITIAL_FEED_COUNT = 60;
+
+// 시세를 조회할 종목 수 상한. 오늘 뉴스에 걸린 종목이 아무리 많아도 이만큼만
+// 봅니다 — 화면에 보이지도 않는 종목까지 조회하면 요청만 늘고 얻는 게 없습니다.
+const MAX_QUOTE_STOCKS = 60;
 
 async function getInitialFeed() {
   try {
-    // 이미 만들어져 있는 /api/feed를 그대로 씁니다 — 데이터를 읽는 방식을
-    // 새로 짜면 기존 동작과 미묘하게 달라질 위험이 있어서, 검증된 통로를
-    // 재사용하는 쪽이 안전합니다.
     const res = await fetch(`${SITE_URL}/api/feed?limit=${INITIAL_FEED_COUNT}`, {
       next: { revalidate: 60 },
     });
@@ -59,20 +60,16 @@ async function getInitialFeed() {
     const data = await res.json();
     return Array.isArray(data?.items) ? data.items : [];
   } catch {
-    // 못 가져와도 페이지는 떠야 합니다 — 빈 배열로 넘기면 예전처럼
-    // 브라우저가 불러옵니다(화면이 깨지지 않음).
+    // 못 가져와도 페이지는 떠야 합니다 — 빈 배열로 넘기면 브라우저가 불러옵니다.
     return [];
   }
 }
 
-// [2026-10-17 추가] 홈 화면 맨 위의 "오늘의 세계증시" 지도에 쓸 지수를
-// 서버가 미리 받아옵니다. 브라우저가 나중에 불러오게 하면 크롤러 눈에는
-// 또 빈 자리로 보이므로(10월에 겪은 문제) 처음부터 채워서 보냅니다.
-//
+// 세계 지수 — 브리핑 밴드의 지도 핀과 아래 띠에 씁니다.
 // 실패해도 null을 넘기면 지도는 뜨고 숫자 자리만 "—"가 됩니다.
 async function getWorldIndices() {
   try {
-    const res = await fetch(`${SITE_URL}/api/world-indices?v=2`, { next: { revalidate: 300 } });
+    const res = await fetch(`${SITE_URL}/api/world-indices?v=3`, { next: { revalidate: 300 } });
     if (!res.ok) return null;
     return await res.json();
   } catch {
@@ -80,8 +77,48 @@ async function getWorldIndices() {
   }
 }
 
+// 오늘 뉴스에 걸린 종목 목록을 추립니다(중복 제거).
+function collectStocks(items) {
+  const seen = new Map();
+  for (const item of items) {
+    for (const m of item?.matches || []) {
+      if (!m?.code || seen.has(m.code)) continue;
+      seen.set(m.code, { code: m.code, market: m.market });
+      if (seen.size >= MAX_QUOTE_STOCKS) return [...seen.values()];
+    }
+  }
+  return [...seen.values()];
+}
+
 export default async function HomePage() {
-  // 둘을 동시에 받아옵니다 — 순서대로 기다리면 첫 화면이 그만큼 늦어집니다.
+  // 피드와 세계 지수를 동시에 받아옵니다 — 순서대로 기다리면 첫 화면이 늦어집니다.
   const [initialItems, worldIndices] = await Promise.all([getInitialFeed(), getWorldIndices()]);
-  return <HomeClient initialItems={initialItems} worldIndices={worldIndices} />;
+
+  // 오늘 올라온 것만 가지고 시세를 조회합니다. 어제 기사에 걸린 종목까지
+  // 전부 조회하면 요청만 늘고, 그 숫자는 어차피 오늘의 한 문장과 무관합니다.
+  const today = todaysItems(initialItems);
+  const stocks = collectStocks(today);
+
+  const [quotes, etfQuotes] = await Promise.all([
+    fetchDomesticQuotes(stocks).catch(() => new Map()),
+    fetchEtfQuotes(US_ETF_SYMBOLS).catch(() => new Map()),
+  ]);
+
+  const brief = buildTodayBrief({ items: initialItems, quotes, etfQuotes });
+
+  // Map은 그대로 화면 쪽으로 넘길 수 없습니다(서버에서 브라우저로 건너갈 때
+  // 평범한 객체만 넘어갑니다). 종목코드를 열쇠로 하는 객체로 바꿔서 보냅니다.
+  const liveQuotes = {};
+  for (const [code, q] of quotes) {
+    if (typeof q.changePct === "number") liveQuotes[code] = { price: q.price, changePct: q.changePct };
+  }
+
+  return (
+    <HomeClient
+      initialItems={initialItems}
+      worldIndices={worldIndices}
+      brief={brief}
+      liveQuotes={liveQuotes}
+    />
+  );
 }
