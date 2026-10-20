@@ -12,7 +12,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Newspaper, Loader2, Flame, Bell, BellOff, Globe, Volume2, VolumeX, Smartphone, X } from "lucide-react";
+import { Newspaper, Loader2, Flame, Bell, BellOff, Volume2, VolumeX, Smartphone, X } from "lucide-react";
 import Header from "../components/Header";
 import NewsCard from "../components/NewsCard";
 import DailyOutlookBanner from "../components/DailyOutlookBanner";
@@ -292,42 +292,11 @@ function DailyMoversPanel() {
 
 // Replaces the old scrolling top ticker — everything visible at once
 // instead of waiting for text to scroll by.
-function GlobalMarketPanel() {
-  const [data, setData] = useState(null);
-
-  useEffect(() => {
-    fetch("/api/market-ticker")
-      .then((r) => r.json())
-      .then(setData)
-      .catch(() => {});
-  }, []);
-
-  const rows = [];
-  if (data?.usd) rows.push(["원/달러", `${data.usd.toLocaleString("ko-KR")}원`]);
-  if (data?.jpy) rows.push(["원/엔(100엔)", `${data.jpy.toLocaleString("ko-KR")}원`]);
-  if (data?.gold) rows.push(["국제 금값(1oz)", `$${Number(data.gold).toLocaleString("ko-KR")}`]);
-  if (data?.wti) rows.push(["WTI", `$${Number(data.wti).toLocaleString("ko-KR")}`]);
-  if (data?.brent) rows.push(["브렌트유", `$${Number(data.brent).toLocaleString("ko-KR")}`]);
-
-  return (
-    <aside className="trending-panel">
-      <h2 className="trending-panel-title">
-        <Globe size={12} style={{ color: "var(--amber)" }} />
-        글로벌 시황
-      </h2>
-      {rows.length === 0 ? (
-        <p className="trending-empty">불러오는 중...</p>
-      ) : (
-        rows.map(([label, value]) => (
-          <div key={label} className="trending-row">
-            <span className="trending-row-name">{label}</span>
-            <span className="mono" style={{ fontSize: 13, fontWeight: 700 }}>{value}</span>
-          </div>
-        ))
-      )}
-    </aside>
-  );
-}
+// [2026-10-20 삭제] GlobalMarketPanel("글로벌 시황")을 없앴습니다.
+// 재성님: "이제 이거 필요가없겠네 없애버려"
+// 맨 위 남색 띠의 "환율 · 금리" / "원자재" 탭이 같은 숫자를 더 많이,
+// 더 정확하게(야후 기준) 보여주게 되면서 완전히 겹쳤습니다.
+// 이 패널은 /api/market-ticker를 쓰던 예전 방식이었습니다.
 
 function InstallHintBanner() {
   const [dismissed, setDismissed] = useState(true); // hidden until localStorage check to avoid a flash
@@ -757,7 +726,6 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
 
           {/* 오른쪽 — 스크롤을 따라오는 보조 패널들 */}
           <aside className="side-rail">
-            <GlobalMarketPanel />
             <DailyMoversPanel />
             <HotThemePanel />
           </aside>

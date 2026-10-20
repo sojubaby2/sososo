@@ -126,11 +126,16 @@ export default function BriefingBand({ brief, worldIndices, strip, activeTheme, 
       {/* 지도는 장식 겸 데이터입니다. 원본이 "연한 바탕 + 어두운 선"이라
           그대로 얹으면 남색에 묻혀 사라집니다. 그래서 색을 뒤집어
           밝은 선으로 만들어 띄웁니다(globals.css의 .brief-map). */}
-      <div className="brief-map" aria-hidden="true">
-        <img src="/world-map.jpg" alt="" width={MAP_WIDTH} height={MAP_HEIGHT} />
-      </div>
-      <div className="brief-pins" aria-hidden="true">
-        <svg viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`}>
+      {/* [2026-10-20 수정] 지도와 핀을 한 상자(.brief-mapwrap)로 묶었습니다.
+          넓은 화면에서는 이 상자가 배경으로 깔리고, 휴대폰에서는 글 위쪽에
+          제대로 보이는 띠가 됩니다. 두 개를 따로 두면 휴대폰에서 자리를
+          옮길 때 핀만 엉뚱한 데 가버립니다. */}
+      <div className="brief-mapwrap" aria-hidden="true">
+        <div className="brief-map">
+          <img src="/world-map.jpg" alt="" width={MAP_WIDTH} height={MAP_HEIGHT} />
+        </div>
+        <div className="brief-pins">
+          <svg viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`}>
           {pins.map((it) => {
             const up = typeof it.changePct === "number" ? it.changePct >= 0 : true;
             const color = up ? "var(--up)" : "var(--down)";
@@ -140,8 +145,9 @@ export default function BriefingBand({ brief, worldIndices, strip, activeTheme, 
                 <circle cx={it.px} cy={it.py} r="7" fill={color} />
               </g>
             );
-          })}
-        </svg>
+            })}
+          </svg>
+        </div>
       </div>
 
       <div className="container-wide brief-inner">

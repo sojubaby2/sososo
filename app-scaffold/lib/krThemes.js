@@ -44,11 +44,18 @@ export const KR_THEMES = [
   { code: "102970", label: "증권", koreanTheme: "증권" }, // KODEX 증권
   { code: "117680", label: "철강", koreanTheme: "철강 주요종목" }, // KODEX 철강
   { code: "117700", label: "건설", koreanTheme: "건설 대표주" }, // KODEX 건설
-  { code: "140710", label: "운송", koreanTheme: "해운" }, // KODEX 운송 (항공·해운·육운)
-  { code: "102960", label: "기계장비", koreanTheme: "기계" }, // KODEX 기계장비
-  { code: "266360", label: "미디어·엔터", koreanTheme: "엔터테인먼트" }, // KODEX 미디어&엔터테인먼트
-  { code: "228790", label: "화장품", koreanTheme: "화장품" }, // TIGER 화장품
-  { code: "463250", label: "방산·우주", koreanTheme: "방산주" }, // TIGER K방산&우주
+  { code: "140710", label: "운송", koreanTheme: "해운" }, // Kodex Transportation (항공·해운·육운)
+
+  // [2026-10-20 정정] 아래 세 줄은 처음에 라벨을 잘못 붙였습니다.
+  // 배포 후 /api/etf-check 로 야후가 돌려준 실제 이름을 보고 바로잡았습니다.
+  // 점검 창구를 만들어둔 보람이 바로 여기서 나왔습니다.
+  //   102960 -> "Kodex Shipbuilding"  (기계장비가 아니라 조선)
+  //   266360 -> "KODEX IT Software"   (미디어·엔터가 아니라 IT 소프트웨어)
+  //   463250 -> "Tiger Space Tech"    (방산보다 우주·항공이 정확)
+  { code: "102960", label: "조선", koreanTheme: "조선" }, // Kodex Shipbuilding
+  { code: "266360", label: "IT 소프트웨어", koreanTheme: "소프트웨어" }, // KODEX IT Software
+  { code: "228790", label: "화장품", koreanTheme: "화장품" }, // Tiger Cosmetics
+  { code: "463250", label: "우주·항공", koreanTheme: "우주항공" }, // Tiger Space Tech
 ];
 
 // 국내 ETF도 코스피 상장이라 야후 기호는 뒤에 .KS를 붙입니다.
