@@ -11,7 +11,10 @@
 //  · 메뉴를 알약 모양으로 — 지금 보고 있는 메뉴가 확실히 드러납니다
 //  · 아이콘 제거 — 글자만 남기니 훨씬 정돈돼 보입니다. 좁은 화면에서
 //    아이콘이 차지하던 자리만큼 메뉴가 더 들어갑니다.
-//  · 로고 높이 52px -> 34px. 띠 높이를 줄여서 본문이 위로 올라옵니다.
+//  · [2026-10-19 추가] 로고 그림을 뺐습니다 — 재성님 판단으로 남색 띠와
+//    어울리지 않아서, 글씨만 남겼습니다. 그림 파일(public/logo.png)은
+//    지우지 않았습니다(다른 곳에서 쓸 수 있어서). 다시 넣고 싶으면
+//    아래 brand 안에 <img src="/logo.png" ... /> 한 줄만 되살리면 됩니다.
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -34,7 +37,6 @@ export default function Header() {
     <header className="site-header">
       <div className="container-wide site-header-inner">
         <Link href="/" className="brand">
-          <img src="/logo.png" alt="뉴스매매 로고" className="brand-logo" />
           <span className="brand-name">뉴스매매</span>
         </Link>
 

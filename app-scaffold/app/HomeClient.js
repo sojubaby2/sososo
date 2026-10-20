@@ -409,7 +409,7 @@ function AboutSiteSection() {
   );
 }
 
-export default function HomeClient({ initialItems = [], worldIndices = null, brief = null, liveQuotes = {} }) {
+export default function HomeClient({ initialItems = [], worldIndices = null, brief = null, liveQuotes = {}, strip = null }) {
   // [2026-10-14 변경] 서버(app/page.js)가 미리 가져다 준 기사들로 시작합니다.
   // 예전에는 빈 배열로 시작해서 브라우저가 불러올 때까지 화면이 비어 있었고,
   // 그 빈 화면이 크롤러에게 그대로 노출됐습니다.
@@ -595,9 +595,13 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
     return items.filter((n) => n.stocks?.some((s) => s.name === filter.value));
   }, [items, filter]);
 
-  // 머리기사는 걸러진 목록의 맨 위(가장 최근) 기사입니다.
-  const leadStory = visible[0] || null;
-  const restStories = visible.slice(1);
+  // [2026-10-19 변경] 재성님 요청 — "오늘의 머리기사" 한 건을 크게 띄우던
+  // 방식을 없애고, 가장 최근 속보 3건을 위에 크게 보여줍니다.
+  // 이 사이트는 지금 막 들어온 속보를 보러 오는 곳이라 최근 것 여러 건을
+  // 같이 보여주는 쪽이 맞습니다.
+  const TOP_COUNT = 3;
+  const topStories = visible.slice(0, TOP_COUNT);
+  const restStories = visible.slice(TOP_COUNT);
 
   // 오늘 가장 많이 불린 종목 — 오늘 올라온 기사에서 종목이 몇 번 나왔는지 셉니다.
   const topStocks = useMemo(() => {
@@ -625,6 +629,7 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
       <BriefingBand
         brief={brief}
         worldIndices={worldIndices}
+        strip={strip}
         activeTheme={filter?.kind === "theme" ? filter.value : null}
         onThemeClick={(t) => toggleFilter("theme", t)}
       />
@@ -633,12 +638,19 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
         <DailyOutlookBanner />
         <InstallHintBanner />
 
-        {/* 감시 바 — 실시간 표시와 알림 토글 */}
-        <div className="watch-bar">
-          <span className="watch-live">
+        <div className="home-split">
+          <div className="home-main-col">
+
+        {/* [2026-10-19 변경] "실시간 급등뉴스 감시중" 띠와 "오늘의 머리기사"를
+            하나로 합쳤습니다. 머리글에 실시간 표시와 알림 토글이 같이 있고,
+            바로 아래에 가장 최근 속보 3건이 큰 카드로 들어갑니다. */}
+        <div className="live-head">
+          <h2>
             <span className="live-dot" />
-            실시간 급등뉴스 감시중
-            <span className="loading-dots"><span>.</span><span>.</span><span>.</span></span>
+            실시간 속보
+          </h2>
+          <span className="stories-count mono">
+            {filter ? `${visible.length}건 / 전체 ${items.length}건` : `${items.length}건`}
           </span>
           <div className="watch-toggles">
             <button type="button" className={`sound-toggle ${soundEnabled ? "on" : ""}`} onClick={toggleSound}>
@@ -649,6 +661,11 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
               {notifyEnabled ? <Bell size={14} /> : <BellOff size={14} />}
               데스크톱 알림 {notifyEnabled ? "켜짐" : "꺼짐"}
             </button>
+            {filter && (
+              <button type="button" className="clear-filter" onClick={() => setFilter(null)}>
+                필터 해제 · {filter.value} ✕
+              </button>
+            )}
           </div>
         </div>
 
@@ -671,25 +688,12 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
           </p>
         )}
 
-        {/* 머리기사 — 신문 1면처럼 가장 최근 기사 하나를 크게.
-            오른쪽 칸에는 그 기사의 근거를 따로 세웁니다. */}
-        {leadStory && (
-          <section className="front">
-            <NewsCard n={leadStory} variant="lead" />
-            <aside className="front-why">
-              <div className="panel-label">왜 이 종목인가</div>
-              <ul>
-                {(leadStory.reasons || []).map((r, i) => (
-                  <li key={i}>{r}</li>
-                ))}
-              </ul>
-              {leadStory.link && (
-                <a className="front-src" href={leadStory.link} target="_blank" rel="noopener noreferrer">
-                  원문 기사 전체 보기 ↗
-                </a>
-              )}
-            </aside>
-          </section>
+        {topStories.length > 0 && (
+          <div className="top-stories">
+            {topStories.map((n) => (
+              <NewsCard key={n.id} n={n} isNew={newIds.has(n.id)} variant="top" />
+            ))}
+          </div>
         )}
 
         {/* 오늘 많이 불린 종목 — 막대 한 칸이 속보 한 건입니다.
@@ -749,12 +753,14 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
           </p>
         )}
 
-        {/* 보조 패널 3개 — 예전에는 오른쪽 세로줄이었는데, 신문 구조로
-            바뀌면서 속보 아래 가로 3칸으로 옮겼습니다. */}
-        <div className="rail-row">
-          <GlobalMarketPanel />
-          <DailyMoversPanel />
-          <HotThemePanel />
+          </div>
+
+          {/* 오른쪽 — 스크롤을 따라오는 보조 패널들 */}
+          <aside className="side-rail">
+            <GlobalMarketPanel />
+            <DailyMoversPanel />
+            <HotThemePanel />
+          </aside>
         </div>
 
         <AboutSiteSection />

@@ -12,6 +12,12 @@ import StockChip from "./StockChip";
 //  · "원문 기사 전체 보기"를 큰 주황 버튼에서 작은 글자 링크로 —
 //    버튼이 제목보다 눈에 띄던 문제를 고쳤습니다
 //
+// [2026-10-19 수정] 재성님 요청 — "오늘의 머리기사"를 없애고 "실시간 속보"
+// 최근 3건으로 바꿨습니다. 머리기사 하나만 크게 띄우는 방식은 하루를
+// 정리해 보여주기엔 좋지만, 이 사이트는 지금 막 들어온 속보를 보러 오는
+// 곳이라 최근 것 여러 건을 같이 보여주는 쪽이 맞습니다.
+// 그래서 모양이 하나로 합쳐졌고, 크기만 다릅니다.
+//
 // 종목 등락률에 대해:
 // 이 숫자는 원래부터 데이터에 들어 있었는데(lib/newsPipeline.js의
 // finalizeMatches가 붙여줍니다) 화면으로 넘기는 과정에서 버려지고
@@ -19,55 +25,22 @@ import StockChip from "./StockChip";
 // 홈 화면에서는 app/page.js가 지금 시세로 한 번 더 갱신해 줍니다.
 //
 // variant:
-//   "lead"  — 머리기사. 제목이 크고, 근거가 오른쪽 칸에 따로 섭니다.
-//   "story" — 그 밖의 속보. 3단 격자에 들어가는 작은 카드.
+//   "top"   — 실시간 속보. 가로로 넓고 제목이 큽니다(최근 3건).
+//   "story" — 그 밖의 속보. 2단 격자에 들어가는 작은 카드.
 
 export default function NewsCard({ n, isNew, variant = "story" }) {
   const isRumor = n.confidence === "rumor";
   const reasons = Array.isArray(n.reasons) && n.reasons.length ? n.reasons : n.reason ? [n.reason] : [];
-
-  if (variant === "lead") {
-    return (
-      <article className="front-lead">
-        <div className="front-kicker">오늘의 머리기사</div>
-        <h2 className="front-title">{n.headline}</h2>
-        {n.summary && <p className="front-stand">{n.summary}</p>}
-        <div className="front-byline">
-          {n.time} 접수
-          {n.source ? ` · ${n.source}` : ""}
-          {n.theme ? ` · ${n.theme}` : ""}
-          {isRumor ? " · 시장 추정" : ""}
-          {n.badCatalyst ? ` · 악재(${n.badCatalyst})` : ""}
-        </div>
-
-        {n.stocks?.length > 0 && (
-          <div className="front-linked">
-            <div className="panel-label">이 뉴스가 걸린 종목</div>
-            <div className="chip-row">
-              {n.stocks.map((s) => (
-                <StockChip
-                  key={s.code}
-                  name={s.name}
-                  code={s.code}
-                  market={s.market}
-                  change={s.change}
-                  catalyst={s.catalyst}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-      </article>
-    );
-  }
+  const isTop = variant === "top";
 
   return (
-    <article className={`story ${isRumor ? "rumor" : ""} ${isNew ? "new-enter" : ""}`}>
+    <article className={`story ${isTop ? "story-top" : ""} ${isRumor ? "rumor" : ""} ${isNew ? "new-enter" : ""}`}>
       <div className="story-meta">
         <b>{n.time}</b>
         {n.badCatalyst && <span className="story-bad">악재</span>}
         {n.theme && <span>· {n.theme}</span>}
         {isRumor && <span>· 시장 추정</span>}
+        {n.source && <span>· {n.source}</span>}
       </div>
 
       <h3 className="story-title">{n.headline}</h3>
@@ -91,7 +64,7 @@ export default function NewsCard({ n, isNew, variant = "story" }) {
 
       {reasons.length > 0 && (
         <div className="story-why">
-          <div className="panel-label">근거</div>
+          <div className="panel-label">{isTop ? "왜 이 종목인가" : "근거"}</div>
           <ul>
             {reasons.map((r, i) => (
               <li key={i}>{r}</li>
@@ -113,7 +86,7 @@ export default function NewsCard({ n, isNew, variant = "story" }) {
         )}
         {n.link && (
           <a href={n.link} target="_blank" rel="noopener noreferrer" className="story-link">
-            원문 보기
+            {isTop ? "원문 기사 전체 보기" : "원문 보기"}
             <ExternalLink size={11} />
           </a>
         )}

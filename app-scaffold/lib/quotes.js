@@ -175,7 +175,9 @@ export async function fetchEtfQuotes(symbols) {
   const fetched = await fetchMany(symbols || []);
   const out = new Map();
   for (const [sym, q] of fetched) {
-    out.set(sym, { price: q.price, changePct: q.changePct, asOf: q.asOf });
+    // name은 점검 창구(app/api/etf-check)에서 "코드가 맞는지" 확인하는 데
+    // 씁니다 — 야후가 돌려준 실제 종목 이름입니다.
+    out.set(sym, { price: q.price, changePct: q.changePct, asOf: q.asOf, name: q.name });
   }
   return out;
 }

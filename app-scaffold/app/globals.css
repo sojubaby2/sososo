@@ -76,7 +76,13 @@ html, body {
      하면서 넘친 부분이 페이지 전체 가로폭을 넓혀버렸음(아래 .nav 자체
      스크롤로 고쳤지만), 혹시 모를 다른 요소의 튀어나옴까지 막는 최후
      안전장치로 문서 자체는 가로 스크롤이 아예 안 생기게 막아둠. */
-  overflow-x: hidden;
+  /* [2026-10-19 변경] hidden -> clip.
+     hidden은 "스크롤 되는 상자"를 하나 만들어 버려서, 그 안에 있는 요소에
+     position: sticky(스크롤을 따라다니기)를 줘도 먹지 않습니다. 실제로
+     예전에 오른쪽 패널을 따라다니게 하려다 이것 때문에 포기한 적이 있습니다.
+     clip은 넘치는 부분을 잘라내는 건 똑같은데 스크롤 상자를 만들지 않아서
+     sticky가 정상 동작합니다. */
+  overflow-x: clip;
 }
 
 button, input { font-family: inherit; }
@@ -528,8 +534,10 @@ button, input { font-family: inherit; }
 .site-header { background: var(--deep); border-bottom: none; }
 .site-header-inner { padding: 11px 0; gap: 18px; }
 .brand { text-decoration: none; gap: 9px; }
+/* [2026-10-19] 헤더에서 로고 그림을 뺐습니다(components/Header.js 참고).
+   .brand-logo 규칙은 다른 페이지에서 로고를 쓸 때를 위해 남겨둡니다. */
 .brand-logo { height: 34px; }
-.brand-name { font-family: var(--font-body); font-size: 17px; font-weight: 700; letter-spacing: -0.03em; color: var(--on-deep); }
+.brand-name { font-family: var(--font-body); font-size: 19px; font-weight: 800; letter-spacing: -0.04em; color: var(--on-deep); }
 .site-header .nav-btn { color: var(--on-deep-soft); border-radius: 999px; padding: 6px 12px; font-weight: 500; }
 .site-header .nav-btn:hover { color: var(--on-deep); background: rgba(255, 255, 255, 0.08); }
 .site-header .nav-btn.active { color: var(--on-deep); background: rgba(255, 255, 255, 0.14); font-weight: 700; }
@@ -538,19 +546,46 @@ button, input { font-family: inherit; }
 .brief-band { position: relative; background: var(--deep); overflow: hidden; }
 /* 지도와 핀은 같은 자리에 겹쳐 둡니다. 가로세로 비율을 그림과 똑같이
    고정해야 핀이 제자리에 남습니다. */
+/* [2026-10-20 조정] 머리글이 두 칸이 되면서 오른쪽까지 글자가 찹니다.
+   지도를 위로 올려 글자와 덜 겹치게 하고, 아래 .brief-band::after로
+   글자 뒤에 어두운 그늘을 깔아 읽기 좋게 만듭니다. */
 .brief-map, .brief-pins {
-  position: absolute; top: -8%; right: -3%; width: 58%; min-width: 430px;
+  position: absolute; top: -20%; right: -4%; width: 52%; min-width: 390px;
   aspect-ratio: 1024 / 559; pointer-events: none;
 }
-/* 글 읽는 데 방해되지 않도록 왼쪽으로 갈수록 서서히 사라지게 합니다. */
+
+/* 글자 뒤 그늘.
+   왼쪽은 완전히 가리고 오른쪽으로 갈수록 투명해져서, 지도는 오른쪽
+   끝에서만 또렷하게 보입니다. 글자(.brief-inner)는 이 그늘 위에 있습니다. */
+.brief-band::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 1;
+  background: linear-gradient(
+    100deg,
+    var(--deep) 0%,
+    var(--deep) 34%,
+    rgba(8, 26, 48, 0.9) 52%,
+    rgba(8, 26, 48, 0.62) 72%,
+    rgba(8, 26, 48, 0.18) 92%,
+    transparent 100%
+  );
+}
+/* [2026-10-19 수정] 재성님 리포트 — "지도가 아예 안 보이고 점만 찍혀 있다".
+   원인: 원본 그림은 "연한 하늘색 바탕 + 어두운 해안선"입니다. 남색 배경에
+   그대로 얹으면 어두운 해안선이 어두운 배경에 묻혀서 사라집니다.
+   해결: 색을 뒤집습니다(invert). 그러면 해안선이 밝은 선이 되고 바탕은
+   어두워집니다. 거기에 screen 합성을 쓰면 어두운 바탕은 아예 안 보이고
+   밝은 해안선만 남색 위에 떠오릅니다.
+   더 흐리게/진하게 하려면 opacity 숫자만 고치면 됩니다. */
 .brief-map {
-  opacity: 0.3; filter: grayscale(1) brightness(2.4) contrast(0.7);
-  -webkit-mask-image: linear-gradient(to left, #000 38%, transparent 97%);
-  mask-image: linear-gradient(to left, #000 38%, transparent 97%);
+  opacity: 0.7;
+  filter: grayscale(1) invert(1) contrast(1.35) brightness(1.1);
+  mix-blend-mode: screen;
+  -webkit-mask-image: linear-gradient(to left, #000 30%, transparent 92%);
+  mask-image: linear-gradient(to left, #000 30%, transparent 92%);
 }
 .brief-map img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .brief-pins svg { width: 100%; height: 100%; display: block; }
-.brief-inner { position: relative; padding: 28px 24px 0; }
+.brief-inner { position: relative; z-index: 2; padding: 28px 24px 0; }
 
 .brief-eyebrow {
   display: inline-flex; align-items: center; gap: 8px;
@@ -560,15 +595,28 @@ button, input { font-family: inherit; }
 .brief-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--up); flex-shrink: 0; animation: live-pulse 1.4s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .brief-dot { animation: none; } }
 
+/* [2026-10-20 변경] 한 문장에서 두 칸(왼쪽 미국 / 오른쪽 한국)으로.
+   두 개를 나란히 놓으려면 글자를 줄여야 해서 최대 52px -> 34px로 낮췄습니다.
+   좁은 화면에서는 위아래로 쌓입니다. */
+.brief-cols {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px 32px; align-items: start;
+}
+@media (max-width: 820px) { .brief-cols { grid-template-columns: minmax(0, 1fr); gap: 18px; } }
+.brief-col { min-width: 0; }
+.brief-col-label {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.14em;
+  color: var(--on-deep-soft); margin-bottom: 7px;
+}
 .brief-lead {
-  margin: 0; max-width: 16ch; font-weight: 900; letter-spacing: -0.045em;
-  font-size: clamp(30px, 5.4vw, 52px); line-height: 1.1;
-  color: var(--on-deep); text-wrap: balance;
+  margin: 0; font-weight: 900; letter-spacing: -0.04em;
+  font-size: clamp(22px, 2.6vw, 34px); line-height: 1.18;
+  color: var(--on-deep); text-wrap: balance; overflow-wrap: anywhere;
 }
 .brief-lead em { font-style: normal; color: var(--up); }
-.brief-sub { margin: 13px 0 0; max-width: 46ch; font-size: 14.5px; line-height: 1.6; color: var(--on-deep-soft); }
+.brief-sub { margin: 9px 0 0; font-size: 13.5px; line-height: 1.6; color: var(--on-deep-soft); }
 
-.brief-label { margin: 24px 0 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.13em; color: var(--on-deep-soft); }
+.brief-label { margin: 22px 0 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.13em; color: var(--on-deep-soft); }
 .brief-heat { display: flex; flex-wrap: wrap; gap: 6px; }
 .brief-heat button {
   border: none; cursor: pointer; font-family: inherit; color: var(--on-deep);
@@ -586,9 +634,24 @@ button, input { font-family: inherit; }
 .brief-heat button[data-rank="3"] { font-size: 13.5px; }
 .brief-heat button[data-rank="4"] { font-size: 12.5px; }
 
+/* [2026-10-20 추가] 지수 띠 탭 — 세계 증시 / 환율·금리 / 원자재 */
+.brief-tabs { display: flex; gap: 4px; margin-top: 22px; flex-wrap: wrap; }
+.brief-tabs button {
+  border: none; cursor: pointer; font-family: inherit;
+  font-size: 12px; font-weight: 600; letter-spacing: -0.01em;
+  padding: 6px 13px; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07); color: var(--on-deep-soft);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.brief-tabs button:hover { background: rgba(255, 255, 255, 0.14); color: var(--on-deep); }
+.brief-tabs button[aria-pressed="true"] { background: var(--on-deep); color: var(--deep); font-weight: 700; }
+
 .brief-ticker {
-  margin-top: 24px; border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.1);
   display: flex; overflow-x: auto; scrollbar-width: none;
+}
+.brief-ticker-empty {
+  display: block; padding: 14px 0 16px; font-size: 12.5px; color: var(--on-deep-soft);
 }
 .brief-ticker::-webkit-scrollbar { display: none; }
 .brief-tk {
@@ -613,33 +676,35 @@ button, input { font-family: inherit; }
 .watch-live { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; letter-spacing: -0.01em; }
 .watch-toggles { display: flex; gap: 7px; margin-left: auto; flex-wrap: wrap; }
 
-/* ── 머리기사 (신문 1면) ──────────────────────────────────────────────── */
-.front {
-  display: grid; grid-template-columns: minmax(0, 1.58fr) minmax(0, 1fr);
-  border-bottom: 1px solid var(--border); margin-bottom: 4px;
+/* ── 실시간 속보 머리글 + 최근 3건 ───────────────────────────────────
+   [2026-10-19 교체] 예전에는 "실시간 급등뉴스 감시중" 띠와 "오늘의 머리기사"
+   가 따로 있었습니다. 재성님 요청으로 둘을 합쳤습니다 — 머리글 한 줄에
+   실시간 표시·건수·알림 토글을 모아두고, 바로 아래에 가장 최근 속보 3건을
+   큰 카드로 놓습니다. 이 사이트는 지금 막 들어온 속보를 보러 오는 곳이라
+   한 건만 크게 띄우는 신문식 머리기사보다 이쪽이 맞습니다. */
+.live-head {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding-bottom: 12px; border-bottom: 2px solid var(--deep-2); margin-bottom: 4px;
 }
-@media (max-width: 860px) { .front { grid-template-columns: minmax(0, 1fr); } }
-.front-lead { padding: 4px 30px 26px 0; border-right: 1px solid var(--border); }
-@media (max-width: 860px) { .front-lead { border-right: none; padding-right: 0; border-bottom: 1px solid var(--border); } }
-.front-kicker { font-size: 11.5px; font-weight: 900; letter-spacing: 0.16em; color: var(--up); margin-bottom: 11px; }
-.front-title {
-  font-family: var(--font-display); margin: 0 0 13px;
-  font-size: clamp(24px, 3.2vw, 36px); line-height: 1.26; font-weight: 700;
-  letter-spacing: -0.035em; text-wrap: balance; overflow-wrap: anywhere;
+.live-head h2 {
+  display: flex; align-items: center; gap: 8px; margin: 0;
+  font-family: var(--font-display); font-size: 21px; font-weight: 700; letter-spacing: -0.03em;
 }
-.front-stand { margin: 0 0 16px; font-size: 15.5px; color: var(--ink-muted); line-height: 1.72; max-width: 48ch; overflow-wrap: anywhere; }
-.front-byline { font-family: var(--font-mono); font-size: 11px; color: var(--ink-soft); letter-spacing: 0.04em; margin-bottom: 15px; }
-.front-linked { border-top: 1px solid var(--border); padding-top: 13px; }
-.front-linked .chip-row { margin-bottom: 0; }
 
-.front-why { padding: 4px 0 26px 26px; }
-@media (max-width: 860px) { .front-why { padding: 20px 0 24px; } }
-.front-why .panel-label { padding-bottom: 8px; border-bottom: 2px solid var(--deep-2); }
-.front-why ul { list-style: none; margin: 0 0 16px; padding: 0; display: flex; flex-direction: column; gap: 9px; }
-.front-why li { font-size: 13.5px; color: var(--ink-muted); padding-left: 16px; position: relative; line-height: 1.62; overflow-wrap: anywhere; }
-.front-why li::before { content: "▸"; position: absolute; left: 0; color: var(--up); }
-.front-src { font-family: var(--font-mono); font-size: 11.5px; color: var(--amber); text-decoration: none; letter-spacing: 0.04em; }
-.front-src:hover { text-decoration: underline; }
+.top-stories { display: flex; flex-direction: column; margin-bottom: 4px; }
+
+/* 최근 3건은 가로로 넓고 글씨가 큽니다. 나머지 모양은 아래 .story와 같습니다. */
+.story-top { padding: 20px 0; }
+.story-top .story-meta { font-size: 11.5px; margin-bottom: 9px; }
+.story-top .story-title { font-size: clamp(20px, 2.1vw, 25px); line-height: 1.34; margin-bottom: 10px; }
+.story-top .story-summary {
+  font-size: 15px; line-height: 1.7; margin-bottom: 13px; max-width: 60ch;
+  -webkit-line-clamp: 3;
+}
+.story-top .chip-row { margin-bottom: 13px; gap: 8px; }
+.story-top .story-why { padding: 13px 16px; margin-bottom: 12px; }
+.story-top .story-why li { font-size: 13.5px; }
+.story-top .story-link { font-size: 12.5px; }
 
 /* ── 많이 불린 종목 띠 ────────────────────────────────────────────────── */
 .hitstrip {
@@ -663,7 +728,7 @@ button, input { font-family: inherit; }
 .hit[aria-pressed="true"] .pc { color: #fff; }
 
 /* ── 그 밖의 속보 ─────────────────────────────────────────────────────── */
-.stories-head { padding: 22px 0 8px; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.stories-head { padding: 26px 0 6px; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
 .stories-head h2 { font-family: var(--font-display); margin: 0; font-size: 21px; font-weight: 700; letter-spacing: -0.03em; }
 .stories-count { font-size: 11.5px; color: var(--ink-soft); letter-spacing: 0.06em; }
 .clear-filter {
@@ -671,8 +736,8 @@ button, input { font-family: inherit; }
   font-weight: 700; font-size: 12.5px; background: var(--amber-tint); color: var(--amber);
   padding: 5px 12px; border-radius: 999px;
 }
-.stories { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 26px; }
-@media (max-width: 1000px) { .stories { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* 오른쪽에 사이드가 생기면서 왼쪽 폭이 줄어, 3단에서 2단으로 바꿨습니다. */
+.stories { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; }
 @media (max-width: 700px) { .stories { grid-template-columns: minmax(0, 1fr); } }
 
 .story { padding: 17px 0; border-top: 1px solid var(--border); min-width: 0; }
@@ -697,15 +762,31 @@ button, input { font-family: inherit; }
 .story-link { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; font-size: 12px; font-weight: 700; color: var(--amber); text-decoration: none; }
 .story-link:hover { text-decoration: underline; }
 
-/* ── 보조 패널 3개 (가로) ─────────────────────────────────────────────── */
-.rail-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 36px; }
-@media (max-width: 900px) { .rail-row { grid-template-columns: minmax(0, 1fr); } }
-.rail-row .trending-panel { margin: 0; }
+/* ── 본문 2단 + 따라다니는 사이드 ─────────────────────────────────────
+   [2026-10-19 변경] 보조 패널 3개를 속보 아래 가로줄에서 오른쪽 세로줄로
+   옮기고, 스크롤을 따라오게 했습니다(재성님 요청).
+
+   따라오게 만드는 것은 아래 position: sticky 한 줄이지만, 그게 동작하려면
+   위쪽 html/body의 overflow-x가 clip이어야 합니다(hidden이면 안 됨 —
+   그 이유는 파일 위쪽 주석에 적어뒀습니다). */
+.home-split { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 28px; align-items: start; }
+@media (max-width: 1000px) { .home-split { grid-template-columns: minmax(0, 1fr); } }
+.home-main-col { min-width: 0; }
+
+.side-rail { display: flex; flex-direction: column; gap: 14px; position: sticky; top: 16px; }
+/* 패널이 화면보다 길어지면 사이드 안에서만 스크롤되게 해서, 아래쪽 패널이
+   영영 안 보이는 일이 없게 합니다. */
+@media (min-width: 1001px) {
+  .side-rail { max-height: calc(100vh - 32px); overflow-y: auto; scrollbar-width: thin; }
+  .side-rail::-webkit-scrollbar { width: 6px; }
+  .side-rail::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+}
+.side-rail .trending-panel { margin: 0; }
 
 /* 좁은 화면 다듬기 */
 @media (max-width: 640px) {
   .brief-inner { padding: 22px 16px 0; }
   .brief-map, .brief-pins { opacity: 0.18; }
-  .brief-lead { font-size: 30px; max-width: none; }
+  .brief-lead { font-size: 24px; }
   .watch-bar { padding: 11px 14px; }
 }

@@ -37,6 +37,8 @@
 import HomeClient from "./HomeClient";
 import { fetchDomesticQuotes, fetchEtfQuotes } from "../lib/quotes";
 import { US_ETF_SYMBOLS } from "../lib/usThemes";
+import { KR_ETF_SYMBOLS } from "../lib/krThemes";
+import { FX_RATES, COMMODITIES, STRIP_SYMBOLS, toStripRows } from "../lib/marketStrip";
 import { buildTodayBrief, todaysItems } from "../lib/todayBrief";
 
 // 이 페이지의 HTML을 60초 동안 재사용합니다(그 사이 방문자는 저장된 걸 받음).
@@ -99,12 +101,18 @@ export default async function HomePage() {
   const today = todaysItems(initialItems);
   const stocks = collectStocks(today);
 
-  const [quotes, etfQuotes] = await Promise.all([
+  // [2026-10-20 추가] stripQuotes — 지수 띠의 "환율·금리", "원자재" 탭에
+  // 쓰는 값입니다. fetchEtfQuotes는 야후 기호면 뭐든 받아오는 함수라
+  // 그대로 재사용합니다(ETF 전용이 아닙니다).
+  const [quotes, etfQuotes, krEtfQuotes, stripQuotes] = await Promise.all([
     fetchDomesticQuotes(stocks).catch(() => new Map()),
     fetchEtfQuotes(US_ETF_SYMBOLS).catch(() => new Map()),
+    // [2026-10-20 추가] 국내 테마 ETF — 한국 칸을 실제 증시값으로 뽑는 데 씁니다.
+    fetchEtfQuotes(KR_ETF_SYMBOLS).catch(() => new Map()),
+    fetchEtfQuotes(STRIP_SYMBOLS).catch(() => new Map()),
   ]);
 
-  const brief = buildTodayBrief({ items: initialItems, quotes, etfQuotes });
+  const brief = buildTodayBrief({ items: initialItems, quotes, etfQuotes, krEtfQuotes });
 
   // Map은 그대로 화면 쪽으로 넘길 수 없습니다(서버에서 브라우저로 건너갈 때
   // 평범한 객체만 넘어갑니다). 종목코드를 열쇠로 하는 객체로 바꿔서 보냅니다.
@@ -113,12 +121,20 @@ export default async function HomePage() {
     if (typeof q.changePct === "number") liveQuotes[code] = { price: q.price, changePct: q.changePct };
   }
 
+  // 지수 띠에 바로 뿌릴 수 있는 모양으로 바꿔서 넘깁니다.
+  // 못 받아온 기호는 toStripRows가 알아서 빼줍니다.
+  const strip = {
+    fx: toStripRows(FX_RATES, stripQuotes),
+    commodity: toStripRows(COMMODITIES, stripQuotes),
+  };
+
   return (
     <HomeClient
       initialItems={initialItems}
       worldIndices={worldIndices}
       brief={brief}
       liveQuotes={liveQuotes}
+      strip={strip}
     />
   );
 }

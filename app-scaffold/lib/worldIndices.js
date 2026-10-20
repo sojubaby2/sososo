@@ -45,6 +45,14 @@ import { fetchIndexTodaySummary } from "./marketIndex";
 // region: 화면 위쪽 탭(전체/아시아/북아메리카/남아메리카/유럽) 거르기용.
 export const MARKETS = [
   { key: "kr", label: "한국", flag: "🇰🇷", indexName: "코스피", region: "아시아", yahoo: "^KS11", fred: null, lon: 127.0, lat: 37.5 },
+  // [2026-10-20 추가] 코스피200.
+  // 지도 핀은 없습니다 — 한국 핀 자리는 코스피가 이미 쓰고 있어서 겹칩니다.
+  // components/BriefingBand.js의 위치표에 이 key가 없으면 핀만 자동으로
+  // 생략되고 아래 지수 띠에는 정상으로 나옵니다.
+  //
+  // 야간선물을 넣고 싶었지만 무료로 안정적으로 주는 곳이 없어서
+  // (야후에는 계약 자체가 없습니다) 정규장 지수인 코스피200으로 넣었습니다.
+  { key: "kr200", label: "코스피200", flag: "🇰🇷", indexName: "코스피200", region: "아시아", yahoo: "^KS200", fred: null, lon: null, lat: null },
   { key: "jp", label: "일본", flag: "🇯🇵", indexName: "닛케이225", region: "아시아", yahoo: "^N225", fred: "NIKKEI225", lon: 139.7, lat: 35.7 },
   { key: "cn", label: "중국", flag: "🇨🇳", indexName: "상하이종합", region: "아시아", yahoo: "000001.SS", fred: null, lon: 121.5, lat: 31.2 },
   { key: "hk", label: "홍콩", flag: "🇭🇰", indexName: "항셍", region: "아시아", yahoo: "^HSI", fred: null, lon: 114.2, lat: 22.3 },
