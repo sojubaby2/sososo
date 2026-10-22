@@ -905,6 +905,36 @@ button, input { font-family: inherit; }
 .chat-flag.bad { background: var(--bad-tint); color: var(--bad-tint-ink); }
 .chat-flag.rumor { background: #eef1f6; color: var(--ink-soft); }
 
+/* ── [2026-10-22 추가] 맨 아래 "입력 중..." 말풍선 ─────────────────────
+   재성님 요청: "맨 밑에 뭔가 입력되고 있는 듯한 모션".
+   카카오톡의 "상대가 입력 중" 표시처럼 점 세 개가 차례로 통통 튑니다.
+   점마다 시작 시간을 0.18초씩 늦춰서(animation-delay) 물결처럼 보이게
+   했습니다. 화면 구성은 app/HomeClient.js의 "chat-typing" 부분입니다. */
+.chat-typing { opacity: 0.92; }
+/* 보낸 사람 동그라미는 남색 계열로 — 기사 말풍선(주황 계열)과 구분해서
+   "이건 기사가 아니라 사이트가 보내는 표시"라는 걸 알 수 있게 합니다. */
+.chat-av.typing-av { background: #e8eef8; color: #1f3a68; font-size: 10.5px; }
+.typing-text { font-size: 11px; color: var(--ink-soft); }
+.chat-bubble.typing-bubble {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 13px 16px; width: auto;
+}
+.typing-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: #8a9bb8;
+  animation: typing-bounce 1.3s ease-in-out infinite;
+}
+.typing-dot:nth-child(2) { animation-delay: 0.18s; }
+.typing-dot:nth-child(3) { animation-delay: 0.36s; }
+@keyframes typing-bounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.45; }
+  30% { transform: translateY(-5px); opacity: 1; }
+}
+/* 컴퓨터 설정에서 "움직임 줄이기"를 켜 둔 사람에게는 튀지 않고 가만히 보이게 */
+@media (prefers-reduced-motion: reduce) {
+  .typing-dot { animation: none; opacity: 0.7; }
+}
+
 /* 말풍선 — 왼쪽 위 모서리만 각지게 해서 "받은 메시지" 모양을 냅니다. */
 .chat-bubble {
   background: var(--surface);

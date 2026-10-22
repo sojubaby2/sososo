@@ -818,6 +818,35 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
                   />
                 )
               )}
+
+              {/* [2026-10-22 추가] 맨 아래 "입력 중..." 말풍선.
+                  재성님 요청: "맨 밑에 뭔가 입력되고 있는 듯한 모션이 있으면 좋겠다".
+                  카카오톡에서 상대가 글을 쓰는 중일 때 점 세 개가 통통 튀는
+                  것과 같은 모양입니다. 이 사이트는 속보가 오면 자동으로 아래에
+                  붙기 때문에, "이 방은 살아 있고 다음 속보를 받는 중"이라는
+                  느낌을 주려고 넣었습니다.
+                  - 실제로 누가 글을 쓰는 건 아니라서, 화면 읽기 프로그램
+                    (시각장애인용)에는 "새 속보를 기다리는 중"이라고만 읽어주고
+                    점 모양은 건너뛰게 했습니다(aria-hidden).
+                  - 맨 아래에 붙어 있으니 새 속보가 오면 그 바로 위에 쌓이고,
+                    이 말풍선은 항상 제일 아래에 남습니다.
+                  - 움직임 스타일은 app/globals.css의 ".chat-typing" 부분입니다. */}
+              <div className="chat-row chat-typing" role="status" aria-label="새 속보를 기다리는 중">
+                <div className="chat-av typing-av" aria-hidden="true">
+                  속보
+                </div>
+                <div className="chat-main">
+                  <div className="chat-meta" aria-hidden="true">
+                    <span className="chat-sender as-text">뉴스매매</span>
+                    <span className="typing-text">새 속보 받는 중</span>
+                  </div>
+                  <div className="chat-bubble typing-bubble" aria-hidden="true">
+                    <span className="typing-dot" />
+                    <span className="typing-dot" />
+                    <span className="typing-dot" />
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}
