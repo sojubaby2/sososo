@@ -828,3 +828,159 @@ button, input { font-family: inherit; }
   .brief-lead { font-size: 24px; }
   .watch-bar { padding: 11px 14px; }
 }
+
+
+/* ══════════════════════════════════════════════════════════════════
+   속보 채팅방  [2026-10-21 신설]
+
+   재성님 요청: "실시간 속보 UI를 채팅창처럼, 진짜 채팅처럼 최신이 아래로"
+
+   왜 자체 스크롤 상자(.chatroom)인가:
+   최신을 맨 아래에 두면서 페이지 전체를 그렇게 만들면, 속보를 보려고
+   매번 페이지 끝까지 내려야 합니다. 그래서 속보만 따로 상자에 담고,
+   그 상자를 열자마자 맨 아래로 보냅니다(app/HomeClient.js의 chatRef).
+   카카오톡을 열면 바로 마지막 대화가 보이는 것과 같은 방식입니다.
+   ══════════════════════════════════════════════════════════════════ */
+
+.chatroom-wrap { position: relative; margin-top: 16px; }
+
+.chatroom {
+  height: clamp(520px, 72vh, 820px);
+  overflow-y: auto;
+  overscroll-behavior: contain; /* 끝까지 내려도 페이지가 같이 밀리지 않게 */
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 18px 18px 22px;
+  display: flex; flex-direction: column; gap: 18px;
+  scrollbar-width: thin;
+}
+.chatroom::-webkit-scrollbar { width: 9px; }
+.chatroom::-webkit-scrollbar-thumb { background: #cfd9e8; border-radius: 20px; border: 2px solid var(--surface-2); }
+.chatroom::-webkit-scrollbar-track { background: transparent; }
+
+/* 날짜 구분선 */
+.chat-day {
+  display: flex; align-items: center; gap: 12px;
+  font-size: 11.5px; font-weight: 700; color: var(--ink-soft);
+  margin: 4px 0 2px;
+}
+.chat-day::before, .chat-day::after { content: ""; height: 1px; background: var(--border); flex: 1; }
+
+/* 말풍선 한 줄 */
+.chat-row { display: flex; gap: 11px; align-items: flex-start; }
+
+.chat-av {
+  width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0; margin-top: 20px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 800; letter-spacing: -0.03em;
+  background: var(--amber-tint); color: var(--amber-tint-ink);
+}
+.chat-av.bad { background: var(--bad-tint); color: var(--bad-tint-ink); }
+.chat-av.rumor { background: #eef1f6; color: var(--ink-soft); }
+
+.chat-main { min-width: 0; flex: 1; }
+
+.chat-meta {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
+  margin-bottom: 5px; font-size: 11.5px; color: var(--ink-soft);
+}
+.chat-sender {
+  font-weight: 800; color: var(--ink-muted); letter-spacing: -0.01em;
+  background: none; border: none; padding: 0; font-family: inherit;
+  font-size: 11.5px; cursor: pointer;
+}
+.chat-sender:hover { color: var(--amber-tint-ink); text-decoration: underline; }
+.chat-sender.as-text { cursor: default; }
+.chat-clock { font-size: 11px; }
+.chat-new {
+  font-size: 10px; font-weight: 800; padding: 1px 6px; border-radius: 20px;
+  background: var(--up); color: #fff;
+}
+.chat-flag {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 20px;
+}
+.chat-flag.ok { background: #e9f3ea; color: #2f6b36; }
+.chat-flag.bad { background: var(--bad-tint); color: var(--bad-tint-ink); }
+.chat-flag.rumor { background: #eef1f6; color: var(--ink-soft); }
+
+/* 말풍선 — 왼쪽 위 모서리만 각지게 해서 "받은 메시지" 모양을 냅니다. */
+.chat-bubble {
+  background: var(--surface);
+  border-radius: 4px 16px 16px 16px;
+  padding: 13px 16px 14px;
+  box-shadow: var(--shadow);
+  max-width: 680px;
+  word-break: keep-all;
+}
+.chat-bubble.unread { box-shadow: 0 0 0 2px var(--amber-bright), var(--shadow); }
+.chat-title {
+  margin: 0; font-family: var(--font-display); font-weight: 700;
+  font-size: 16.5px; line-height: 1.45; color: var(--ink); letter-spacing: -0.02em;
+}
+.chat-sum {
+  margin: 7px 0 0; font-size: 13px; line-height: 1.62; color: var(--ink-muted);
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+
+/* .chip-row가 가진 아래 여백 14px은 채팅에서는 너무 떠 보입니다. */
+.chat-chips { margin-top: 9px; margin-bottom: 0; max-width: 680px; }
+
+.chat-foot { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+.chat-more {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 12px; font-weight: 700; color: var(--amber-tint-ink);
+  background: none; border: none; padding: 0; cursor: pointer; font-family: inherit;
+}
+.chat-more svg { transition: transform 0.15s ease; }
+.chat-more svg.flip { transform: rotate(180deg); }
+/* [2026-10-21 수정] 원문 링크를 작은 회색 글씨에서 알약 단추로.
+   재성님: "원문 보러 가기 있어야 되고" — 있긴 했는데 너무 작아서
+   안 보였습니다. 기사를 끝까지 읽으려는 사람에게는 이게 목적지입니다. */
+/* [2026-10-21 재수정] 재성님 — "원문 보러 가기는 색깔을 다르게".
+   옆의 "왜 이 종목인가"와 같은 파란 계열이라 둘이 섞여 보였습니다.
+   남색을 꽉 채운 단추로 바꿔서 확실히 구분되게 했습니다.
+   빨강·파랑 글씨는 이 사이트에서 등락률 색이라 일부러 피했습니다
+   (종목 숫자로 오해할 여지를 없애려고요).
+
+   ★ 색을 바꾸고 싶으면 아래 background 한 줄만 고치면 됩니다.
+     · 초록  background: #1f7a47;
+     · 보라  background: #5b3fa8;
+     · 검정  background: #1b2430;
+     · 테두리만(연하게)
+         background: transparent; color: var(--ink-muted);
+         box-shadow: inset 0 0 0 1px var(--border); */
+.chat-link {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 12px; font-weight: 700; text-decoration: none;
+  color: #fff; background: var(--deep);
+  padding: 6px 12px; border-radius: 20px;
+  transition: background 0.15s ease;
+}
+.chat-link:hover { background: var(--deep-2); }
+
+.chat-why {
+  margin: 9px 0 0; padding: 10px 14px 10px 28px;
+  background: var(--surface); border-radius: 12px; box-shadow: var(--shadow);
+  max-width: 680px; font-size: 12.5px; line-height: 1.6; color: var(--ink-muted);
+}
+.chat-why li { margin: 3px 0; word-break: keep-all; }
+
+/* 참고: 예전에 있던 "새 속보 N건 ↓" 단추(.chat-jump)는 없앴습니다.
+   이제 새 속보가 오면 항상 자동으로 따라 내려갑니다
+   (app/HomeClient.js의 ALWAYS_FOLLOW). */
+
+@media (max-width: 760px) {
+  .chatroom { height: clamp(460px, 68vh, 640px); padding: 14px 12px 18px; gap: 15px; border-radius: var(--r-md); }
+  .chat-row { gap: 9px; }
+  .chat-av { width: 30px; height: 30px; font-size: 10px; margin-top: 19px; }
+  .chat-title { font-size: 15.5px; }
+  .chat-bubble { padding: 12px 14px 13px; }
+
+  /* 휴대폰에서는 종목칩이 한 줄에 하나씩만 들어가 너무 길어집니다.
+     종목코드를 감춰서 두세 개가 한 줄에 들어가게 합니다.
+     (칩을 누르면 코드가 복사되는 기능은 그대로입니다.) */
+  .chat-chips .chip { padding: 5px 10px; font-size: 12.5px; gap: 5px; }
+  .chat-chips .chip .code { display: none; }
+}

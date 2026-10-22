@@ -55,7 +55,21 @@ const MIN_NEWS_FOR_DOMESTIC = 5;
 // 너무 자주 "조용합니다"가 뜨면 숫자를 낮추고, "움직였다"가 남발되면
 // 올리면 됩니다. 이 두 줄만 고치면 됩니다.
 const US_QUIET_PCT = 1.0; // 미국 ETF 기준
-const KR_QUIET_PCT = 2.0; // 국내 테마 평균 기준
+// [2026-10-21 변경] 재성님 요청 — 한국 칸 문장은 **코스피 지수**가 정합니다.
+//
+//   코스피 +0.5% 이상  ->  "오늘 한국을 움직인 건 ○○"   (제일 많이 오른 테마)
+//   코스피 -0.5% 이하  ->  "오늘 한국을 끌어내린 건 ○○" (제일 많이 빠진 테마)
+//   그 사이(±0.5% 안)  ->  "오늘 한국은 조용했습니다"
+//
+// 예전에는 테마 ETF들끼리 비교해서 제일 크게 움직인 쪽으로 정했습니다.
+// 그러면 코스피는 올랐는데 "끌어내린 건"이라고 쓰는 일이 생깁니다
+// (어느 테마 하나가 크게 빠지면). 시장 전체 방향은 코스피가 정하고,
+// 테마는 그 방향의 대표선수를 고르는 것이 맞습니다.
+const KOSPI_QUIET_PCT = 0.5;
+
+// 오늘 시세가 최소 이만큼은 들어와야 "오늘 값"으로 인정합니다.
+// 장 시작 직후에는 종목별로 들어오는 시간이 조금씩 다릅니다.
+const MIN_FRESH_KR_THEMES = 5; // 국내 테마 평균 기준
 
 // 한국시간 기준 "오늘 몇 시인지"와 "오늘 0시가 언제인지"를 구합니다.
 // 서버는 UTC로 돌아가므로 9시간을 더한 뒤 getUTC* 로 읽습니다
@@ -202,17 +216,69 @@ function rankDomestic(themeRows) {
 //
 // ETF를 하나도 못 받아오면 null을 돌려주고, 그때는 부르는 쪽에서
 // 예전 뉴스 기준으로 돌아갑니다.
-function rankKrEtf(krEtfQuotes) {
-  const rows = [];
+//
+// [2026-10-21 수정] 재성님 리포트 — "한국 장중인데 왜 안 바뀌지?"
+//
+// 실제로 안 바뀌고 있었습니다. 10월 20일에도 10월 21일 오전에도 똑같이
+// "우주·항공 ETF -9.9%"가 떴습니다. 같은 숫자가 이틀 연속 소수점까지
+// 똑같이 나올 수는 없습니다. **어제 종가를 오늘 값인 것처럼 보여주고
+// 있었습니다.**
+//
+// 왜 그랬나:
+// 야후의 국내 시세는 15~20분 지연입니다. 그래서 9시에 장이 열려도
+// 9시 20분쯤까지는 야후가 아직 "어제 종가"를 현재가로 들고 있습니다.
+// 그런데 이 함수는 숫자만 보고 **그 숫자가 언제 것인지는 보지 않았습니다.**
+// (lib/quotes.js의 날짜 검사는 "5일보다 오래된 것"만 버리기 때문에
+//  어제 값은 그냥 통과합니다.)
+//
+// 그 결과 9시~9시 20분에 들어온 방문자는
+//   라벨: "지금 한국 (장중)"   ← 오늘
+//   숫자: 어제 종가            ← 어제
+// 이렇게 짝이 안 맞는 화면을 봤습니다. 장중인데 안 바뀌는 것처럼 보인
+// 이유가 이것입니다.
+//
+// 어떻게 고쳤나:
+// 시세마다 딸려오는 "기준 시각(asOf)"을 보고 **오늘 것만** 씁니다.
+//   · 오늘 것이 하나라도 있으면 -> 그것만 쓰고 fresh: true
+//   · 전부 어제 것이면          -> 그대로 쓰되 fresh: false 를 달아서
+//                                 부르는 쪽이 "어제 마감 기준"이라고
+//                                 솔직하게 쓰게 합니다
+//   · 아무것도 없으면           -> null (예전 뉴스 기준으로 돌아감)
+//
+// 이러면 9시~9시 20분에는 "어제 한국 (마감)"으로 뜨다가, 오늘 값이
+// 들어오는 순간 자동으로 "지금 한국 (장중)"으로 바뀝니다.
+function rankKrEtf(krEtfQuotes, startOfDayMs) {
+  const fresh = [];
+  const all = [];
+
   for (const t of KR_THEMES) {
     const q = krEtfQuotes?.get?.(`${t.code}.KS`);
-    if (q && typeof q.changePct === "number" && Number.isFinite(q.changePct)) {
-      rows.push({ ...t, changePct: q.changePct });
+    if (!q || typeof q.changePct !== "number" || !Number.isFinite(q.changePct)) continue;
+
+    const row = { ...t, changePct: q.changePct };
+    all.push(row);
+
+    // asOf는 "2026-10-21T00:16:00.000Z" 같은 글자입니다. 이것이 한국시간
+    // 오늘 0시 이후면 오늘 장 자료입니다.
+    const stamp = q.asOf ? Date.parse(q.asOf) : NaN;
+    if (Number.isFinite(stamp) && typeof startOfDayMs === "number" && stamp >= startOfDayMs) {
+      fresh.push(row);
     }
   }
+
+  // 오늘 값이 한두 개만 들어온 상태에서 그것만 쓰면 "테마 1개 중 1위"
+  // 같은 말이 나옵니다. 절반 이상 들어왔을 때만 오늘 것으로 인정합니다.
+  const enough = fresh.length >= MIN_FRESH_KR_THEMES;
+  const rows = enough ? fresh : all;
   if (rows.length === 0) return null;
+
   const sorted = [...rows].sort((a, b) => b.changePct - a.changePct);
-  return { best: sorted[0], worst: sorted[sorted.length - 1], count: rows.length };
+  return {
+    best: sorted[0],
+    worst: sorted[sorted.length - 1],
+    count: rows.length,
+    fresh: enough,
+  };
 }
 
 // 미국 후보 추리기 — ETF 등락률.
@@ -255,6 +321,28 @@ function signed(value, digits = 1) {
   return `${value >= 0 ? "+" : ""}${value.toFixed(digits)}%`;
 }
 
+// [2026-10-21 신설] "제일 크게 움직인 것" 고르기.
+//
+// 왜 만들었나 — 시험하다 발견한 버그입니다:
+// 원래는 "1등이 플러스면 1등을, 마이너스면 꼴찌를" 골랐습니다.
+// 그런데 이러면 오르는 것과 내리는 것이 섞인 날에 틀립니다.
+//   예) 헬스케어 +0.4% / 방산·우주 -9.9%
+//       -> 1등(헬스케어)이 플러스니까 헬스케어를 고름
+//       -> 심지어 "+0.4%는 2% 미만이니 오늘은 조용했습니다"가 됨
+//       -> 9.9% 빠진 날인데 조용했다고 써버립니다
+//
+// 그래서 부호를 먼저 보지 말고 **움직인 폭(절댓값)이 큰 쪽**을 고릅니다.
+// 올라서 1등이든 내려서 꼴찌든, 그날 제일 크게 움직인 것이 그날의 주인공입니다.
+//
+// "조용한 날" 판단도 같이 고쳤습니다. 위아래 둘 다 기준치 안쪽일 때만
+// 조용한 것이지, 한쪽이라도 크게 움직였으면 조용한 날이 아닙니다.
+function pickMover(best, worst) {
+  const bestMag = Math.abs(best.changePct);
+  const worstMag = Math.abs(worst.changePct);
+  const leader = bestMag >= worstMag ? best : worst;
+  return { leader, up: leader.changePct >= 0, maxMag: Math.max(bestMag, worstMag) };
+}
+
 // ── 미국 칸 ──────────────────────────────────────────────────────────
 function buildUsPanel(etfQuotes, k) {
   // 미국 정규장은 한국시간으로 대략 23:30 ~ 06:00입니다(서머타임에 따라
@@ -273,15 +361,14 @@ function buildUsPanel(etfQuotes, k) {
     };
   }
 
-  const up = r.best.changePct >= 0;
-  const leader = up ? r.best : r.worst;
+  const { leader, up, maxMag } = pickMover(r.best, r.worst);
 
   // 잠잠한 날에는 1등을 뽑아도 "움직였다"고 말할 수 없습니다.
-  if (Math.abs(leader.changePct) < US_QUIET_PCT) {
+  if (maxMag < US_QUIET_PCT) {
     return {
       label: when,
       lead: { before: `${when}은 `, highlight: live ? "조용합니다" : "조용했습니다", after: "" },
-      sub: `테마별 등락이 ±${US_QUIET_PCT}% 안쪽입니다. 가장 큰 건 ${r.best.label} ${signed(r.best.changePct)}.`,
+      sub: `테마별 등락이 ±${US_QUIET_PCT}% 안쪽입니다. 가장 큰 건 ${leader.label} ${signed(leader.changePct)}.`,
       up: true,
       theme: null,
     };
@@ -302,43 +389,83 @@ function buildUsPanel(etfQuotes, k) {
 
 // ── 한국 칸 ──────────────────────────────────────────────────────────
 // 오늘 자료가 모자라면(개장 전·주말) 어제 것으로 대신 채웁니다.
-function buildDomesticPanel(items, today, todayRows, quotes, k, now, krEtfQuotes) {
+function buildDomesticPanel(items, today, todayRows, quotes, k, now, krEtfQuotes, kospi) {
   // 국내 정규장은 09:00 ~ 15:30입니다.
   const marketOpen = k.hour >= 9 && (k.hour < 15 || (k.hour === 15 && k.minute < 30));
 
-  // ── ① 실제 증시값(테마 ETF) 기준 — 이게 1순위입니다 ──
-  const etf = rankKrEtf(krEtfQuotes);
+  // ── ① 실제 증시값 기준 — 이게 1순위입니다 ──
+  //    방향은 코스피가, 대표 테마는 ETF가 정합니다.
+  const etf = rankKrEtf(krEtfQuotes, k.startOfDayMs);
   if (etf) {
-    const live = marketOpen;
-    const label = marketOpen ? "지금 한국 (장중)" : "오늘 한국";
-    const up = etf.best.changePct >= 0;
-    const leader = up ? etf.best : etf.worst;
+    // 받아온 값이 어제 것이면(장 시작 직후 20분쯤), 장중이어도
+    // "장중"이라고 쓰면 안 됩니다. 어제 값이라고 밝힙니다.
+    const stale = etf.fresh === false;
+    const live = marketOpen && !stale;
+    const label = stale ? "어제 한국 (마감)" : marketOpen ? "지금 한국 (장중)" : "오늘 한국";
+    const dayWord = stale ? "어제" : "오늘";
+    const staleNote = stale ? " · 오늘 시세는 9시 20분쯤부터 반영됩니다" : "";
 
-    if (Math.abs(leader.changePct) < KR_QUIET_PCT) {
+    // 코스피 등락률. 못 받아왔으면(null) 예전처럼 테마끼리 비교합니다.
+    const kospiPct =
+      kospi && typeof kospi.changePct === "number" && Number.isFinite(kospi.changePct)
+        ? kospi.changePct
+        : null;
+
+    // ⓐ 코스피가 거의 안 움직인 날 — 조용했다고 씁니다.
+    if (kospiPct !== null && Math.abs(kospiPct) < KOSPI_QUIET_PCT) {
       return {
         label,
-        lead: { before: "오늘 한국은 ", highlight: live ? "조용합니다" : "조용했습니다", after: "" },
-        sub: `테마별 등락이 ±${KR_QUIET_PCT}% 안쪽입니다. 가장 큰 건 ${etf.best.label} ${signed(etf.best.changePct)}.`,
-        up: true,
+        lead: { before: `${dayWord} 한국은 `, highlight: live ? "조용합니다" : "조용했습니다", after: "" },
+        sub: `코스피 ${signed(kospiPct, 2)} · 테마 중 가장 큰 건 ${
+          Math.abs(etf.best.changePct) >= Math.abs(etf.worst.changePct) ? etf.best.label : etf.worst.label
+        } ${signed(
+          Math.abs(etf.best.changePct) >= Math.abs(etf.worst.changePct) ? etf.best.changePct : etf.worst.changePct
+        )}.${staleNote}`,
+        up: kospiPct >= 0,
         theme: null,
-        basis: "etf",
+        basis: "kospi",
       };
     }
+
+    // ⓑ 방향을 정합니다.
+    let up;
+    let leader;
+    if (kospiPct !== null) {
+      up = kospiPct > 0;
+      // 코스피가 오른 날이면 제일 많이 오른 테마, 내린 날이면 제일 많이 빠진 테마.
+      leader = up ? etf.best : etf.worst;
+
+      // 안전장치: 코스피는 올랐는데 테마가 전부 마이너스인 날이 드물게
+      // 있습니다(코스피를 끌어올린 대형주가 이 13개 테마에 없는 경우).
+      // 그때 "움직인 건 ○○ -0.3%"라고 쓰면 말이 안 되니, 이때만
+      // 예전 방식(제일 크게 움직인 쪽)으로 돌아갑니다.
+      if ((up && leader.changePct <= 0) || (!up && leader.changePct >= 0)) {
+        const fallback = pickMover(etf.best, etf.worst);
+        leader = fallback.leader;
+        up = fallback.up;
+      }
+    } else {
+      // 코스피를 못 받아온 경우 — 예전 방식.
+      const picked = pickMover(etf.best, etf.worst);
+      leader = picked.leader;
+      up = picked.up;
+    }
+
+    const kospiNote = kospiPct !== null ? `코스피 ${signed(kospiPct, 2)} · ` : "";
 
     return {
       label,
       lead: {
         before: up
-          ? `오늘 한국을 움직${live ? "이는" : "인"} 건 `
-          : `오늘 한국을 끌어내${live ? "리는" : "린"} 건 `,
+          ? `${dayWord} 한국을 움직${live ? "이는" : "인"} 건 `
+          : `${dayWord} 한국을 끌어내${live ? "리는" : "린"} 건 `,
         highlight: leader.label,
         after: live ? "입니다" : pastSuffix(leader.label),
       },
-      // 내릴 때는 "1위"라고 하면 거꾸로 읽힙니다(가장 많이 빠진 것이므로).
-      sub: `${leader.label} ETF ${signed(leader.changePct)} · 테마 ${etf.count}개 중 ${up ? "가장 많이 상승" : "가장 많이 하락"}`,
+      sub: `${kospiNote}${leader.label} ETF ${signed(leader.changePct)}${staleNote}`,
       up,
       theme: leader.koreanTheme || null,
-      basis: "etf",
+      basis: "kospi",
     };
   }
 
@@ -382,11 +509,11 @@ function buildDomesticPanel(items, today, todayRows, quotes, k, now, krEtfQuotes
 
   // 잠잠한 날 — 미국과 같은 이유입니다. 국내 테마주는 변동이 커서
   // 기준을 미국(1%)보다 높게 잡았습니다.
-  if (Math.abs(leader.avgChangePct) < KR_QUIET_PCT) {
+  if (Math.abs(leader.avgChangePct) < KOSPI_QUIET_PCT) {
     return {
       label,
       lead: { before: `${when} 한국은 `, highlight: live ? "조용합니다" : "조용했습니다", after: "" },
-      sub: `테마별 평균 등락이 ±${KR_QUIET_PCT}% 안쪽입니다. 가장 큰 건 ${ranked.best.theme} ${signed(ranked.best.avgChangePct)}.`,
+      sub: `테마별 평균 등락이 ±${KOSPI_QUIET_PCT}% 안쪽입니다. 가장 큰 건 ${ranked.best.theme} ${signed(ranked.best.avgChangePct)}.`,
       up: true,
       theme: null,
     };
@@ -417,7 +544,8 @@ function buildDomesticPanel(items, today, todayRows, quotes, k, now, krEtfQuotes
 //     themeRows: [...],   // 테마 히트맵용
 //     newsCount: 38,
 //   }
-export function buildTodayBrief({ items, quotes, etfQuotes, krEtfQuotes, now = new Date() }) {
+// kospi: 코스피 지수 시세 { changePct, asOf } — 한국 칸의 문장 방향을 정합니다.
+export function buildTodayBrief({ items, quotes, etfQuotes, krEtfQuotes, kospi, now = new Date() }) {
   const k = kstNow(now);
   const today = todaysItems(items, now);
   const themeRows = summarizeThemes(today, quotes);
@@ -427,6 +555,6 @@ export function buildTodayBrief({ items, quotes, etfQuotes, krEtfQuotes, now = n
     newsCount: today.length,
     themeRows,
     us: buildUsPanel(etfQuotes, k),
-    domestic: buildDomesticPanel(items, today, themeRows, quotes, k, now, krEtfQuotes),
+    domestic: buildDomesticPanel(items, today, themeRows, quotes, k, now, krEtfQuotes, kospi),
   };
 }

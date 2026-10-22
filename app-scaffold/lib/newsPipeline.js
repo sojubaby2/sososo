@@ -215,6 +215,58 @@ const THEME_SEARCH_TOKENS = (() => {
   return out;
 })();
 
+// ---------------------------------------------------------------------------
+// [2026-10-22 추가] 삼성 + 로봇 뉴스 → 레인보우로보틱스 강제 포함 (코드 안전장치)
+//
+// 왜 만들었나: 삼성전자는 2025년 2월에 레인보우로보틱스 지분을 35%로 늘려
+// 최대주주가 됐고, 이 회사를 연결 자회사로 편입했습니다. 삼성의 휴머노이드
+// 개발을 맡은 주력 계열사입니다. 그래서 "삼성이 로봇에 투자한다 /
+// 휴머노이드를 만든다" 같은 기사는 레인보우로보틱스가 바로 수혜를 봅니다.
+//
+// 그런데 기사 제목에 "레인보우로보틱스"라는 이름이 직접 안 나오면,
+//   ① 후보 종목 목록에 이 회사가 안 들어갈 수 있고(그러면 AI는 아예 못 고름)
+//   ② 후보에 들어가더라도 AI가 가끔 빠뜨립니다.
+// 아래 프롬프트에도 같은 규칙을 넣었지만, 프롬프트는 "부탁"일 뿐 100% 지켜지지
+// 않습니다. 그래서 코드에서도 한 번 더 확인해서 강제로 넣습니다.
+//
+// 언제 작동하나: 제목+요약에 아래 두 가지가 "둘 다" 있을 때만.
+//   - 삼성 계열 이름 ("삼성" 두 글자로 확인 — 삼성전자·삼성그룹·삼성SDI 등 전부 포함)
+//   - 로봇 관련 단어 (로봇·휴머노이드·협동로봇·로보틱스)
+// 그래서 LG·두산·현대의 로봇 뉴스(삼성이 없음)나, 로봇과 상관없는 삼성
+// 뉴스(반도체·스마트폰 등, 로봇 단어가 없음)에는 작동하지 않습니다.
+// ---------------------------------------------------------------------------
+
+const RAINBOW_ROBOTICS = { code: "277810", name: "레인보우로보틱스", market: "코스닥" };
+
+// 로봇 관련 단어. ("협동로봇"은 "로봇"에 이미 걸리지만, 사람이 읽기 쉽게
+//  요청받은 단어를 그대로 다 적어둠)
+const SAMSUNG_ROBOT_WORDS = ["로봇", "휴머노이드", "협동로봇", "로보틱스"];
+
+// "로봇청소기"는 생활가전(삼성 비스포크 제트봇 같은 것)이라 휴머노이드 개발
+// 회사와 상관이 없습니다. 그래서 로봇 단어를 찾기 전에 이 단어들을 먼저
+// 지워버립니다. 이렇게 하면:
+//   - "삼성, 신형 로봇청소기 출시" → "로봇"이 남지 않음 → 작동 안 함 (원하는 대로)
+//   - "삼성, 로봇청소기 이어 휴머노이드도 개발" → "휴머노이드"가 남음 → 작동함
+const SAMSUNG_ROBOT_EXCLUDE_WORDS = ["로봇청소기", "로봇 청소기"];
+
+// "삼성"이 들어가지만 삼성그룹의 로봇 사업과는 무관하게 기사에 등장하는
+// 이름들. 예를 들어 "삼성증권 리서치센터는 LG 로봇 사업을 긍정적으로
+// 평가했다"는 기사는 삼성이 주어가 아니라 그냥 코멘트를 한 증권사일 뿐입니다
+// (이 파일 프롬프트의 "증권사 코멘트 출처는 관련주로 넣지 마" 규칙과 같은
+// 이유). "삼성동"은 서울 지명이라 마찬가지로 지웁니다.
+const SAMSUNG_NOT_SUBJECT_WORDS = [
+  "삼성증권", "삼성자산운용", "삼성액티브자산운용", "삼성선물", "삼성동",
+];
+
+function isSamsungRobotNews(title, summary) {
+  let text = `${title || ""}\n${summary || ""}`;
+  for (const w of SAMSUNG_ROBOT_EXCLUDE_WORDS) text = text.split(w).join("");
+  for (const w of SAMSUNG_NOT_SUBJECT_WORDS) text = text.split(w).join("");
+  const hasSamsung = text.includes("삼성");
+  const hasRobot = SAMSUNG_ROBOT_WORDS.some((w) => text.includes(w));
+  return hasSamsung && hasRobot;
+}
+
 // "code|name|market" 줄들을 다시 객체로. (getCachedUniverse가 문자열로
 // 들고 다니기 때문에 여기서 한 번 풀어줌 — 2,800줄 쪼개기는 공짜.)
 function parseUniverseRows(universeCompanyList) {
@@ -257,6 +309,14 @@ export function extractMatchCandidates(title, summary, universeCompanyList) {
   const universeByCode = new Map(rows.map((r) => [r.code, r]));
   const picked = new Map(); // code -> {code,name,market}
   for (const r of mentioned) picked.set(r.code, r);
+
+  // [2026-10-22 추가] 삼성 + 로봇 기사면 레인보우로보틱스를 후보 맨 앞에 넣음.
+  // 기사에 "레인보우로보틱스"라는 이름이 직접 안 나와도 AI가 고를 수 있게
+  // 하려는 것입니다(후보에 없는 종목은 AI가 절대 고를 수 없음 — 위 설명 참고).
+  // 오늘 시세 목록(universe)에 있으면 그 정보를, 없으면 고정값을 씁니다.
+  if (isSamsungRobotNews(title, summary) && !picked.has(RAINBOW_ROBOTICS.code)) {
+    picked.set(RAINBOW_ROBOTICS.code, universeByCode.get(RAINBOW_ROBOTICS.code) || RAINBOW_ROBOTICS);
+  }
 
   const themeLines = [];
   for (const theme of candidateThemes) {
@@ -413,6 +473,8 @@ const SYSTEM_PROMPT = `너는 한국 주식 뉴스와 종목/테마를 연결하
 **[2026-09-09 추가] 제목에 테마 이름이 그대로 등장하면 그 테마를 반드시 채택**: 기사 제목에 [테마 목록] 중 하나의 이름이 (띄어쓰기 차이 정도는 무시하고) 그대로 등장하면 — 예를 들어 제목에 "사이버보안"이라는 단어가 있으면 — 정작 어느 상장사가 그 일을 하는지 요약문에 구체적으로 안 나와 있어도 "사이버 보안"을 반드시 primary_theme 또는 secondary_themes에 포함시키고, theme_stocks에서 그 테마의 동반 종목도 실제로 골라 넣어(빈 배열로 남겨두지 마). 재성님 리포트 — "오픈AI, 한국서 사이버보안 파트너 5곳 뽑는다"는 기사가, 그 5곳이 구체적으로 어느 회사인지 요약문에 안 나온다는 이유만으로 관련주가 하나도 안 뜨고 통째로 걸러진 적이 있었음. 이건 위쪽 "관련 종목이 하나도 없는 게 정상일 수 있어" 원칙이나 "명확한 핵심이 없으면 null" 원칙보다 이 규칙이 우선해 — 기사 제목에 테마 이름이 명시적으로 쓰였다는 것 자체가 이미 충분히 강한 관련성 신호이기 때문이야.
 
 **[2026-09-09 추가] 해외 대기업이 주어인 기사는 뒤에 나오는 산업 키워드로 테마를 매칭**: 기사의 핵심 행위자(주어)가 오픈AI·구글·엔비디아·애플·테슬라·마이크로소프트·TSMC·아마존·메타처럼 이름값 있는 해외 대기업이면(FILTER 단계에서 이런 기사는 이미 대부분 통과시키도록 되어 있음), 그 대기업 자신은 [후보 종목]에 없으니 matches에 넣을 순 없지만, 그 대기업의 행위 뒤에 붙는 산업·기술 키워드(예: "사이버보안 파트너", "반도체 장비 발주", "데이터센터 투자", "AI 서버", "배터리 공급" 등)를 보고 [테마 목록] 중 가장 가까운 테마를 primary_theme 또는 secondary_themes로 채택해. 굳이 그 테마 이름이 제목에 토씨 하나 안 틀리고 등장하지 않아도 돼(위 규칙보다 좀 더 느슨하게 적용) — 키워드가 그 테마의 사업 영역을 가리키기만 하면 충분해. 그 다음 theme_stocks에서 그 테마의 동반 종목(국내 관련 부품·장비·서비스 회사들)을 실제로 채워 넣어. 재성님 판단 — 해외 대기업의 사업 확장·투자·파트너십 소식은 국내 관련 공급망 회사들에 대부분 호재로 작용하기 때문에, 이런 기사는 최대한 적극적으로 관련 테마를 찾아 매칭해야 해.
+
+**[2026-10-22 추가] 삼성 + 로봇 뉴스는 레인보우로보틱스가 1순위**: 삼성전자·삼성그룹이 주어인 로봇·휴머노이드 뉴스에는 레인보우로보틱스(277810, 코스닥)를 관련주 1순위로 넣어. 삼성전자가 2025년 2월 지분 35%로 최대주주가 되면서 연결 자회사로 편입했고, 삼성의 휴머노이드 개발 주력 계열사야. "삼성이 로봇에 투자한다 / 휴머노이드를 만든다 / 로봇 사업을 확대한다" 류의 기사는 이 회사가 직접 수혜 대상이야. 단, 기사에 삼성 계열 이름과 로봇 관련 단어(로봇·휴머노이드·협동로봇·로보틱스)가 둘 다 있어야 해. LG·두산·현대의 로봇 뉴스나, 로봇과 무관한 삼성 뉴스(반도체·스마트폰 등)에는 적용하지 마. "로봇청소기" 같은 생활가전 기사도 제외야.
 
 **C. 부가 테마 (secondary_themes)**: 핵심만큼은 아니지만 함께 언급되거나 부차적으로 관련된 테마들. 최대 2개까지만, 배열로. 없으면 빈 배열.
 
@@ -605,6 +667,31 @@ export async function matchStocks(title, summary, universeCompanyList) {
   const directMatches = (Array.isArray(parsed.matches) ? parsed.matches : [])
     .filter((m) => !isSelfContradicting(m?.reason))
     .map((m) => ({ ...m, tier: "direct" }));
+
+  // [2026-10-22 추가] 삼성 + 로봇 기사면 레인보우로보틱스를 직접 관련주 1순위로.
+  //
+  // 프롬프트에도 같은 규칙을 넣었지만 AI가 가끔 빠뜨리거나 뒤쪽에 넣습니다.
+  // 그래서 여기서 최종 확인:
+  //   - AI가 이미 넣었으면 → 그 항목(AI가 쓴 이유 문장 포함)을 맨 앞으로 옮김
+  //   - AI가 빠뜨렸으면 → 새로 만들어서 맨 앞에 넣음
+  // 맨 앞에 두는 이유: 아래 finalizeMatches는 "직접 관련주" 안에서는 순서를
+  // 바꾸지 않고 그대로 둡니다. 그래서 맨 앞에 있으면 화면에서 "대장주"
+  // 자리에 그대로 나옵니다.
+  // 같은 종목이 두 번 나오지 않도록, 기존 항목은 빼고 다시 넣습니다.
+  if (isSamsungRobotNews(title, summary)) {
+    const idx = directMatches.findIndex((m) => m.code === RAINBOW_ROBOTICS.code);
+    const rainbow =
+      idx >= 0
+        ? directMatches.splice(idx, 1)[0]
+        : {
+            ...RAINBOW_ROBOTICS,
+            confidence: "confirmed",
+            tier: "direct",
+            reason: "삼성전자 연결 자회사(지분 35%)이자 삼성 휴머노이드 개발 주력 계열사",
+          };
+    directMatches.unshift(rainbow);
+  }
+
   const existingCodes = new Set(directMatches.map((m) => m.code));
 
   // Attach the (optional) negative-catalyst label to whichever direct match

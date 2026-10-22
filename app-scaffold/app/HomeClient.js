@@ -13,8 +13,11 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Newspaper, Loader2, Flame, Bell, BellOff, Volume2, VolumeX, Smartphone, X } from "lucide-react";
+// [2026-10-21 추가] 뉴스 제목의 &#039; 같은 글자를 원래대로 되돌립니다.
+import { decodeEntities } from "../lib/decodeEntities";
+// [2026-10-21 추가] 속보를 채팅 말풍선으로 보여주는 컴포넌트.
+import ChatMessage from "../components/ChatMessage";
 import Header from "../components/Header";
-import NewsCard from "../components/NewsCard";
 import DailyOutlookBanner from "../components/DailyOutlookBanner";
 import BriefingBand from "../components/BriefingBand";
 import { extractThemes } from "../lib/todayBrief";
@@ -98,6 +101,10 @@ function toneOf(value) {
 //                (lib/newsPipeline.js의 finalizeMatches가 붙여줍니다)
 //                여기서 버려지고 있었습니다. liveQuotes가 있으면 지금
 //                시세로 덮어씁니다.
+// 새 속보가 들어오면 읽던 위치와 상관없이 항상 맨 아래로 따라 내려갈지.
+// false로 바꾸면 맨 아래에 붙어 있을 때만 따라갑니다.
+const ALWAYS_FOLLOW = true;
+
 function toCardShape(item, liveQuotes) {
   const hasLegitimate = item.matches.some((m) => m.confidence === "confirmed" || m.confidence === "theme");
   const reasons = item.matches
@@ -117,8 +124,10 @@ function toCardShape(item, liveQuotes) {
     // "2026/09/18 08:12" 형태로 보여줌 (formatKoreanDateTime 참고).
     time: formatKoreanDateTime(item.pubDate),
     source: item.keyword,
-    headline: item.title,
-    summary: item.summary,
+    // [2026-10-21 수정] 제목·요약에 &#039; 가 그대로 보이던 문제.
+    // RSS가 따옴표를 암호처럼 바꿔 보내는데 되돌리는 단계가 없었습니다.
+    headline: decodeEntities(item.title),
+    summary: decodeEntities(item.summary),
     link: item.link,
     confidence: hasLegitimate ? "confirmed" : "rumor",
     reason: reason || "관련 근거 정보 없음",
@@ -462,7 +471,7 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
         setNewIds(new Set(freshIds));
         const freshItems = items.filter((it) => freshIds.includes(it.id));
         const latest = freshItems[0];
-        setToast({ count: freshIds.length, headline: latest?.title || "" });
+        setToast({ count: freshIds.length, headline: decodeEntities(latest?.title || "") });
         clearTimeout(newIdsTimerRef.current);
         newIdsTimerRef.current = setTimeout(() => setNewIds(new Set()), 4000);
         clearTimeout(toastTimerRef.current);
@@ -564,13 +573,117 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
     return items.filter((n) => n.stocks?.some((s) => s.name === filter.value));
   }, [items, filter]);
 
-  // [2026-10-19 변경] 재성님 요청 — "오늘의 머리기사" 한 건을 크게 띄우던
-  // 방식을 없애고, 가장 최근 속보 3건을 위에 크게 보여줍니다.
-  // 이 사이트는 지금 막 들어온 속보를 보러 오는 곳이라 최근 것 여러 건을
-  // 같이 보여주는 쪽이 맞습니다.
-  const TOP_COUNT = 3;
-  const topStories = visible.slice(0, TOP_COUNT);
-  const restStories = visible.slice(TOP_COUNT);
+  // ── [2026-10-21 전면 변경] 속보를 "채팅방"으로 ──────────────────────
+  //
+  // 재성님 요청: "채팅창처럼 보이게, 진짜 채팅처럼 최신이 아래로"
+  //
+  // 예전에는 최신 3건을 위에 크게(topStories), 나머지를 아래 2단 격자로
+  // (restStories) 나눠 보여줬습니다. 이제는 하나의 긴 대화방입니다.
+  //
+  // ★ 여기가 핵심입니다 — 순서를 뒤집습니다.
+  //   서버가 주는 visible은 "최신이 맨 앞"입니다(뉴스 순서).
+  //   채팅은 "최신이 맨 아래"입니다. 그래서 뒤집어서 그립니다.
+  //
+  // ★ 그럼 최신 속보를 보려고 매번 끝까지 내려야 하지 않나?
+  //   아닙니다. 아래 chatRef가 **화면에 뜨는 순간 맨 아래로 보내줍니다.**
+  //   카카오톡을 열면 바로 마지막 대화가 보이는 것과 똑같습니다.
+  //   그래서 속보 영역은 페이지와 따로 노는 "스크롤 상자"여야 합니다
+  //   (globals.css의 .chatroom). 페이지 전체를 뒤집으면 매번 바닥까지
+  //   내려야 하므로 그렇게 하지 않았습니다.
+  //
+  // 날짜가 바뀌는 자리에는 "— 10월 21일 (수) —" 구분선을 넣습니다.
+  // time은 "2026/10/21 09:14" 형태라 앞쪽만 떼면 날짜입니다.
+  const chatRows = useMemo(() => {
+    const rows = [];
+    let lastDay = null;
+    // slice()로 복사한 뒤 뒤집습니다 — 원본 배열을 그대로 reverse하면
+    // 다른 곳에서 쓰는 순서까지 같이 망가집니다.
+    const oldestFirst = visible.slice().reverse();
+    for (const n of oldestFirst) {
+      const day = String(n.time || "").split(" ")[0];
+      if (day && day !== lastDay) {
+        rows.push({ kind: "day", key: `day-${day}`, day });
+        lastDay = day;
+      }
+      rows.push({ kind: "msg", key: n.id, n });
+    }
+    return rows;
+  }, [visible]);
+
+  // 날짜를 "10월 21일 (수)"로 바꿉니다.
+  function dayLabel(day) {
+    const [y, m, d] = String(day).split("/").map(Number);
+    if (!y || !m || !d) return day;
+    const names = ["일", "월", "화", "수", "목", "금", "토"];
+    const w = names[new Date(y, m - 1, d).getDay()];
+    const today = new Date();
+    const isToday = today.getFullYear() === y && today.getMonth() + 1 === m && today.getDate() === d;
+    return `${isToday ? "오늘 · " : ""}${m}월 ${d}일 (${w})`;
+  }
+
+  // ── 채팅방 스크롤 다루기 ──────────────────────────────────────────
+  //
+  // [2026-10-21 변경] 재성님 판단으로 "무조건 따라 내려가기"로 바꿨습니다.
+  //
+  //   "속보는 빨리 읽어야 하니까(지난 뉴스보다는) 자동으로 화면이
+  //    내려가게 했으면 좋겠는데"
+  //
+  // 처음에는 위쪽 옛날 글을 읽는 중이면 끌어내리지 않고 "새 속보 N건 ↓"
+  // 단추만 띄웠습니다. 읽던 자리를 뺏지 않으려던 것인데, 이 사이트의
+  // 성격에는 안 맞습니다. 여기는 지난 뉴스를 정독하러 오는 곳이 아니라
+  // **지금 막 터진 걸 제일 먼저 보러 오는 곳**입니다. 한 박자라도 빨리
+  // 보여주는 쪽이 맞습니다. 그래서 단추를 없애고 항상 내려갑니다.
+  //
+  // ★ 되돌리고 싶으면 아래 ALWAYS_FOLLOW를 false로만 바꾸면 됩니다.
+  //   그러면 맨 아래에 붙어 있을 때만 따라 내려가고, 위를 읽는 중이면
+  //   가만히 둡니다.
+  const chatRef = useRef(null);
+  const pinnedRef = useRef(true); // 지금 맨 아래에 붙어 있나?
+
+  function scrollChatToBottom(smooth) {
+    const el = chatRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: smooth ? "smooth" : "auto" });
+    pinnedRef.current = true;
+  }
+
+  // 스크롤할 때마다 "바닥에 붙어 있는지"를 기록합니다.
+  // (ALWAYS_FOLLOW를 false로 돌렸을 때 쓰입니다.)
+  // 60px은 여유값입니다 — 딱 0px일 때만 인정하면 손가락이 살짝만 움직여도
+  // 붙어있지 않은 것으로 판정돼 버립니다.
+  function onChatScroll() {
+    const el = chatRef.current;
+    if (!el) return;
+    pinnedRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
+  }
+
+  // 목록이 바뀔 때마다(처음 로딩 / 새 속보 도착 / 필터 변경) 처리합니다.
+  const lastCountRef = useRef(0);
+  const firstFitRef = useRef(false);
+  useEffect(() => {
+    const el = chatRef.current;
+    if (!el || chatRows.length === 0) return;
+
+    // 처음 한 번은 애니메이션 없이 바로 맨 아래로.
+    // 스르륵 내려가는 걸 보여줄 필요가 없습니다 — 처음부터 거기 있어야 합니다.
+    if (!firstFitRef.current) {
+      firstFitRef.current = true;
+      lastCountRef.current = chatRows.length;
+      scrollChatToBottom(false);
+      return;
+    }
+
+    const grew = chatRows.length - lastCountRef.current;
+    lastCountRef.current = chatRows.length;
+    if (grew <= 0) return;
+
+    if (ALWAYS_FOLLOW || pinnedRef.current) scrollChatToBottom(true);
+  }, [chatRows]);
+
+  // 필터를 바꾸면 목록이 통째로 달라지므로 다시 맨 아래로 보냅니다.
+  useEffect(() => {
+    firstFitRef.current = false;
+  }, [filter]);
 
   // 오늘 가장 많이 불린 종목 — 오늘 올라온 기사에서 종목이 몇 번 나왔는지 셉니다.
   const topStocks = useMemo(() => {
@@ -657,14 +770,6 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
           </p>
         )}
 
-        {topStories.length > 0 && (
-          <div className="top-stories">
-            {topStories.map((n) => (
-              <NewsCard key={n.id} n={n} isNew={newIds.has(n.id)} variant="top" />
-            ))}
-          </div>
-        )}
-
         {/* 오늘 많이 불린 종목 — 막대 한 칸이 속보 한 건입니다.
             누르면 그 종목이 걸린 속보만 아래에 남습니다. */}
         {topStocks.length > 0 && (
@@ -692,25 +797,29 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
           </section>
         )}
 
-        {restStories.length > 0 && (
-          <>
-            <div className="stories-head">
-              <h2>그 밖의 속보</h2>
-              <span className="stories-count mono">
-                {filter ? `${visible.length}건 / 전체 ${items.length}건` : `${items.length}건`}
-              </span>
-              {filter && (
-                <button type="button" className="clear-filter" onClick={() => setFilter(null)}>
-                  필터 해제 · {filter.value} ✕
-                </button>
+
+        {/* [2026-10-21 신설] 속보 채팅방.
+            onScroll로 "바닥에 붙어 있는지"를 계속 확인합니다 — 위를 읽는
+            중에 새 글이 와도 화면을 끌어내리지 않기 위해서입니다. */}
+        {chatRows.length > 0 && (
+          <div className="chatroom-wrap">
+            <div className="chatroom" ref={chatRef} onScroll={onChatScroll}>
+              {chatRows.map((row) =>
+                row.kind === "day" ? (
+                  <div className="chat-day" key={row.key}>
+                    {dayLabel(row.day)}
+                  </div>
+                ) : (
+                  <ChatMessage
+                    key={row.key}
+                    n={row.n}
+                    isNew={newIds.has(row.n.id)}
+                    onThemeClick={(t) => toggleFilter("theme", t)}
+                  />
+                )
               )}
             </div>
-            <div className="stories">
-              {restStories.map((n) => (
-                <NewsCard key={n.id} n={n} isNew={newIds.has(n.id)} />
-              ))}
-            </div>
-          </>
+          </div>
         )}
 
         {filter && visible.length === 0 && (

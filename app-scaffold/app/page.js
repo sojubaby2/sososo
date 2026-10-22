@@ -53,6 +53,9 @@ const INITIAL_FEED_COUNT = 60;
 // 봅니다 — 화면에 보이지도 않는 종목까지 조회하면 요청만 늘고 얻는 게 없습니다.
 const MAX_QUOTE_STOCKS = 60;
 
+// 코스피 지수의 야후 기호입니다(lib/worldIndices.js의 "한국"과 같은 값).
+const KOSPI_SYMBOL = "^KS11";
+
 async function getInitialFeed() {
   try {
     const res = await fetch(`${SITE_URL}/api/feed?limit=${INITIAL_FEED_COUNT}`, {
@@ -69,9 +72,14 @@ async function getInitialFeed() {
 
 // 세계 지수 — 브리핑 밴드의 지도 핀과 아래 띠에 씁니다.
 // 실패해도 null을 넘기면 지도는 뜨고 숫자 자리만 "—"가 됩니다.
+// ?v=숫자 는 "저장된 걸 버리고 새로 받아오라"는 표시입니다.
+// 지수 목록(lib/worldIndices.js)을 바꾸면 이 숫자를 1 올려야 배포 직후
+// 바로 바뀐 목록이 보입니다. 안 올리면 최대 5분 동안 예전 목록이 그대로
+// 나옵니다(아래 revalidate: 300 때문입니다).
+//   v=3 -> v=4 : 2026-10-22, 코스피200을 빼고 코스닥을 넣으면서
 async function getWorldIndices() {
   try {
-    const res = await fetch(`${SITE_URL}/api/world-indices?v=3`, { next: { revalidate: 300 } });
+    const res = await fetch(`${SITE_URL}/api/world-indices?v=4`, { next: { revalidate: 300 } });
     if (!res.ok) return null;
     return await res.json();
   } catch {
@@ -104,15 +112,25 @@ export default async function HomePage() {
   // [2026-10-20 추가] stripQuotes — 지수 띠의 "환율·금리", "원자재" 탭에
   // 쓰는 값입니다. fetchEtfQuotes는 야후 기호면 뭐든 받아오는 함수라
   // 그대로 재사용합니다(ETF 전용이 아닙니다).
-  const [quotes, etfQuotes, krEtfQuotes, stripQuotes] = await Promise.all([
+  const [quotes, etfQuotes, krEtfQuotes, stripQuotes, kospiQuotes] = await Promise.all([
     fetchDomesticQuotes(stocks).catch(() => new Map()),
     fetchEtfQuotes(US_ETF_SYMBOLS).catch(() => new Map()),
     // [2026-10-20 추가] 국내 테마 ETF — 한국 칸을 실제 증시값으로 뽑는 데 씁니다.
     fetchEtfQuotes(KR_ETF_SYMBOLS).catch(() => new Map()),
     fetchEtfQuotes(STRIP_SYMBOLS).catch(() => new Map()),
+    // [2026-10-21 추가] 코스피 지수 — 한국 칸 문장의 방향(올랐다/내렸다/
+    // 조용했다)을 정하는 기준입니다. fetchEtfQuotes는 야후 기호면 뭐든
+    // 받아오는 함수라 지수에도 그대로 씁니다.
+    fetchEtfQuotes([KOSPI_SYMBOL]).catch(() => new Map()),
   ]);
 
-  const brief = buildTodayBrief({ items: initialItems, quotes, etfQuotes, krEtfQuotes });
+  const brief = buildTodayBrief({
+    items: initialItems,
+    quotes,
+    etfQuotes,
+    krEtfQuotes,
+    kospi: kospiQuotes.get(KOSPI_SYMBOL) || null,
+  });
 
   // Map은 그대로 화면 쪽으로 넘길 수 없습니다(서버에서 브라우저로 건너갈 때
   // 평범한 객체만 넘어갑니다). 종목코드를 열쇠로 하는 객체로 바꿔서 보냅니다.

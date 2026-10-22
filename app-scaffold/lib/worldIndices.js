@@ -40,19 +40,43 @@ import { fetchIndexTodaySummary } from "./marketIndex";
 //
 // yahoo: 야후 파이낸스 종목기호. 어느 나라가 "—"로 뜨면 이 값부터 의심하세요.
 // fred : FRED 통계 코드(있는 나라만).
-// lon/lat: 지금 화면은 안 쓰지만(핀 위치는 components/WorldMarketMap.js의
+// lon/lat: 지금 화면은 안 쓰지만(핀 위치는 components/BriefingBand.js의
 //          표로 직접 잡습니다) 나중에 다른 용도로 쓸 수 있어 남겨둡니다.
 // region: 화면 위쪽 탭(전체/아시아/북아메리카/남아메리카/유럽) 거르기용.
+// [2026-10-22 순서·구성 변경] 재성님 요청.
+//
+//   1) 한국-코스피
+//   2) 한국-코스닥   ← 새로 넣음 (코스피200은 뺌)
+//   3) 미국-나스닥
+//   4) 미국-다우
+//   5) 그 아래로 나머지 나라들 (예전 순서 그대로)
+//
+// 왜 이 순서인가: 우리 방문자가 실제로 보는 순서입니다. 내 시장(코스피·
+// 코스닥)을 먼저 보고, 그다음 간밤의 미국을 봅니다. 나머지 나라는 참고용
+// 입니다. 예전에는 아시아→유럽→미국 지리 순서였는데, 지리 교과서가
+// 아니라 증시 화면이니 이쪽이 맞습니다.
+//
+// 코스피200을 뺀 이유: 코스피와 거의 같이 움직여서 두 칸을 쓸 값어치가
+// 없었습니다. 코스닥은 따로 움직이는 날이 많아 볼 이유가 분명합니다.
+//
+// ★ 순서를 바꾸고 싶으면 아래 줄 순서만 바꾸면 됩니다. 화면에 나오는
+//   순서가 곧 이 배열 순서입니다(아래 MARKETS.map이 그대로 씁니다).
+// ★ 어느 칸이 "—"로만 뜨면 그 줄의 yahoo 값을 의심하세요. 확인은
+//   주소창에 아래를 치면 어느 기호가 실패했는지 바로 나옵니다.
+//     newsmeme.co.kr/api/world-indices?debug=1
 export const MARKETS = [
-  { key: "kr", label: "한국", flag: "🇰🇷", indexName: "코스피", region: "아시아", yahoo: "^KS11", fred: null, lon: 127.0, lat: 37.5 },
-  // [2026-10-20 추가] 코스피200.
-  // 지도 핀은 없습니다 — 한국 핀 자리는 코스피가 이미 쓰고 있어서 겹칩니다.
-  // components/BriefingBand.js의 위치표에 이 key가 없으면 핀만 자동으로
-  // 생략되고 아래 지수 띠에는 정상으로 나옵니다.
-  //
-  // 야간선물을 넣고 싶었지만 무료로 안정적으로 주는 곳이 없어서
-  // (야후에는 계약 자체가 없습니다) 정규장 지수인 코스피200으로 넣었습니다.
-  { key: "kr200", label: "코스피200", flag: "🇰🇷", indexName: "코스피200", region: "아시아", yahoo: "^KS200", fred: null, lon: null, lat: null },
+  // ── 국내 ──────────────────────────────────────────────────────────
+  { key: "kr", label: "한국-코스피", flag: "🇰🇷", indexName: "코스피", region: "아시아", yahoo: "^KS11", fred: null, lon: 127.0, lat: 37.5 },
+  // 지도 핀은 없습니다 — 서울 자리는 코스피가 이미 쓰고 있어 겹칩니다.
+  // components/BriefingBand.js의 위치표(MAP_POINTS)에 이 key가 없으면
+  // 핀만 자동으로 생략되고 아래 지수 띠에는 정상으로 나옵니다.
+  { key: "kq", label: "한국-코스닥", flag: "🇰🇷", indexName: "코스닥", region: "아시아", yahoo: "^KQ11", fred: null, lon: null, lat: null },
+
+  // ── 미국 (간밤 장) ────────────────────────────────────────────────
+  { key: "us-nasdaq", label: "미국-나스닥", flag: "🇺🇸", indexName: "나스닥", region: "북아메리카", yahoo: "^IXIC", fred: "NASDAQCOM", lon: -96.0, lat: 33.0 },
+  { key: "us-dow", label: "미국-다우", flag: "🇺🇸", indexName: "다우존스", region: "북아메리카", yahoo: "^DJI", fred: "DJIA", lon: -77.0, lat: 40.0 },
+
+  // ── 나머지 나라 (예전 순서 그대로) ────────────────────────────────
   { key: "jp", label: "일본", flag: "🇯🇵", indexName: "닛케이225", region: "아시아", yahoo: "^N225", fred: "NIKKEI225", lon: 139.7, lat: 35.7 },
   { key: "cn", label: "중국", flag: "🇨🇳", indexName: "상하이종합", region: "아시아", yahoo: "000001.SS", fred: null, lon: 121.5, lat: 31.2 },
   { key: "hk", label: "홍콩", flag: "🇭🇰", indexName: "항셍", region: "아시아", yahoo: "^HSI", fred: null, lon: 114.2, lat: 22.3 },
@@ -60,8 +84,6 @@ export const MARKETS = [
   { key: "in", label: "인도", flag: "🇮🇳", indexName: "센섹스", region: "아시아", yahoo: "^BSESN", fred: null, lon: 72.9, lat: 19.1 },
   { key: "gb", label: "영국", flag: "🇬🇧", indexName: "FTSE100", region: "유럽", yahoo: "^FTSE", fred: null, lon: -2.0, lat: 53.5 },
   { key: "de", label: "독일", flag: "🇩🇪", indexName: "DAX", region: "유럽", yahoo: "^GDAXI", fred: null, lon: 10.4, lat: 51.0 },
-  { key: "us-dow", label: "미국-다우", flag: "🇺🇸", indexName: "다우존스", region: "북아메리카", yahoo: "^DJI", fred: "DJIA", lon: -77.0, lat: 40.0 },
-  { key: "us-nasdaq", label: "미국-나스닥", flag: "🇺🇸", indexName: "나스닥", region: "북아메리카", yahoo: "^IXIC", fred: "NASDAQCOM", lon: -96.0, lat: 33.0 },
   { key: "br", label: "브라질", flag: "🇧🇷", indexName: "보베스파", region: "남아메리카", yahoo: "^BVSP", fred: null, lon: -46.6, lat: -23.5 },
 ];
 
