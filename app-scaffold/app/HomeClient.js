@@ -12,7 +12,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Newspaper, Loader2, Flame, Bell, BellOff, Volume2, VolumeX, Smartphone, X } from "lucide-react";
+import { Newspaper, Loader2, Flame, Bell, BellOff, Volume2, VolumeX, Smartphone, X, ArrowDown } from "lucide-react";
 // [2026-10-21 추가] 뉴스 제목의 &#039; 같은 글자를 원래대로 되돌립니다.
 import { decodeEntities } from "../lib/decodeEntities";
 // [2026-10-21 추가] 속보를 채팅 말풍선으로 보여주는 컴포넌트.
@@ -637,14 +637,23 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
   // ★ 되돌리고 싶으면 아래 ALWAYS_FOLLOW를 false로만 바꾸면 됩니다.
   //   그러면 맨 아래에 붙어 있을 때만 따라 내려가고, 위를 읽는 중이면
   //   가만히 둡니다.
+  const JUMP_SHOW_PX = 300;
   const chatRef = useRef(null);
   const pinnedRef = useRef(true); // 지금 맨 아래에 붙어 있나?
+
+  // [2026-10-22 추가] "최신 속보 보기" 단추를 보여줄지.
+  // 재성님 요청: "대화창 올라가 있을 때 누를 수 있게 최신속보 보기 버튼".
+  // 옛날 속보를 읽으려고 위로 올려 둔 상태에서, 한 번 눌러서 바로 맨 아래
+  // (가장 최근 속보)로 돌아올 수 있게 합니다.
+  // 맨 아래 근처에 있을 때는 필요 없으니 숨깁니다(JUMP_SHOW_PX 참고).
+  const [showJump, setShowJump] = useState(false);
 
   function scrollChatToBottom(smooth) {
     const el = chatRef.current;
     if (!el) return;
     el.scrollTo({ top: el.scrollHeight, behavior: smooth ? "smooth" : "auto" });
     pinnedRef.current = true;
+    setShowJump(false); // 맨 아래로 갔으니 단추는 숨김
   }
 
   // 스크롤할 때마다 "바닥에 붙어 있는지"를 기록합니다.
@@ -654,7 +663,17 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
   function onChatScroll() {
     const el = chatRef.current;
     if (!el) return;
-    pinnedRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
+    const distance = el.scrollHeight - el.scrollTop - el.clientHeight; // 바닥까지 남은 거리
+    pinnedRef.current = distance < 60;
+
+    // [2026-10-22 추가] 바닥에서 300px 넘게 올라가 있으면 "최신 속보 보기"
+    // 단추를 띄웁니다. 60px(위의 "붙어 있음" 기준)보다 넉넉하게 잡은 이유:
+    // 손가락이 살짝만 움직여도 단추가 깜빡깜빡 나타났다 사라지면 거슬립니다.
+    // 속보 말풍선 하나가 대략 200~300px이라, "한 건 이상 올라갔을 때"쯤
+    // 나타나게 맞췄습니다.
+    // (값이 같으면 React가 화면을 다시 그리지 않으므로, 스크롤할 때마다
+    //  불러도 느려지지 않습니다.)
+    setShowJump(distance > JUMP_SHOW_PX);
   }
 
   // 목록이 바뀔 때마다(처음 로딩 / 새 속보 도착 / 필터 변경) 처리합니다.
@@ -848,6 +867,18 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
                 </div>
               </div>
             </div>
+
+            {/* [2026-10-22 추가] "최신 속보 보기" 단추.
+                채팅 상자(.chatroom) 바깥, 감싸는 상자(.chatroom-wrap) 안에 둬서
+                상자 아래쪽 가운데에 떠 있게 했습니다. 상자 안에 넣으면 스크롤과
+                같이 위로 밀려 올라가 버립니다.
+                누르면 스르륵 맨 아래(가장 최근 속보)로 내려갑니다. */}
+            {showJump && (
+              <button type="button" className="chat-jump-latest" onClick={() => scrollChatToBottom(true)}>
+                <ArrowDown size={15} />
+                최신 속보 보기
+              </button>
+            )}
           </div>
         )}
 

@@ -1001,6 +1001,36 @@ button, input { font-family: inherit; }
    이제 새 속보가 오면 항상 자동으로 따라 내려갑니다
    (app/HomeClient.js의 ALWAYS_FOLLOW). */
 
+/* ── [2026-10-22 추가] "최신 속보 보기" 단추 ─────────────────────────
+   재성님 요청: 위로 올려서 옛날 속보를 읽고 있을 때 눌러서 바로
+   맨 아래(최신)로 돌아오는 단추.
+   - 채팅 상자 아래쪽 가운데에 둥둥 떠 있습니다(position: absolute).
+   - 색은 "원문 보러 가기" 단추와 같은 진한 남색이라 사이트와 잘 어울립니다.
+   - 나타날 때 아래에서 살짝 올라오게 했습니다(jump-pop).
+   위의 예전 .chat-jump(새 속보 N건)와는 다른 단추입니다 — 그건 새 글이
+   왔을 때만 떴고, 이건 위로 올려 두기만 하면 언제든 뜹니다. */
+.chat-jump-latest {
+  position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%);
+  z-index: 5;
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 10px 18px; border: none; border-radius: 999px;
+  background: var(--deep, #0b1f3f); color: #fff;
+  font-family: inherit; font-size: 13.5px; font-weight: 700; letter-spacing: -0.01em;
+  box-shadow: 0 6px 18px rgba(11, 31, 63, 0.28);
+  cursor: pointer;
+  animation: jump-pop 0.22s ease-out;
+}
+.chat-jump-latest:hover { background: var(--deep-2, #16305c); }
+.chat-jump-latest:focus-visible { outline: 3px solid #9db8e6; outline-offset: 2px; }
+@keyframes jump-pop {
+  from { opacity: 0; transform: translate(-50%, 8px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+@media (prefers-reduced-motion: reduce) { .chat-jump-latest { animation: none; } }
+@media (max-width: 760px) {
+  .chat-jump-latest { bottom: 14px; padding: 9px 16px; font-size: 13px; }
+}
+
 @media (max-width: 760px) {
   .chatroom { height: clamp(460px, 68vh, 640px); padding: 14px 12px 18px; gap: 15px; border-radius: var(--r-md); }
   .chat-row { gap: 9px; }
