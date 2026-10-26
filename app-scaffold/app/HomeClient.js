@@ -728,7 +728,44 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const items = useMemo(() => rawItems.map((it) => toCardShape(it, liveQuotes)), [rawItems, liveQuotes]);
+  // [2026-10-26 추가] 칩 등락률을 "오늘 값"으로 계속 맞추기.
+  // 재성님 질문: "종목을 누르기 전 등락률과 눌렀을 때 등락률이 왜 다르냐"
+  //   → 페이지를 연 뒤 들어온 속보는 오늘 시세가 없어서 기사 들어올 때 찍힌
+  //     KRX 값(= 전 거래일 등락률)이 보이고 있었습니다(app/api/live-quotes 주석 참고).
+  // 이제 화면을 보고 있는 동안 1분마다, 그리고 새 속보가 들어올 때 위쪽 속보 40건에
+  // 붙은 종목들의 오늘 등락률을 다시 받아 덮어씁니다. 서버가 처음 넣어준 값(liveQuotes)에서 시작.
+  const [quotesNow, setQuotesNow] = useState(liveQuotes);
+  const quoteKey = useMemo(() => {
+    const syms = new Set();
+    for (const it of rawItems.slice(0, 40)) {
+      for (const m of it.matches || []) {
+        if (!/^[0-9A-Z]{6}$/i.test(m.code || "")) continue;
+        syms.add(`${m.code.toUpperCase()}.${String(m.market || "").includes("닥") ? "KQ" : "KS"}`);
+      }
+    }
+    return [...syms].sort().slice(0, 60).join(",");
+  }, [rawItems]);
+  useEffect(() => {
+    if (!quoteKey) return;
+    let alive = true;
+    const load = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      fetch(`/api/live-quotes?s=${encodeURIComponent(quoteKey)}`)
+        .then((r) => r.json())
+        .then((d) => {
+          if (alive && d?.quotes && Object.keys(d.quotes).length) setQuotesNow((cur) => ({ ...cur, ...d.quotes }));
+        })
+        .catch(() => {});
+    };
+    load(); // 종목 목록이 바뀌면(새 속보) 바로 한 번
+    const t = setInterval(load, 60000);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, [quoteKey]);
+
+  const items = useMemo(() => rawItems.map((it) => toCardShape(it, quotesNow)), [rawItems, quotesNow]);
 
   // [2026-10-19 추가] 테마나 종목을 누르면 아래 속보를 그것만 남깁니다.
   // filter: null | { kind: "theme" | "stock", value: "해운" }

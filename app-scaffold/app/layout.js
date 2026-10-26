@@ -74,8 +74,19 @@ export const viewport = {
 // 어두운 터미널 화면에 맞는 단단한 글꼴이고, 숫자 자릿수가 딱딱 맞습니다.
 export default function RootLayout({ children }) {
   return (
-    <html lang="ko">
+    // suppressHydrationWarning: 아래 짧은 코드가 화면 뜨기 전에 data-theme을 붙이므로
+    // "서버가 그린 것과 다르다"는 경고를 이 한 줄(html 태그)에 한해서만 끕니다.
+    <html lang="ko" suppressHydrationWarning>
       <head>
+        {/* [2026-10-26 추가] 밝은/어두운 화면 기억값을 화면이 그려지기 "전에" 적용 —
+            이게 없으면 밝은 화면을 고른 사람도 페이지를 열 때마다 잠깐 검게
+            번쩍였다가 바뀝니다. (components/ThemeToggle.js 참고) */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{if(localStorage.getItem('nm-theme')==='light')document.documentElement.setAttribute('data-theme','light')}catch(e){}",
+          }}
+        />
         <link
           href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
           rel="stylesheet"

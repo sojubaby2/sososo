@@ -34,17 +34,34 @@
 // koreanTheme은 lib/themeData.json에 실제로 있는 테마 이름이어야
 // 화면에서 연결이 됩니다(없는 이름을 적어도 문장은 정상으로 나옵니다).
 
+// [2026-10-26 추가] members — 그 테마의 "코스피 대형주" 몇 개입니다.
+//   "지수 기여 1위"(어느 테마가 코스피를 실제로 가장 많이 밀어 올렸나/끌어내렸나)를
+//   계산하는 데만 씁니다(lib/indexContribution.js). 문장의 주인공 테마를 고르는
+//   방식(ETF 등락률)은 그대로입니다.
+//   · 코스피 지수는 덩치(시가총액) 큰 종목일수록 크게 반영되므로, 각 테마의
+//     큰 종목 3~6개만 넣어도 그 테마가 지수에 준 힘이 거의 다 잡힙니다.
+//   · 코드가 틀린 줄은 계산에서 조용히 빠집니다(화면이 깨지지 않음).
+//   · 한 종목은 한 테마에만 넣었습니다(두 번 세지 않게).
 export const KR_THEMES = [
   // 오래 상장돼 있어 코드가 안정적인 업종 ETF들입니다.
-  { code: "091160", label: "반도체", koreanTheme: "반도체" }, // KODEX 반도체
-  { code: "305720", label: "2차전지", koreanTheme: "2차전지" }, // KODEX 2차전지산업
-  { code: "091180", label: "자동차", koreanTheme: "자동차" }, // KODEX 자동차
-  { code: "143860", label: "헬스케어", koreanTheme: "제약업체" }, // TIGER 헬스케어
-  { code: "091170", label: "은행", koreanTheme: "은행" }, // KODEX 은행
-  { code: "102970", label: "증권", koreanTheme: "증권" }, // KODEX 증권
-  { code: "117680", label: "철강", koreanTheme: "철강 주요종목" }, // KODEX 철강
-  { code: "117700", label: "건설", koreanTheme: "건설 대표주" }, // KODEX 건설
-  { code: "140710", label: "운송", koreanTheme: "해운" }, // Kodex Transportation (항공·해운·육운)
+  { code: "091160", label: "반도체", koreanTheme: "반도체", // KODEX 반도체
+    members: ["005930", "000660", "042700", "000990"] }, // 삼성전자, SK하이닉스, 한미반도체, DB하이텍
+  { code: "305720", label: "2차전지", koreanTheme: "2차전지", // KODEX 2차전지산업
+    members: ["373220", "006400", "096770", "003670"] }, // LG에너지솔루션, 삼성SDI, SK이노베이션, 포스코퓨처엠
+  { code: "091180", label: "자동차", koreanTheme: "자동차", // KODEX 자동차
+    members: ["005380", "000270", "012330", "161390", "204320"] }, // 현대차, 기아, 현대모비스, 한국타이어앤테크놀로지, HL만도
+  { code: "143860", label: "헬스케어", koreanTheme: "제약업체", // TIGER 헬스케어
+    members: ["207940", "068270", "000100", "128940", "326030"] }, // 삼성바이오로직스, 셀트리온, 유한양행, 한미약품, SK바이오팜
+  { code: "091170", label: "은행", koreanTheme: "은행", // KODEX 은행
+    members: ["105560", "055550", "086790", "316140", "024110", "323410"] }, // KB금융, 신한지주, 하나금융지주, 우리금융지주, 기업은행, 카카오뱅크
+  { code: "102970", label: "증권", koreanTheme: "증권", // KODEX 증권
+    members: ["006800", "005940", "016360", "039490", "071050"] }, // 미래에셋증권, NH투자증권, 삼성증권, 키움증권, 한국금융지주
+  { code: "117680", label: "철강", koreanTheme: "철강 주요종목", // KODEX 철강
+    members: ["005490", "004020", "010130"] }, // POSCO홀딩스, 현대제철, 고려아연
+  { code: "117700", label: "건설", koreanTheme: "건설 대표주", // KODEX 건설
+    members: ["000720", "006360", "047040", "375500"] }, // 현대건설, GS건설, 대우건설, DL이앤씨
+  { code: "140710", label: "운송", koreanTheme: "해운", // Kodex Transportation (항공·해운·육운)
+    members: ["003490", "011200", "086280", "028670", "000120"] }, // 대한항공, HMM, 현대글로비스, 팬오션, CJ대한통운
 
   // [2026-10-20 정정] 아래 세 줄은 처음에 라벨을 잘못 붙였습니다.
   // 배포 후 /api/etf-check 로 야후가 돌려준 실제 이름을 보고 바로잡았습니다.
@@ -52,11 +69,18 @@ export const KR_THEMES = [
   //   102960 -> "Kodex Shipbuilding"  (기계장비가 아니라 조선)
   //   266360 -> "KODEX IT Software"   (미디어·엔터가 아니라 IT 소프트웨어)
   //   463250 -> "Tiger Space Tech"    (방산보다 우주·항공이 정확)
-  { code: "102960", label: "조선", koreanTheme: "조선" }, // Kodex Shipbuilding
-  { code: "266360", label: "IT 소프트웨어", koreanTheme: "소프트웨어" }, // KODEX IT Software
-  { code: "228790", label: "화장품", koreanTheme: "화장품" }, // Tiger Cosmetics
-  { code: "463250", label: "우주·항공", koreanTheme: "우주항공" }, // Tiger Space Tech
+  { code: "102960", label: "조선", koreanTheme: "조선", // Kodex Shipbuilding
+    members: ["009540", "329180", "042660", "010140", "010620"] }, // HD한국조선해양, HD현대중공업, 한화오션, 삼성중공업, HD현대미포
+  { code: "266360", label: "IT 소프트웨어", koreanTheme: "소프트웨어", // KODEX IT Software
+    members: ["035420", "035720", "018260", "259960", "036570"] }, // NAVER, 카카오, 삼성에스디에스, 크래프톤, 엔씨소프트
+  { code: "228790", label: "화장품", koreanTheme: "화장품", // Tiger Cosmetics
+    members: ["090430", "051900", "192820", "161890"] }, // 아모레퍼시픽, LG생활건강, 코스맥스, 한국콜마
+  { code: "463250", label: "우주·항공", koreanTheme: "우주항공", // Tiger Space Tech
+    members: ["012450", "047810", "079550", "064350"] }, // 한화에어로스페이스, 한국항공우주, LIG넥스원, 현대로템
 ];
 
 // 국내 ETF도 코스피 상장이라 야후 기호는 뒤에 .KS를 붙입니다.
 export const KR_ETF_SYMBOLS = KR_THEMES.map((t) => `${t.code}.KS`);
+
+// [2026-10-26 추가] 지수 기여 계산에 쓰는 대형주 전체(중복 없이)
+export const KR_THEME_MEMBER_CODES = [...new Set(KR_THEMES.flatMap((t) => t.members || []))];

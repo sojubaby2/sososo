@@ -389,7 +389,9 @@ function buildUsPanel(etfQuotes, k) {
 
 // ── 한국 칸 ──────────────────────────────────────────────────────────
 // 오늘 자료가 모자라면(개장 전·주말) 어제 것으로 대신 채웁니다.
-function buildDomesticPanel(items, today, todayRows, quotes, k, now, krEtfQuotes, kospi) {
+// [2026-10-26 추가] contribText — "지수 기여 1위 반도체 +0.35%p" 같은 한 줄
+// (lib/indexContribution.js). 있으면 작은 글씨 맨 끝에 붙입니다. 없으면 예전과 똑같습니다.
+function buildDomesticPanel(items, today, todayRows, quotes, k, now, krEtfQuotes, kospi, contribText = "") {
   // 국내 정규장은 09:00 ~ 15:30입니다.
   const marketOpen = k.hour >= 9 && (k.hour < 15 || (k.hour === 15 && k.minute < 30));
 
@@ -404,6 +406,7 @@ function buildDomesticPanel(items, today, todayRows, quotes, k, now, krEtfQuotes
     const label = stale ? "어제 한국 (마감)" : marketOpen ? "지금 한국 (장중)" : "오늘 한국";
     const dayWord = stale ? "어제" : "오늘";
     const staleNote = stale ? " · 오늘 시세는 9시 20분쯤부터 반영됩니다" : "";
+    const contribNote = contribText ? ` · ${contribText}` : "";
 
     // 코스피 등락률. 못 받아왔으면(null) 예전처럼 테마끼리 비교합니다.
     const kospiPct =
@@ -420,7 +423,7 @@ function buildDomesticPanel(items, today, todayRows, quotes, k, now, krEtfQuotes
           Math.abs(etf.best.changePct) >= Math.abs(etf.worst.changePct) ? etf.best.label : etf.worst.label
         } ${signed(
           Math.abs(etf.best.changePct) >= Math.abs(etf.worst.changePct) ? etf.best.changePct : etf.worst.changePct
-        )}.${staleNote}`,
+        )}${contribNote}.${staleNote}`,
         up: kospiPct >= 0,
         theme: null,
         basis: "kospi",
@@ -462,7 +465,7 @@ function buildDomesticPanel(items, today, todayRows, quotes, k, now, krEtfQuotes
         highlight: leader.label,
         after: live ? "입니다" : pastSuffix(leader.label),
       },
-      sub: `${kospiNote}${leader.label} ETF ${signed(leader.changePct)}${staleNote}`,
+      sub: `${kospiNote}${leader.label} ETF ${signed(leader.changePct)}${contribNote}${staleNote}`,
       up,
       theme: leader.koreanTheme || null,
       basis: "kospi",
@@ -545,7 +548,7 @@ function buildDomesticPanel(items, today, todayRows, quotes, k, now, krEtfQuotes
 //     newsCount: 38,
 //   }
 // kospi: 코스피 지수 시세 { changePct, asOf } — 한국 칸의 문장 방향을 정합니다.
-export function buildTodayBrief({ items, quotes, etfQuotes, krEtfQuotes, kospi, now = new Date() }) {
+export function buildTodayBrief({ items, quotes, etfQuotes, krEtfQuotes, kospi, contribText = "", now = new Date() }) {
   const k = kstNow(now);
   const today = todaysItems(items, now);
   const themeRows = summarizeThemes(today, quotes);
@@ -555,6 +558,6 @@ export function buildTodayBrief({ items, quotes, etfQuotes, krEtfQuotes, kospi, 
     newsCount: today.length,
     themeRows,
     us: buildUsPanel(etfQuotes, k),
-    domestic: buildDomesticPanel(items, today, themeRows, quotes, k, now, krEtfQuotes, kospi),
+    domestic: buildDomesticPanel(items, today, themeRows, quotes, k, now, krEtfQuotes, kospi, contribText),
   };
 }

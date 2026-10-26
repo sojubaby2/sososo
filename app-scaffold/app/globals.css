@@ -82,7 +82,18 @@
   --r-md: 8px;
   --r-sm: 6px;
   --shadow: 0 0 0 1px var(--border);
-  --shadow-hover: 0 0 0 1px #3a3940, 0 10px 28px rgba(0, 0, 0, 0.35);
+  --shadow-hover: 0 0 0 1px var(--border-strong), 0 10px 28px rgba(0, 0, 0, 0.35);
+
+  /* [2026-10-26 추가 — 밝은 화면 전환용] 예전엔 아래 색들이 곳곳에 숫자로 직접
+     박혀 있어서, 밝은 화면으로 바꿀 때 같이 안 바뀌었습니다. 이름을 붙여 한곳에 모음. */
+  --on-fill: #141416;          /* 진한 글자색·호박색으로 꽉 칠한 단추 위의 글자 */
+  --border-strong: #3a3940;    /* 조금 더 진한 테두리 */
+  --row-hover: #17161a;        /* 한 줄 목록에 마우스 올렸을 때 / 펼친 줄 바탕 */
+  --skel-hi: #232229;          /* 불러오는 중 반짝이는 띠 */
+  --backdrop: rgba(5, 5, 7, 0.72);       /* 차트 창 뒤를 덮는 막 */
+  --deep-rgb: 11, 11, 13;      /* 브리핑 띠 바탕색(--deep)의 숫자판 — 그늘·글자 번짐용 */
+  --toast-sub: rgba(255, 255, 255, 0.75);
+  --solid-hover: #d9d9dc;      /* "원문 보기"처럼 꽉 칠한 단추에 마우스 올렸을 때 */
 }
 
 * { box-sizing: border-box; }
@@ -289,7 +300,7 @@ input::placeholder { color: var(--ink-soft); }
 
 .chip-copied {
   position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
-  background: var(--ink); color: #141416; font-size: 11px; font-weight: 600; padding: 4px 9px;
+  background: var(--ink); color: var(--on-fill); font-size: 11px; font-weight: 600; padding: 4px 9px;
   border-radius: 6px; white-space: nowrap; animation: chip-copied-pop 1.4s ease forwards; pointer-events: none;
 }
 @keyframes chip-copied-pop {
@@ -316,7 +327,7 @@ input::placeholder { color: var(--ink-soft); }
 .news-reason strong { color: var(--down); font-weight: 700; }
 .news-link {
   display: inline-flex; align-items: center; gap: 6px;
-  font-size: 13px; font-weight: 700; color: #141416;
+  font-size: 13px; font-weight: 700; color: var(--on-fill);
   background: var(--amber); padding: 7px 14px; border-radius: 999px;
   text-decoration: none;
 }
@@ -337,7 +348,7 @@ input::placeholder { color: var(--ink-soft); }
    살짝 커지는 애니메이션도 넣어서 지금 뭐가 선택돼 있는지 한눈에 보이게 함. */
 .range-toggle-btn { font-size: 11px; font-weight: 600; color: var(--ink-muted); background: transparent; border: none; border-radius: 999px; padding: 4px 10px; cursor: pointer; line-height: 1.2; transition: background-color 0.15s ease, color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease; }
 .range-toggle-btn:hover:not(.active) { color: var(--amber); background: var(--amber-tint); }
-.range-toggle-btn.active { color: #141416; background: var(--amber); box-shadow: none; transform: none; }
+.range-toggle-btn.active { color: var(--on-fill); background: var(--amber); box-shadow: none; transform: none; }
 .trending-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); }
 .trending-row:last-child { border-bottom: none; }
 /* [2026-09-08 추가] HOT 테마 줄을 누르면 테마별 종목정리로 이동하는 링크로 바뀜 */
@@ -354,12 +365,12 @@ input::placeholder { color: var(--ink-soft); }
 .new-toast {
   display: flex; align-items: flex-start; gap: 10px;
   background: var(--surface-2); color: var(--ink); padding: 14px 16px; border-radius: var(--r-md);
-  max-width: 320px; border: 1px solid #3a3940; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  max-width: 320px; border: 1px solid var(--border-strong); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
   animation: toast-slide-in 320ms ease, toast-slide-out 320ms ease 4.2s forwards;
 }
 .new-toast-icon { flex-shrink: 0; margin-top: 1px; color: var(--amber-bright); }
 .new-toast-title { font-size: 13px; font-weight: 700; margin: 0 0 2px; }
-.new-toast-headline { font-size: 12px; color: rgba(255,255,255,0.75); line-height: 1.4; margin: 0; }
+.new-toast-headline { font-size: 12px; color: var(--toast-sub); line-height: 1.4; margin: 0; }
 @keyframes toast-slide-in { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: translateX(0); } }
 @keyframes toast-slide-out { to { opacity: 0; transform: translateX(24px); } }
 @media (prefers-reduced-motion: reduce) { .new-toast { animation: none; } }
@@ -646,7 +657,7 @@ input::placeholder { color: var(--ink-soft); }
    안 보였음. 이제 왼쪽 글자 쪽만 확실히 가리고, 지도 쪽은 살짝만 눌러 줌. */
 .brief-band::after {
   content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
-  background: linear-gradient(100deg, var(--deep) 0%, var(--deep) 32%, rgba(11, 11, 13, 0.55) 50%, rgba(11, 11, 13, 0.12) 72%, transparent 88%);
+  background: linear-gradient(100deg, var(--deep) 0%, var(--deep) 32%, rgba(var(--deep-rgb), 0.55) 50%, rgba(var(--deep-rgb), 0.12) 72%, transparent 88%);
 }
 /* 지수 줄은 지도 위에 불투명하게 깔아 숫자가 지도선과 겹치지 않게 */
 .brief-strip { position: relative; z-index: 2; background: var(--deep); }
@@ -660,7 +671,7 @@ input::placeholder { color: var(--ink-soft); }
 .brief-cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 40px; align-items: start; }
 .brief-col { min-width: 0; padding-left: 14px; border-left: 1px solid var(--border); }
 /* [2026-10-26 추가] 지도가 진해진 만큼, 지도 위에 올라간 글자 뒤에 어두운 번짐을 깔아 글씨가 묻히지 않게 */
-.brief-col { text-shadow: 0 1px 2px rgba(11, 11, 13, 0.9), 0 0 14px rgba(11, 11, 13, 0.85); }
+.brief-col { text-shadow: 0 1px 2px rgba(var(--deep-rgb), 0.9), 0 0 14px rgba(var(--deep-rgb), 0.85); }
 .brief-col-label { font-size: 12px; color: var(--on-deep-soft); margin-bottom: 4px; }
 /* 한국어는 띄어쓰기에서만 자릅니다(예전 "끌어내 / 린" 문제 재발 방지). */
 .brief-lead {
@@ -774,7 +785,7 @@ input::placeholder { color: var(--ink-soft); }
   background: transparent; border: 1px solid var(--border); border-radius: 999px;
   transition: border-color 0.15s ease, color 0.15s ease;
 }
-.sound-toggle:hover { border-color: #3a3940; color: var(--ink); }
+.sound-toggle:hover { border-color: var(--border-strong); color: var(--ink); }
 .sound-toggle.on { color: var(--ink); background: transparent; border-color: var(--amber); }
 .sound-toggle:focus-visible, .clear-filter:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
 .clear-filter {
@@ -850,7 +861,7 @@ input::placeholder { color: var(--ink-soft); }
 .nb-newpill {
   position: sticky; top: 68px; z-index: 6; display: flex; align-items: center; gap: 6px;
   margin: 10px auto -46px; height: 36px; padding: 0 16px; width: max-content;
-  border: none; border-radius: 999px; background: var(--amber); color: #141416;
+  border: none; border-radius: 999px; background: var(--amber); color: var(--on-fill);
   font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
   box-shadow: 0 10px 26px rgba(0, 0, 0, 0.55); animation: jump-pop 0.22s ease-out;
 }
@@ -868,7 +879,7 @@ input::placeholder { color: var(--ink-soft); }
 
 /* ── 속보 느낌 (2026-10-26 오후) ─────────────────────────────────── */
 /* 흐르는 자막 띠 — 왼쪽 빨간 "속보", 가운데 흐르는 제목, 오른쪽 초 시계 */
-.nb-crawl { display: flex; align-items: stretch; height: 40px; background: #0b0b0d; border-bottom: 1px solid var(--border); overflow: hidden; }
+.nb-crawl { display: flex; align-items: stretch; height: 40px; background: var(--deep); border-bottom: 1px solid var(--border); overflow: hidden; }
 .nb-crawl-label {
   flex: none; display: flex; align-items: center; gap: 7px; padding: 0 14px;
   background: var(--breaking); color: #fff; font-weight: 700; font-size: 14px; letter-spacing: 0.02em;
@@ -893,7 +904,7 @@ input::placeholder { color: var(--ink-soft); }
 /* 말머리 딱지 — [단독]·[속보]는 빨간 테두리, 나머지([특징주] 등)는 회색 */
 .nb-tag {
   display: inline-flex; align-items: center; height: 20px; padding: 0 6px; border-radius: 3px; flex: none;
-  border: 1px solid #3a3940; color: var(--ink-muted); font-size: 11.5px; font-weight: 600; white-space: nowrap;
+  border: 1px solid var(--border-strong); color: var(--ink-muted); font-size: 11.5px; font-weight: 600; white-space: nowrap;
 }
 .nb-tag.hot { border-color: var(--breaking-bright); color: var(--breaking-bright); }
 
@@ -928,10 +939,10 @@ input::placeholder { color: var(--ink-soft); }
 /* 원문 보기 — 흰 바탕 검은 글자, 화면에서 가장 눈에 띄는 단추 */
 .nb-orig {
   display: inline-flex; align-items: center; gap: 4px; height: 30px; padding: 0 13px; border-radius: 999px;
-  background: var(--ink); color: #141416; font-size: 12.5px; font-weight: 600; text-decoration: none;
+  background: var(--ink); color: var(--on-fill); font-size: 12.5px; font-weight: 600; text-decoration: none;
   transition: background 0.15s ease;
 }
-.nb-orig:hover { background: #d9d9dc; }
+.nb-orig:hover { background: var(--solid-hover); }
 .nb-orig:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
 .nb-chips { margin: 10px 0 0; gap: 6px; }
 .nb-why ul { margin: 0; padding-left: 16px; color: var(--ink-muted); font-size: 13px; line-height: 1.6; }
@@ -973,7 +984,7 @@ input::placeholder { color: var(--ink-soft); }
   min-height: 48px; padding: 6px 20px; background: none; border: none; cursor: pointer; text-align: left;
   font-family: inherit; transition: background 0.15s ease;
 }
-.nb-row:hover { background: #17161a; }
+.nb-row:hover { background: var(--row-hover); }
 .nb-row:focus-visible { outline: 2px solid var(--amber); outline-offset: -2px; }
 .nb-time { font-size: 13px; color: var(--ink-soft); }
 .nb-time.fresh { color: var(--breaking-bright); font-weight: 600; }
@@ -986,8 +997,8 @@ input::placeholder { color: var(--ink-soft); }
 .nb-leadstk .more { color: var(--ink-soft); font-size: 12px; font-weight: 400; }
 .nb-chev { color: var(--ink-soft); transition: transform 0.15s ease; }
 .nb-tape > li.open .nb-chev { transform: rotate(90deg); }
-.nb-tape > li.open .nb-row { background: #17161a; }
-.nb-detail { padding: 2px 20px 16px 196px; background: #17161a; display: grid; gap: 10px; }
+.nb-tape > li.open .nb-row { background: var(--row-hover); }
+.nb-detail { padding: 2px 20px 16px 196px; background: var(--row-hover); display: grid; gap: 10px; }
 .nb-detail-sum { margin: 0; font-size: 14px; line-height: 1.6; color: var(--ink-muted); word-break: keep-all; max-width: 70ch; }
 .nb-detail .nb-chips { margin: 0; }
 .nb-detail .nb-actions { margin-top: 0; }
@@ -1083,7 +1094,7 @@ button.nb-stk:focus-visible { outline: 2px solid var(--amber); outline-offset: 2
 /* 바탕(어둡게 덮는 막) + 창 */
 .sc-backdrop {
   position: fixed; inset: 0; z-index: 100;
-  background: rgba(5, 5, 7, 0.72);
+  background: var(--backdrop);
   display: flex; align-items: center; justify-content: center;
   padding: 16px;
   animation: sc-fade 0.14s ease-out;
@@ -1143,7 +1154,7 @@ button.nb-stk:focus-visible { outline: 2px solid var(--amber); outline-offset: 2
 .sc-last-txt { fill: #fff; font-size: 10.5px; font-weight: 600; font-family: var(--font-mono, monospace); }
 .sc-cross { stroke: var(--ink-muted); stroke-width: 1; stroke-dasharray: 2 2; }
 
-.sc-skel { height: 302px; border-radius: 10px; background: linear-gradient(90deg, var(--surface-2) 0%, #232229 50%, var(--surface-2) 100%); background-size: 200% 100%; animation: sc-shimmer 1.2s linear infinite; }
+.sc-skel { height: 302px; border-radius: 10px; background: linear-gradient(90deg, var(--surface-2) 0%, var(--skel-hi) 50%, var(--surface-2) 100%); background-size: 200% 100%; animation: sc-shimmer 1.2s linear infinite; }
 @keyframes sc-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
 .sc-empty { height: 302px; display: flex; align-items: center; justify-content: center; text-align: center; color: var(--ink-muted); font-size: 14px; line-height: 1.6; border: 1px dashed var(--border); border-radius: 10px; }
 
@@ -1167,4 +1178,103 @@ button.nb-stk:focus-visible { outline: 2px solid var(--amber); outline-offset: 2
   .sc-backdrop { align-items: flex-end; padding: 0; }
   .sc-modal { width: 100%; border-radius: 16px 16px 0 0; max-height: 92dvh; padding: 16px 14px 18px; }
   .sc-title { font-size: 18px; }
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   [2026-10-26 추가] 밝은 화면 (머리띠 오른쪽 해/달 단추로 전환)
+   재성님 요청: "지금 다크모드 같은 화면이잖아? 반대 모드도 만들어서 전환 가능하게"
+
+   어떻게 동작하나:
+     · 단추를 누르면 <html data-theme="light">가 붙고, 아래 값들이 맨 위
+       :root의 어두운 값을 덮어씁니다. 이름은 그대로라 사이트 전체가 한 번에 바뀝니다.
+     · 고른 화면은 그 브라우저에 기억됩니다(다음에 와도 그대로).
+     · 처음 오는 방문자는 지금처럼 어두운 화면으로 시작합니다.
+
+   색 고른 기준(어두운 화면과 같은 규칙):
+     · 바탕은 살짝 따뜻한 흰색, 카드는 순백 — 눈부심을 줄이려고 바탕을 한 톤 내림.
+     · 글자 세 단계 모두 흰 카드 위에서 4.5:1 이상(읽기 기준 통과).
+     · 오르면 빨강, 내리면 파랑은 그대로 — 흰 바탕에서 읽히게 한 단계 진하게.
+     · 호박색 강조는 흰 바탕에선 글자로 안 읽혀서 진한 황토색으로.
+   ═══════════════════════════════════════════════════════════════════ */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --bg: #f4f4f1;
+  --surface: #ffffff;
+  --surface-2: #f0efeb;
+
+  --ink: #16161a;
+  --ink-muted: #45474e;
+  --ink-soft: #686a72;
+  --border: #e3e2dd;
+
+  --amber: #a5600a;
+  --amber-bright: #8a4f06;
+  --amber-tint: #fbf0dd;
+  --amber-tint-ink: #8a4f06;
+
+  --deep: #fbfbf9;
+  --deep-2: #f0efeb;
+  --on-deep: #16161a;
+  --on-deep-soft: #5d5f66;
+
+  --green-tint: #e4f3eb;
+  --green-tint-ink: #16704a;
+
+  --up: #d42f3a;
+  --down: #1f5fd1;
+
+  --bad: #be2a7b;
+  --bad-tint: #fbe8f2;
+  --bad-tint-ink: #9c1f63;
+
+  --strip: #fbfbf9;
+
+  --breaking: #d62b2f;
+  --breaking-bright: #e53935;
+  --breaking-tint: #fde9e9;
+
+  --shadow-hover: 0 0 0 1px var(--border-strong), 0 10px 28px rgba(20, 20, 30, 0.08);
+
+  --on-fill: #ffffff;
+  --border-strong: #cfcec8;
+  --row-hover: #f6f5f1;
+  --skel-hi: #e6e5e0;
+  --backdrop: rgba(22, 22, 26, 0.42);
+  --deep-rgb: 251, 251, 249;
+  --toast-sub: #45474e;
+  --solid-hover: #34343b;
+}
+
+/* 세계지도: 원본 그림이 "연한 바탕 + 어두운 해안선"이라, 밝은 화면에선
+   색을 뒤집지 않고 그대로 겹쳐서(곱하기) 어두운 선만 남깁니다. */
+:root[data-theme="light"] .brief-map {
+  opacity: 0.42;
+  filter: grayscale(1) contrast(1.35);
+  mix-blend-mode: multiply;
+}
+:root[data-theme="light"] .new-toast { box-shadow: 0 12px 32px rgba(20, 20, 30, 0.14); }
+:root[data-theme="light"] .sc-modal { box-shadow: 0 24px 60px rgba(20, 20, 30, 0.22); }
+:root[data-theme="light"] .nb-jump,
+:root[data-theme="light"] .nb-newpill { box-shadow: 0 10px 26px rgba(20, 20, 30, 0.18); }
+
+/* ── 화면 전환 단추 (components/ThemeToggle.js) ── */
+.site-header .nav { margin-left: auto; }
+.theme-toggle {
+  flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px;
+  height: 32px; padding: 0 12px; border-radius: 999px;
+  background: transparent; border: 1px solid var(--border); color: var(--on-deep-soft);
+  font-size: 12.5px; font-weight: 500; cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.theme-toggle:hover { color: var(--on-deep); border-color: var(--amber); }
+.theme-toggle:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+@media (max-width: 860px) {
+  .theme-toggle { margin-left: auto; }
+  .site-header .nav { order: 3; margin-left: 0; }
+}
+@media (max-width: 480px) {
+  .theme-toggle-text { display: none; }
+  .theme-toggle { width: 34px; padding: 0; justify-content: center; }
 }

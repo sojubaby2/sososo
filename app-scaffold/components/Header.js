@@ -37,6 +37,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import ThemeToggle from "./ThemeToggle";
 
 // 로고 글씨에서 강조할 글자의 색입니다.
 const BRAND_ACCENT = "#ff5b4e";
@@ -83,6 +84,9 @@ export default function Header() {
             );
           })}
         </nav>
+
+        {/* [2026-10-26 추가] 어두운 화면 ↔ 밝은 화면 전환 단추 */}
+        <ThemeToggle />
       </div>
     </header>
   );

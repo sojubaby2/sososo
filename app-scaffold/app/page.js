@@ -37,7 +37,8 @@
 import HomeClient from "./HomeClient";
 import { fetchDomesticQuotes, fetchEtfQuotes } from "../lib/quotes";
 import { US_ETF_SYMBOLS } from "../lib/usThemes";
-import { KR_ETF_SYMBOLS } from "../lib/krThemes";
+import { KR_ETF_SYMBOLS, KR_THEME_MEMBER_CODES } from "../lib/krThemes";
+import { getKospiCapTable, computeThemeContributions, pickTopContributor, contributionText } from "../lib/indexContribution";
 import { FX_RATES, COMMODITIES, STRIP_SYMBOLS, toStripRows } from "../lib/marketStrip";
 import { buildTodayBrief, todaysItems } from "../lib/todayBrief";
 
@@ -112,7 +113,7 @@ export default async function HomePage() {
   // [2026-10-20 추가] stripQuotes — 지수 띠의 "환율·금리", "원자재" 탭에
   // 쓰는 값입니다. fetchEtfQuotes는 야후 기호면 뭐든 받아오는 함수라
   // 그대로 재사용합니다(ETF 전용이 아닙니다).
-  const [quotes, etfQuotes, krEtfQuotes, stripQuotes, kospiQuotes] = await Promise.all([
+  const [quotes, etfQuotes, krEtfQuotes, stripQuotes, kospiQuotes, memberQuotes, capTable] = await Promise.all([
     fetchDomesticQuotes(stocks).catch(() => new Map()),
     fetchEtfQuotes(US_ETF_SYMBOLS).catch(() => new Map()),
     // [2026-10-20 추가] 국내 테마 ETF — 한국 칸을 실제 증시값으로 뽑는 데 씁니다.
@@ -122,14 +123,25 @@ export default async function HomePage() {
     // 조용했다)을 정하는 기준입니다. fetchEtfQuotes는 야후 기호면 뭐든
     // 받아오는 함수라 지수에도 그대로 씁니다.
     fetchEtfQuotes([KOSPI_SYMBOL]).catch(() => new Map()),
+    // [2026-10-26 추가] "지수 기여 1위" 계산용 — 테마별 코스피 대형주의 오늘 등락률과
+    // 시가총액(하루 몇 번만 KRX에서 받음). lib/indexContribution.js 참고. 비용 0.
+    fetchDomesticQuotes(KR_THEME_MEMBER_CODES.map((code) => ({ code, market: "코스피" }))).catch(() => new Map()),
+    getKospiCapTable().catch(() => null),
   ]);
+
+  const kospi = kospiQuotes.get(KOSPI_SYMBOL) || null;
+  const contribTop = pickTopContributor(
+    computeThemeContributions(capTable, memberQuotes),
+    typeof kospi?.changePct === "number" ? kospi.changePct : null
+  );
 
   const brief = buildTodayBrief({
     items: initialItems,
     quotes,
     etfQuotes,
     krEtfQuotes,
-    kospi: kospiQuotes.get(KOSPI_SYMBOL) || null,
+    kospi,
+    contribText: contributionText(contribTop),
   });
 
   // Map은 그대로 화면 쪽으로 넘길 수 없습니다(서버에서 브라우저로 건너갈 때
