@@ -10,72 +10,104 @@
 //
 // ── 계산 방법 ─────────────────────────────────────────────────────────
 //   코스피는 덩치(시가총액) 큰 종목이 많이 반영되는 지수입니다.
-//   종목 하나가 지수에 준 힘 ≈ (그 종목 시가총액 ÷ 코스피 전체 시가총액) × 그 종목 등락률
+//   종목 하나가 지수에 준 힘 ≈ (그 종목 시가총액 ÷ 코스피 전체 시가총액) × 그 종목 오늘 등락률
 //   테마가 준 힘 = 그 테마 대형주들(lib/krThemes.js의 members) 힘의 합
 //
 //   예) 반도체 +1% × 비중 35% = 지수 약 +0.35%p
 //       조선   +8% × 비중 3%  = 지수 약 +0.24%p   → 지수 기여 1위는 반도체
 //
 //   "%p"는 "코스피 등락률 중 이 테마 몫"이라는 뜻입니다.
-//   (코스피 +1.10% 중 +0.35%p는 반도체가 만든 것)
 //
-// ── 숫자는 어디서 ─────────────────────────────────────────────────────
-//   · 시가총액: KRX 정식 Open API(이미 쓰고 있는 것, 무료)의 "전 영업일 종가 × 상장주식수".
-//     하루에 거의 안 변하는 값이라 6시간에 한 번만 받아옵니다(Next.js 저장 기능,
-//     Redis 안 씀). KRX 하루 한도 10,000회 중 하루 몇 회만 씁니다.
-//   · 오늘 등락률: 야후(이미 쓰고 있는 것, 무료, 15~20분 지연). 5분마다 갱신.
+// ── [2026-10-26 오후 변경] 시가총액을 KRX에서 받지 않고 아래 표에 적어 둡니다 ──
+//   처음 버전은 KRX에서 시가총액을 6시간마다 받아왔는데, 배포해 보니 "지수 기여 1위"
+//   줄이 나오지 않았습니다(재성님 확인). 페이지를 만드는 짧은 시간 안에 KRX 응답이
+//   오지 않은 것으로 보입니다(장중에는 KRX에 "오늘" 자료가 없어서 하루 전으로
+//   한 번 더 물어보느라 시간이 더 걸림).
+//   지수 안에서 각 종목의 비중은 하루하루 거의 변하지 않으므로, 2026-10-22 종가 기준
+//   시가총액을 아래 표에 적어 두고 그대로 씁니다.
+//     · 장점: 바깥 서버를 전혀 부르지 않아 실패할 곳이 없고 빠름(비용 0)
+//     · 한계: 몇 달 지나면 비중이 조금씩 달라짐 → 테마 점검할 때 같이 새로 고치면 충분
+//       (대형주 상장·합병처럼 큰일이 있으면 그때 갱신)
+//   오늘 등락률은 그대로 야후(15~20분 지연)에서 5분마다 받아옵니다.
 //
-// 비용: 0원. AI·Redis를 전혀 쓰지 않습니다.
-//
-// 실패하면: 이 한 줄만 안 나오고, 문장 나머지는 예전과 똑같이 나옵니다.
+// 문제가 생겼을 때: https://newsmeme.co.kr/api/index-contribution 을 열면 계산 과정이 보입니다.
 
-import { unstable_cache } from "next/cache";
-import { fetchLatestAvailable } from "./krxOpenApi";
-import { KR_THEMES, KR_THEME_MEMBER_CODES } from "./krThemes";
+import { KR_THEMES } from "./krThemes";
 
-const CAP_CACHE_SECONDS = 6 * 3600; // 6시간
-const KRX_TIMEOUT_MS = 8000;
+// 단위: 억 원. 코스피 상장 종목 시가총액(2026-10-22 종가 기준, 출처: KRX 시세를 모은 공개 자료 FinanceData/marcap)
+export const KOSPI_CAP_SNAPSHOT = {
+  asOf: "2026-10-22",
+  totalCap: 45690530, // 코스피 전체
+  caps: {
+    "005930": 12540268,
+    "000660": 8933922,
+    "373220": 912600,
+    "207940": 630020,
+    "005380": 613451,
+    "105560": 561116,
+    "068270": 450918,
+    "000270": 424769,
+    "055550": 423914,
+    "012450": 418179,
+    "006400": 412598,
+    "086790": 324893,
+    "329180": 324330,
+    "012330": 302695,
+    "035420": 268320,
+    "096770": 239548,
+    "316140": 230246,
+    "005490": 226631,
+    "011200": 213643,
+    "010130": 185978,
+    "042700": 182237,
+    "009540": 178348,
+    "042660": 175268,
+    "018260": 160172,
+    "024110": 158289,
+    "010140": 152416,
+    "003670": 148362,
+    "006800": 135212,
+    "035720": 134451,
+    "086280": 133575,
+    "079550": 106260,
+    "000720": 103561,
+    "047810": 103226,
+    "003490": 97394,
+    "323410": 95663,
+    "064350": 93317,
+    "259960": 88067,
+    "005940": 87133,
+    "071050": 82140,
+    "090430": 78088,
+    "161390": 76307,
+    "016360": 69208,
+    "000100": 61837,
+    "047040": 59702,
+    "326030": 58657,
+    "039490": 56784,
+    "128940": 47465,
+    "036570": 45566,
+    "000990": 43026,
+    "051900": 40284,
+    "004020": 36364,
+    "028670": 33785,
+    "192820": 30927,
+    "161890": 29459,
+    "006360": 25161,
+    "375500": 22636,
+    "204320": 17867,
+    "000120": 15125,
+  },
+};
 
-// KRX에서 코스피 전체 시가총액과, 우리가 쓰는 대형주들의 시가총액만 뽑아 작은 표로 만듭니다.
-// (전 종목 2,700개를 들고 다닐 필요가 없어서 59개만 남깁니다)
-async function buildCapTable() {
-  const krx = await Promise.race([
-    fetchLatestAvailable(new Date()),
-    new Promise((_, reject) => setTimeout(() => reject(new Error("KRX 시간 초과")), KRX_TIMEOUT_MS)),
-  ]);
-  if (!krx?.items?.length) throw new Error("KRX 데이터 없음"); // 던져야 "실패"가 6시간 저장되지 않음
-
-  const want = new Set(KR_THEME_MEMBER_CODES);
-  let totalCap = 0;
-  const caps = {};
-  for (const it of krx.items) {
-    if (it.mrktCtg !== "KOSPI") continue;
-    const cap = it.clpr * it.lstgStCnt;
-    if (!Number.isFinite(cap) || cap <= 0) continue;
-    totalCap += cap;
-    if (want.has(it.srtnCd)) caps[it.srtnCd] = cap;
-  }
-  if (totalCap <= 0 || Object.keys(caps).length === 0) throw new Error("시가총액 계산 불가");
-  return { basDt: krx.basDt, totalCap, caps };
-}
-
-const getCapTableCached = unstable_cache(buildCapTable, ["kospi-cap-table-v1"], {
-  revalidate: CAP_CACHE_SECONDS,
-});
-
+// 예전 이름 그대로 둡니다(app/page.js가 이 이름으로 부름). 이제 바깥 호출 없이 바로 돌려줍니다.
 export async function getKospiCapTable() {
-  if (!process.env.KRX_OPENAPI_KEY) return null;
-  try {
-    return await getCapTableCached();
-  } catch {
-    return null;
-  }
+  return KOSPI_CAP_SNAPSHOT;
 }
 
 // 테마별 지수 기여(%p)를 계산합니다.
-//   capTable: getKospiCapTable() 결과
+//   capTable: KOSPI_CAP_SNAPSHOT
 //   memberQuotes: Map(종목코드 → { changePct }) — 대형주들의 오늘 등락률
-// 돌려주는 값: [{ label, contribPct, covered }] (기여 큰 순서 아님 — 고르는 쪽에서 정함)
 export function computeThemeContributions(capTable, memberQuotes) {
   if (!capTable || !memberQuotes || memberQuotes.size === 0) return [];
   const rows = [];

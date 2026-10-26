@@ -123,8 +123,8 @@ export default async function HomePage() {
     // 조용했다)을 정하는 기준입니다. fetchEtfQuotes는 야후 기호면 뭐든
     // 받아오는 함수라 지수에도 그대로 씁니다.
     fetchEtfQuotes([KOSPI_SYMBOL]).catch(() => new Map()),
-    // [2026-10-26 추가] "지수 기여 1위" 계산용 — 테마별 코스피 대형주의 오늘 등락률과
-    // 시가총액(하루 몇 번만 KRX에서 받음). lib/indexContribution.js 참고. 비용 0.
+    // [2026-10-26 추가] "지수 기여 1위" 계산용 — 테마별 코스피 대형주의 오늘 등락률(야후)과
+    // 시가총액(파일에 적어 둔 2026-10-22 기준 값 — 바깥 호출 없음). lib/indexContribution.js 참고. 비용 0.
     fetchDomesticQuotes(KR_THEME_MEMBER_CODES.map((code) => ({ code, market: "코스피" }))).catch(() => new Map()),
     getKospiCapTable().catch(() => null),
   ]);
