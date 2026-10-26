@@ -608,8 +608,35 @@ input::placeholder { color: var(--ink-soft); }
    예전: 높이 약 420px(지도 배경 + 34px 큰 제목) → 지금: 약 190px.
    지도 그림은 장식이 화면을 차지해서 뺐습니다(components/BriefingBand.js
    주석에 되돌리는 방법을 적어뒀습니다). */
-.brief-band { position: relative; background: var(--deep); border-bottom: 1px solid var(--border); }
-.brief-inner { padding: 18px 40px 0; }
+.brief-band { position: relative; background: var(--deep); border-bottom: 1px solid var(--border); overflow: hidden; }
+.brief-inner { position: relative; z-index: 2; padding: 18px 40px 0; }
+
+/* 세계지도 — 띠 오른쪽 배경. 가로세로 비율을 그림과 똑같이 고정해야
+   핀이 제자리에 남습니다. 띠보다 큰 지도를 세로 가운데에 맞춰 두고,
+   위아래 넘치는 부분(극지방)은 잘라냅니다 — 핀이 있는 중위도만 보입니다. */
+.brief-mapwrap {
+  position: absolute; z-index: 0; right: 2%; top: -38%;
+  width: min(48%, 700px); aspect-ratio: 1024 / 559; pointer-events: none;
+}
+.brief-map, .brief-pins { position: absolute; inset: 0; }
+/* 원본 그림은 "연한 바탕 + 어두운 해안선"이라 색을 뒤집어 밝은 선만 띄웁니다.
+   ★ 지도를 더 진하게/흐리게: 아래 opacity 숫자만 고치면 됩니다(0.1~0.6). */
+.brief-map {
+  opacity: 0.32;
+  filter: grayscale(1) invert(1) contrast(1.4);
+  mix-blend-mode: screen;
+  -webkit-mask-image: linear-gradient(to left, #000 35%, transparent 95%);
+  mask-image: linear-gradient(to left, #000 35%, transparent 95%);
+}
+.brief-map img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.brief-pins svg { width: 100%; height: 100%; display: block; }
+/* 글자 뒤 그늘 — 왼쪽은 완전히 가리고 오른쪽으로 갈수록 투명. 지도는 오른쪽에서만 또렷. */
+.brief-band::after {
+  content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  background: linear-gradient(100deg, var(--deep) 0%, var(--deep) 38%, rgba(11, 11, 13, 0.75) 60%, rgba(11, 11, 13, 0.15) 90%, transparent 100%);
+}
+/* 지수 줄은 지도 위에 불투명하게 깔아 숫자가 지도선과 겹치지 않게 */
+.brief-strip { position: relative; z-index: 2; background: var(--deep); }
 .brief-eyebrow {
   display: inline-flex; align-items: center; gap: 8px;
   font-family: var(--font-mono); font-size: 12px; color: var(--on-deep-soft); margin-bottom: 10px;
@@ -816,8 +843,11 @@ input::placeholder { color: var(--ink-soft); }
 /* 높이: 화면 높이에서 머리띠·속보 머리를 뺀 만큼. 그래서 큰 화면에서도
    작은 노트북에서도 칸 아래 끝이 화면 안에 들어옵니다. */
 .chatroom {
-  /* 1440×900 화면 기준 속보 칸 위쪽이 약 390px → 아래 끝이 화면 안에 들어오게 */
-  height: clamp(440px, calc(100vh - 400px), 860px);
+  /* [2026-10-26 재조정] 재성님: "뉴스 채팅 칸이 너무 짧다, 길게 해도 될 것 같다".
+     화면 높이에서 머리띠(56px)와 속보 칸 머리만 뺀 만큼 = 조금만 내려도
+     속보 칸이 화면을 꽉 채웁니다. 양옆 칸은 스크롤을 따라오므로 같이 보입니다.
+     ★ 더 길게/짧게: 가운데 "100vh - 150px"의 150을 줄이면 길어지고, 늘리면 짧아집니다. */
+  height: clamp(560px, calc(100vh - 150px), 1100px);
   overflow-y: auto; overscroll-behavior: contain;
   background: var(--surface); border: none; border-radius: 0;
   padding: 8px 18px 20px;
@@ -957,6 +987,7 @@ input::placeholder { color: var(--ink-soft); }
 @media (max-width: 860px) {
   .container-wide.home-main, .site-header .container-wide, .brief-band .container-wide { padding-left: 16px; padding-right: 16px; }
   .brief-inner { padding: 14px 16px 0; }
+  .brief-mapwrap, .brief-band::after { display: none; }  /* 휴대폰·태블릿 세로: 지도가 글자와 겹쳐서 숨김 */
   .home-grid { grid-template-columns: minmax(0, 1fr); gap: 16px; }
   .home-left, .home-right { position: static; }
   .home-left { grid-column: 1; grid-row: 3; display: flex; }

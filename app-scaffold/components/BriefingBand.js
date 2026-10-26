@@ -6,11 +6,9 @@
 // 예전 components/WorldMarketMap.js(지도 + 지수 카드)를 흡수했습니다.
 //
 // [2026-10-26 변경] 어두운 터미널 디자인으로 바꾸면서 띠를 낮게 줄였습니다.
-//   · 세계지도 배경을 뺐습니다. 장식이 화면 위쪽을 400px 넘게 차지해서
-//     정작 속보가 첫 화면 아래로 밀렸기 때문입니다.
-//     ★ 되돌리려면: 아래 return 안의 "지도" 주석 자리에 예전 brief-mapwrap
-//       블록을 다시 넣으면 됩니다(GitHub History의 2026-10-25 이전 버전 참고).
-//       MAP_POINTS 표와 그림 파일(public/world-map.jpg)은 그대로 남겨뒀습니다.
+//   · 세계지도는 띠 오른쪽에 은은한 배경으로만 깝니다(예전엔 지도 때문에
+//     띠 높이가 400px 넘어서 속보가 첫 화면 아래로 밀렸습니다).
+//     지도를 더 진하게/흐리게 하려면 globals.css의 .brief-map opacity 숫자만.
 //   · "뉴스가 몰린 테마" 단추들은 속보 칸 머리 바로 아래로 옮겼습니다
 //     (app/HomeClient.js의 theme-filter). 누르면 바로 아래 속보가 걸러지니
 //     속보 옆에 있는 게 자연스럽습니다.
@@ -131,12 +129,35 @@ export default function BriefingBand({ brief, worldIndices, strip, activeTheme, 
   }, [tab, indices, strip]);
 
   // (테마 단추는 2026-10-26부터 app/HomeClient.js에서 그립니다.)
-  void pins; void activeTheme; void onThemeClick; void MAX_THEMES;
+  void activeTheme; void onThemeClick; void MAX_THEMES;
 
   return (
     <section className="brief-band">
-      {/* 지도: 2026-10-26 디자인 개편 때 뺐습니다(위 주석 참고). pins 계산은
-          되돌릴 때를 위해 남겨둡니다. */}
+      {/* [2026-10-26 되살림] 세계지도 — 재성님: "지도 배경은 좋지 않았나?"
+          맞습니다. 나라별 핀이 그날 지수에 따라 빨강(상승)·파랑(하락)으로
+          빛나서 "세계 증시가 지금 어떤지"를 한눈에 보여주는 데이터이기도
+          합니다. 다만 띠 높이는 낮게 유지해야 해서(첫 화면에 속보가 보여야
+          하므로) 띠 오른쪽에 은은하게만 깝니다. 휴대폰에서는 글자와 겹쳐서
+          숨깁니다(globals.css의 .brief-mapwrap). */}
+      <div className="brief-mapwrap" aria-hidden="true">
+        <div className="brief-map">
+          <img src="/world-map.jpg" alt="" width={MAP_WIDTH} height={MAP_HEIGHT} />
+        </div>
+        <div className="brief-pins">
+          <svg viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`}>
+            {pins.map((it) => {
+              const up = typeof it.changePct === "number" ? it.changePct >= 0 : true;
+              const color = up ? "var(--up)" : "var(--down)";
+              return (
+                <g key={it.key}>
+                  <circle cx={it.px} cy={it.py} r="20" fill={color} opacity="0.2" />
+                  <circle cx={it.px} cy={it.py} r="6" fill={color} />
+                </g>
+              );
+            })}
+          </svg>
+        </div>
+      </div>
       <div className="container-wide brief-inner">
         <span className="brief-eyebrow">
           <span className="brief-dot" />
