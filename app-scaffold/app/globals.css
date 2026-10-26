@@ -768,26 +768,6 @@ input::placeholder { color: var(--ink-soft); }
   padding: 0 12px; border-radius: 999px;
 }
 
-/* 뉴스가 몰린 테마 — 속보 칸 머리 아래 한 줄. 누르면 그 테마 속보만. */
-.theme-filter {
-  display: flex; align-items: center; gap: 6px; padding: 10px 18px; border-bottom: 1px solid var(--border);
-  overflow-x: auto; scrollbar-width: none;
-}
-.theme-filter::-webkit-scrollbar { display: none; }
-.theme-filter .lbl { font-size: 12px; color: var(--ink-soft); margin-right: 4px; white-space: nowrap; }
-.theme-filter button {
-  flex: none; display: inline-flex; align-items: baseline; gap: 6px; height: 30px; padding: 0 12px;
-  border: 1px solid var(--border); border-radius: 999px; background: transparent; color: var(--ink-muted);
-  font-family: inherit; font-size: 13px; cursor: pointer; white-space: nowrap; line-height: 28px;
-  transition: border-color 0.15s ease, color 0.15s ease;
-}
-.theme-filter button:hover { border-color: #3a3940; color: var(--ink); }
-.theme-filter button .n { font-family: var(--font-mono); font-size: 12px; color: var(--ink-soft); }
-.theme-filter button[data-rank="1"] { color: var(--ink); border-color: #3a3940; }
-.theme-filter button[data-rank="1"] .n { color: var(--amber); }
-.theme-filter button[aria-pressed="true"] { border-color: var(--amber); color: var(--ink); background: var(--amber-tint); }
-.theme-filter button:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
-
 /* ── 대표 종목 (오른쪽 칸 맨 위) ──────────────────────────────────── */
 .flagship { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 14px 18px 16px; }
 .flagship .panel-label { font-size: 15px; font-weight: 600; color: var(--ink); margin: 0 0 10px; letter-spacing: -0.01em; }
@@ -837,136 +817,141 @@ input::placeholder { color: var(--ink-soft); }
 .story-link { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; font-size: 12px; font-weight: 600; color: var(--amber); text-decoration: none; }
 
 /* ══════════════════════════════════════════════════════════════════
-   속보 채팅방 — 최신이 아래 (2026-10-21 구조 그대로, 모양만 새로)
+   [2026-10-26] 실시간 속보 — "헤드라인 + 테이프" (components/NewsBoard.js)
+   ──────────────────────────────────────────────────────────────────
+   채팅방(최신이 아래, 칸 안 스크롤)을 대신합니다. 최신이 맨 위,
+   스크롤은 페이지 하나. 크기 세 단계: 헤드라인 1건 / 중간 2건 / 한 줄 목록.
    ══════════════════════════════════════════════════════════════════ */
-.chatroom-wrap { position: relative; }
-/* 높이: 화면 높이에서 머리띠·속보 머리를 뺀 만큼. 그래서 큰 화면에서도
-   작은 노트북에서도 칸 아래 끝이 화면 안에 들어옵니다. */
-.chatroom {
-  /* [2026-10-26 재조정] 재성님: "뉴스 채팅 칸이 너무 짧다, 길게 해도 될 것 같다".
-     화면 높이에서 머리띠(56px)와 속보 칸 머리만 뺀 만큼 = 조금만 내려도
-     속보 칸이 화면을 꽉 채웁니다. 양옆 칸은 스크롤을 따라오므로 같이 보입니다.
-     ★ 더 길게/짧게: 가운데 "100vh - 150px"의 150을 줄이면 길어지고, 늘리면 짧아집니다. */
-  height: clamp(560px, calc(100vh - 150px), 1100px);
-  overflow-y: auto; overscroll-behavior: contain;
-  background: var(--surface); border: none; border-radius: 0;
-  padding: 8px 18px 20px;
-  display: flex; flex-direction: column; gap: 4px;
-  scrollbar-width: thin; scrollbar-color: #3a3940 transparent;
-}
-.chatroom::-webkit-scrollbar { width: 8px; }
-.chatroom::-webkit-scrollbar-thumb { background: #3a3940; border-radius: 8px; }
-.chatroom::-webkit-scrollbar-track { background: transparent; }
+.feed-panel { overflow: visible; }
 
-/* 날짜 구분선 */
-.chat-day {
-  display: flex; align-items: center; gap: 12px;
-  font-family: var(--font-mono); font-size: 12px; color: var(--ink-soft); margin: 14px 0 6px;
-}
-.chat-day::before, .chat-day::after { content: ""; height: 1px; background: var(--border); flex: 1; }
+/* 머리의 "새 속보 받는 중" */
+.nb-waiting { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-soft); }
+.nb-dots { display: inline-flex; gap: 3px; }
+.nb-dots i { width: 5px; height: 5px; border-radius: 50%; background: var(--amber); animation: nb-blink 1.3s ease-in-out infinite; }
+.nb-dots i:nth-child(2) { animation-delay: 0.18s; } .nb-dots i:nth-child(3) { animation-delay: 0.36s; }
+@keyframes nb-blink { 0%, 60%, 100% { opacity: 0.3; } 30% { opacity: 1; } }
 
-/* 속보 한 건 */
-.chat-row { display: flex; gap: 12px; align-items: flex-start; padding: 12px 0; border-bottom: 1px solid var(--border); }
-.chat-row.new-enter { animation: chat-arrive 0.6s ease; }
-@keyframes chat-arrive { from { background: var(--amber-tint); } to { background: transparent; } }
-@media (prefers-reduced-motion: reduce) { .chat-row.new-enter { animation: none; } }
-
-/* 왼쪽 네모: 테마 약칭. 원형 대신 모서리만 살짝 둥근 사각형. */
-.chat-av {
-  width: 40px; height: 36px; border-radius: 8px; flex-shrink: 0; margin-top: 2px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 11px; font-weight: 600; letter-spacing: -0.03em;
-  background: var(--surface-2); color: var(--ink-muted); border: 1px solid var(--border);
-}
-.chat-av.bad { background: var(--bad-tint); color: var(--bad-tint-ink); border-color: transparent; }
-.chat-av.rumor { background: transparent; color: var(--ink-soft); border-style: dashed; }
-
-.chat-main { min-width: 0; flex: 1; }
-.chat-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; font-size: 12px; color: var(--ink-soft); }
-.chat-sender {
-  font-weight: 500; color: var(--ink-muted); background: none; border: none; padding: 0;
-  font-family: inherit; font-size: 13px; cursor: pointer; transition: color 0.15s ease;
-}
-.chat-sender:hover { color: var(--amber); text-decoration: none; }
-.chat-sender.as-text { cursor: default; }
-.chat-sender:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
-.chat-clock { font-family: var(--font-mono); font-size: 12px; }
-.chat-new { font-size: 11px; font-weight: 600; padding: 0 6px; border-radius: 4px; background: var(--up); color: #141416; line-height: 18px; }
-.chat-flag { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 500; padding: 0 6px; border-radius: 4px; line-height: 18px; }
-/* "관련주 확정"은 대부분의 속보가 해당돼서 매번 붙이면 소음이 됩니다 — 숨기고,
-   예외인 "시장 추정"·"악재"만 보여줍니다(시안 B와 같은 원칙). */
-.chat-flag.ok { display: none; }
-.chat-flag.bad { background: var(--bad-tint); color: var(--bad-tint-ink); }
-.chat-flag.rumor { background: var(--surface-2); color: var(--ink-muted); }
-
-/* 말풍선 대신 "제목 블록" — 채팅 느낌은 유지하되 테두리·그림자 없이 깔끔하게. */
-.chat-bubble {
-  background: none; border-radius: 0; padding: 0; box-shadow: none; max-width: 720px; word-break: keep-all;
-}
-.chat-bubble.unread .chat-title { color: var(--amber-bright); }
-.chat-title { margin: 0; font-family: var(--font-body); font-weight: 600; font-size: 16px; line-height: 1.5; color: var(--ink); letter-spacing: -0.02em; }
-.chat-sum {
-  margin: 3px 0 0; font-size: 13.5px; line-height: 1.6; color: var(--ink-muted);
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
-}
-.chat-chips { margin-top: 8px; margin-bottom: 0; max-width: 720px; gap: 6px; }
-
-/* 종목 칩 — 어두운 화면용 */
-.chip {
-  background: transparent; border: 1px solid var(--border); border-radius: 6px;
-  color: var(--ink); transition: border-color 0.15s ease, background 0.15s ease;
-}
-.chip:hover { border-color: #4a4950; background: var(--surface-2); }
-.chip .code { color: var(--ink-soft); font-size: 12px; }
-.chip-bad { border-color: rgba(244, 114, 182, 0.55); }
-.chip-bad:hover { background: var(--bad-tint); border-color: var(--bad); }
-
-.chat-foot { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; margin-top: 8px; }
-.chat-more {
-  display: inline-flex; align-items: center; gap: 3px; font-size: 13px; font-weight: 500; color: var(--ink-soft);
-  background: none; border: none; padding: 0; cursor: pointer; font-family: inherit; transition: color 0.15s ease;
-}
-.chat-more:hover { color: var(--ink); }
-.chat-more svg { transition: transform 0.15s ease; }
-.chat-more svg.flip { transform: rotate(180deg); }
-/* 원문 보기 — 흰 글자 대신 "흰 바탕 검은 글자"로 뒤집어서 가장 눈에 띄는 단추로. */
-.chat-link {
-  display: inline-flex; align-items: center; gap: 4px; height: 28px;
-  font-size: 12px; font-weight: 600; text-decoration: none;
-  color: #141416; background: var(--ink); padding: 0 12px; border-radius: 999px;
-  transition: background 0.15s ease;
-}
-.chat-link:hover { background: #d9d9dc; }
-.chat-link:focus-visible, .chat-more:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
-.chat-why {
-  margin: 8px 0 0; padding: 10px 14px 10px 28px; background: var(--surface-2); border-radius: var(--r-md);
-  box-shadow: none; max-width: 720px; font-size: 13px; line-height: 1.6; color: var(--ink-muted);
-}
-.chat-why li { margin: 3px 0; word-break: keep-all; }
-
-/* 맨 아래 "새 속보 받는 중" — 점 세 개 (2026-10-22 기능 유지) */
-.chat-typing { border-bottom: none; opacity: 0.95; }
-.chat-av.typing-av { background: transparent; color: var(--amber); border-color: var(--border); font-size: 11px; }
-.typing-text { font-size: 12px; color: var(--ink-soft); }
-.chat-bubble.typing-bubble { display: inline-flex; align-items: center; gap: 5px; padding: 6px 0 0; width: auto; }
-.typing-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--amber); animation: typing-bounce 1.3s ease-in-out infinite; }
-.typing-dot:nth-child(2) { animation-delay: 0.18s; }
-.typing-dot:nth-child(3) { animation-delay: 0.36s; }
-@keyframes typing-bounce { 0%, 60%, 100% { transform: translateY(0); opacity: 0.35; } 30% { transform: translateY(-4px); opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .typing-dot { animation: none; opacity: 0.7; } }
-
-/* "최신 속보 보기" (2026-10-22 기능 유지) — 흰 바탕 검은 글자 알약 */
-.chat-jump-latest {
-  position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 5;
-  display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 16px;
-  border: none; border-radius: 999px; background: var(--ink); color: #141416;
+/* 아래로 내려가 있을 때 뜨는 "↑ 새 속보 N건" — 화면 위쪽에 붙어 따라옵니다 */
+.nb-newpill {
+  position: sticky; top: 68px; z-index: 6; display: flex; align-items: center; gap: 6px;
+  margin: 10px auto -46px; height: 36px; padding: 0 16px; width: max-content;
+  border: none; border-radius: 999px; background: var(--amber); color: #141416;
   font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
   box-shadow: 0 10px 26px rgba(0, 0, 0, 0.55); animation: jump-pop 0.22s ease-out;
 }
-.chat-jump-latest:hover { background: #d9d9dc; }
-.chat-jump-latest:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
-@keyframes jump-pop { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
-@media (prefers-reduced-motion: reduce) { .chat-jump-latest { animation: none; } }
+.nb-newpill:hover { background: var(--amber-bright); }
+.nb-newpill:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+@keyframes jump-pop { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+
+/* 새로 들어온 속보는 잠깐 호박빛으로 물들었다가 사라집니다 */
+.nb-arrive { animation: nb-arrive 2.4s ease; }
+@keyframes nb-arrive { from { background: var(--amber-tint); } to { background: transparent; } }
+
+/* 공통 조각 */
+.nb-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 13px; color: var(--ink-muted); }
+.nb-meta .mono { color: var(--ink-soft); font-size: 12.5px; }
+/* "8분 전" — 숫자 폭 고정 글꼴로 쓰면 한글 사이가 벌어져서 본문 글꼴 + 숫자 폭 고정으로 */
+.nb-ago { font-family: var(--font-body); font-variant-numeric: tabular-nums; font-size: 12.5px; color: var(--ink-soft); }
+.nb-ago.fresh { color: var(--amber); }
+.nb-flag { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 500; padding: 0 6px; border-radius: 4px; line-height: 18px; white-space: nowrap; }
+.nb-flag.bad { background: var(--bad-tint); color: var(--bad-tint-ink); }
+.nb-flag.rumor { background: var(--surface-2); color: var(--ink-muted); }
+.nb-label { font-size: 12px; color: var(--ink-soft); margin: 0 0 6px; }
+.nb-actions { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
+/* 원문 보기 — 흰 바탕 검은 글자, 화면에서 가장 눈에 띄는 단추 */
+.nb-orig {
+  display: inline-flex; align-items: center; gap: 4px; height: 30px; padding: 0 13px; border-radius: 999px;
+  background: var(--ink); color: #141416; font-size: 12.5px; font-weight: 600; text-decoration: none;
+  transition: background 0.15s ease;
+}
+.nb-orig:hover { background: #d9d9dc; }
+.nb-orig:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.nb-chips { margin: 10px 0 0; gap: 6px; }
+.nb-why ul { margin: 0; padding-left: 16px; color: var(--ink-muted); font-size: 13px; line-height: 1.6; }
+.nb-why li { word-break: keep-all; }
+
+/* ① 헤드라인 — 가장 최근 1건 */
+.nb-lead {
+  display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 24px;
+  padding: 20px 20px 20px; border-bottom: 1px solid var(--border);
+}
+.nb-lead-title {
+  margin: 8px 0 0; font-size: 24px; line-height: 1.38; font-weight: 600; letter-spacing: -0.025em;
+  color: var(--ink); word-break: keep-all; overflow-wrap: break-word;
+}
+.nb-lead-sum { margin: 8px 0 0; font-size: 15px; line-height: 1.65; color: var(--ink-muted); word-break: keep-all; max-width: 62ch; }
+.nb-lead-side { border-left: 1px solid var(--border); padding-left: 20px; align-self: start; }
+.nb-stk { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 2px 10px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.nb-stk:last-child { border-bottom: none; }
+.nb-stk-nm { font-weight: 600; font-size: 14.5px; display: inline-flex; align-items: center; gap: 4px; min-width: 0; }
+.nb-stk-code { font-size: 12px; font-weight: 400; color: var(--ink-soft); margin-left: 4px; }
+.nb-stk-pct { font-size: 16px; font-weight: 500; }
+.nb-stk-why { grid-column: 1 / -1; font-size: 12px; line-height: 1.5; color: var(--ink-soft); word-break: keep-all; }
+
+/* ② 다음 2건 — 중간 크기, 나란히 */
+.nb-second { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-bottom: 1px solid var(--border); }
+.nb-second > article { padding: 16px 20px; min-width: 0; }
+.nb-second > article + article { border-left: 1px solid var(--border); }
+.nb-second-title { margin: 6px 0 0; font-size: 16.5px; line-height: 1.45; font-weight: 600; letter-spacing: -0.02em; word-break: keep-all; }
+.nb-second .nb-actions { margin-top: 10px; }
+/* 중간 크기 칸은 폭이 좁아 종목코드를 숨겨 칩이 한 줄에 더 들어가게 */
+.nb-second .chip .code { display: none; }
+
+/* ③ 나머지 — 한 줄에 한 건 */
+.nb-tape { list-style: none; margin: 0; padding: 0; }
+.nb-tape > li { border-bottom: 1px solid var(--border); }
+.nb-tape > li:last-child { border-bottom: none; }
+.nb-row {
+  width: 100%; display: grid; grid-template-columns: 56px 96px minmax(0, 1fr) auto 16px; align-items: center; gap: 12px;
+  min-height: 48px; padding: 6px 20px; background: none; border: none; cursor: pointer; text-align: left;
+  font-family: inherit; transition: background 0.15s ease;
+}
+.nb-row:hover { background: #17161a; }
+.nb-row:focus-visible { outline: 2px solid var(--amber); outline-offset: -2px; }
+.nb-time { font-size: 13px; color: var(--ink-soft); }
+.nb-time.fresh { color: var(--amber); }
+.nb-theme { font-size: 12.5px; color: var(--ink-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nb-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.nb-head-text { font-size: 15px; font-weight: 500; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nb-leadstk { display: inline-flex; align-items: baseline; gap: 6px; font-size: 13px; white-space: nowrap; }
+.nb-leadstk .nm { color: var(--ink-muted); }
+.nb-leadstk .mono { font-weight: 500; }
+.nb-leadstk .more { color: var(--ink-soft); font-size: 12px; font-weight: 400; }
+.nb-chev { color: var(--ink-soft); transition: transform 0.15s ease; }
+.nb-tape > li.open .nb-chev { transform: rotate(90deg); }
+.nb-tape > li.open .nb-row { background: #17161a; }
+.nb-detail { padding: 2px 20px 16px 196px; background: #17161a; display: grid; gap: 10px; }
+.nb-detail-sum { margin: 0; font-size: 14px; line-height: 1.6; color: var(--ink-muted); word-break: keep-all; max-width: 70ch; }
+.nb-detail .nb-chips { margin: 0; }
+.nb-detail .nb-actions { margin-top: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .nb-dots i, .nb-arrive, .nb-newpill { animation: none; }
+}
+
+/* 노트북(가운데 칸이 좁을 때): 헤드라인의 종목 칸을 아래로 */
+@media (max-width: 1320px) {
+  .nb-lead { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .nb-lead-side { border-left: none; padding-left: 0; border-top: 1px solid var(--border); padding-top: 12px; }
+}
+/* 휴대폰: 한 줄 목록은 두 줄로(시각 | 제목 / 테마), 대장주는 오른쪽 */
+@media (max-width: 760px) {
+  .nb-lead { padding: 16px 14px; }
+  .nb-lead-title { font-size: 20px; }
+  .nb-lead-sum { font-size: 14px; }
+  .nb-second { grid-template-columns: minmax(0, 1fr); }
+  .nb-second > article { padding: 14px; }
+  .nb-second > article + article { border-left: none; border-top: 1px solid var(--border); }
+  .nb-row { grid-template-columns: 44px minmax(0, 1fr) auto; grid-template-rows: auto auto; gap: 2px 10px; padding: 10px 14px; }
+  .nb-time { grid-row: 1 / span 2; align-self: start; padding-top: 2px; }
+  .nb-head { grid-column: 2; grid-row: 1; }
+  .nb-head-text { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; word-break: keep-all; }
+  .nb-theme { grid-column: 2; grid-row: 2; }
+  .nb-leadstk { grid-column: 3; grid-row: 1 / span 2; flex-direction: column; align-items: flex-end; gap: 0; align-self: start; }
+  .nb-chev { display: none; }
+  .nb-detail { padding: 2px 14px 14px 68px; }
+  .nb-waiting { width: 100%; }
+}
 
 /* 사이트 설명(애드센스용 본문) */
 .about-site { max-width: 760px; margin-top: 56px; padding-top: 28px; border-top: 1px solid var(--border); color: var(--ink-muted); font-size: 15px; line-height: 1.8; }
@@ -1000,18 +985,13 @@ input::placeholder { color: var(--ink-soft); }
   .brief-tabs { border-right: none; padding: 10px 0 0; }
   .brief-tk { padding: 8px 14px 9px; }
   .brief-tk:first-child { padding-left: 0; }
-  .chatroom { height: 64vh; padding: 4px 14px 18px; }
   .live-head { padding: 12px 14px 10px; }
-  .theme-filter { padding: 8px 14px; }
 }
 @media (max-width: 480px) {
   .site-header-inner { height: auto; padding: 10px 0 0; flex-wrap: wrap; gap: 6px; }
   .site-header .nav { height: 40px; gap: 18px; width: 100%; }
   .site-header .nav-btn { font-size: 13.5px; }
+  .nb-chips .chip { padding: 5px 10px; font-size: 12.5px; gap: 5px; }
+  .nb-chips .chip .code { display: none; }
   .watch-toggles { margin-left: 0; width: 100%; }
-  .chat-av { width: 36px; height: 32px; font-size: 11px; letter-spacing: -0.06em; }
-  .chat-row { gap: 10px; }
-  .chat-title { font-size: 15.5px; }
-  .chat-chips .chip { padding: 5px 10px; font-size: 12.5px; gap: 5px; }
-  .chat-chips .chip .code { display: none; }
 }

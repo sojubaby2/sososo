@@ -12,11 +12,11 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Newspaper, Loader2, Flame, Bell, BellOff, Volume2, VolumeX, Smartphone, X, ArrowDown } from "lucide-react";
+import { Newspaper, Loader2, Flame, Bell, BellOff, Volume2, VolumeX, Smartphone, X, ArrowUp } from "lucide-react";
 // [2026-10-21 추가] 뉴스 제목의 &#039; 같은 글자를 원래대로 되돌립니다.
 import { decodeEntities } from "../lib/decodeEntities";
 // [2026-10-21 추가] 속보를 채팅 말풍선으로 보여주는 컴포넌트.
-import ChatMessage from "../components/ChatMessage";
+import NewsBoard from "../components/NewsBoard";
 import Header from "../components/Header";
 import DailyOutlookBanner from "../components/DailyOutlookBanner";
 import BriefingBand from "../components/BriefingBand";
@@ -103,7 +103,7 @@ function toneOf(value) {
 //                시세로 덮어씁니다.
 // 새 속보가 들어오면 읽던 위치와 상관없이 항상 맨 아래로 따라 내려갈지.
 // false로 바꾸면 맨 아래에 붙어 있을 때만 따라갑니다.
-const ALWAYS_FOLLOW = true;
+
 
 function toCardShape(item, liveQuotes) {
   const hasLegitimate = item.matches.some((m) => m.confidence === "confirmed" || m.confidence === "theme");
@@ -123,6 +123,8 @@ function toCardShape(item, liveQuotes) {
     // [2026-09-18 수정] 세계표준시 원본 대신 한국 시간
     // "2026/09/18 08:12" 형태로 보여줌 (formatKoreanDateTime 참고).
     time: formatKoreanDateTime(item.pubDate),
+    // [2026-10-26 추가] "3분 전"을 계산하려면 원본 시각이 필요합니다(components/NewsBoard.js).
+    ts: item.pubDate,
     source: item.keyword,
     // [2026-10-21 수정] 제목·요약에 &#039; 가 그대로 보이던 문제.
     // RSS가 따옴표를 암호처럼 바꿔 보내는데 되돌리는 단계가 없었습니다.
@@ -687,139 +689,44 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
     return items.filter((n) => n.stocks?.some((s) => s.name === filter.value));
   }, [items, filter]);
 
-  // ── [2026-10-21 전면 변경] 속보를 "채팅방"으로 ──────────────────────
+  // ── [2026-10-26 변경] 채팅방 → "헤드라인 + 테이프" (components/NewsBoard.js) ──
   //
-  // 재성님 요청: "채팅창처럼 보이게, 진짜 채팅처럼 최신이 아래로"
+  // 재성님: "채팅방 컨셉이 스크롤 내리는 게 불편하고 시인성이 안 나온다".
+  // 최신이 맨 위로 오고, 속보 칸 안의 따로 스크롤이 없어졌습니다.
   //
-  // 예전에는 최신 3건을 위에 크게(topStories), 나머지를 아래 2단 격자로
-  // (restStories) 나눠 보여줬습니다. 이제는 하나의 긴 대화방입니다.
-  //
-  // ★ 여기가 핵심입니다 — 순서를 뒤집습니다.
-  //   서버가 주는 visible은 "최신이 맨 앞"입니다(뉴스 순서).
-  //   채팅은 "최신이 맨 아래"입니다. 그래서 뒤집어서 그립니다.
-  //
-  // ★ 그럼 최신 속보를 보려고 매번 끝까지 내려야 하지 않나?
-  //   아닙니다. 아래 chatRef가 **화면에 뜨는 순간 맨 아래로 보내줍니다.**
-  //   카카오톡을 열면 바로 마지막 대화가 보이는 것과 똑같습니다.
-  //   그래서 속보 영역은 페이지와 따로 노는 "스크롤 상자"여야 합니다
-  //   (globals.css의 .chatroom). 페이지 전체를 뒤집으면 매번 바닥까지
-  //   내려야 하므로 그렇게 하지 않았습니다.
-  //
-  // 날짜가 바뀌는 자리에는 "— 10월 21일 (수) —" 구분선을 넣습니다.
-  // time은 "2026/10/21 09:14" 형태라 앞쪽만 떼면 날짜입니다.
-  const chatRows = useMemo(() => {
-    const rows = [];
-    let lastDay = null;
-    // slice()로 복사한 뒤 뒤집습니다 — 원본 배열을 그대로 reverse하면
-    // 다른 곳에서 쓰는 순서까지 같이 망가집니다.
-    const oldestFirst = visible.slice().reverse();
-    for (const n of oldestFirst) {
-      const day = String(n.time || "").split(" ")[0];
-      if (day && day !== lastDay) {
-        rows.push({ kind: "day", key: `day-${day}`, day });
-        lastDay = day;
-      }
-      rows.push({ kind: "msg", key: n.id, n });
-    }
-    return rows;
-  }, [visible]);
+  // 그래서 예전 "최신 속보 보기 ↓" 단추는 방향이 바뀌었습니다:
+  //   아래로 내려가서 지난 속보를 읽는 중에 새 속보가 들어오면
+  //   속보 칸 위쪽에 "↑ 새 속보 N건" 단추가 떠서, 누르면 맨 위로 올라갑니다.
+  //   속보 칸 맨 위가 화면에 보이는 상태면 단추를 띄우지 않습니다(이미 보이니까).
+  const feedTopRef = useRef(null);
+  const [unseen, setUnseen] = useState(0);
 
-  // 날짜를 "10월 21일 (수)"로 바꿉니다.
-  function dayLabel(day) {
-    const [y, m, d] = String(day).split("/").map(Number);
-    if (!y || !m || !d) return day;
-    const names = ["일", "월", "화", "수", "목", "금", "토"];
-    const w = names[new Date(y, m - 1, d).getDay()];
-    const today = new Date();
-    const isToday = today.getFullYear() === y && today.getMonth() + 1 === m && today.getDate() === d;
-    return `${isToday ? "오늘 · " : ""}${m}월 ${d}일 (${w})`;
+  function feedTopVisible() {
+    const el = feedTopRef.current;
+    if (!el) return true;
+    return el.getBoundingClientRect().top > -40;
   }
 
-  // ── 채팅방 스크롤 다루기 ──────────────────────────────────────────
-  //
-  // [2026-10-21 변경] 재성님 판단으로 "무조건 따라 내려가기"로 바꿨습니다.
-  //
-  //   "속보는 빨리 읽어야 하니까(지난 뉴스보다는) 자동으로 화면이
-  //    내려가게 했으면 좋겠는데"
-  //
-  // 처음에는 위쪽 옛날 글을 읽는 중이면 끌어내리지 않고 "새 속보 N건 ↓"
-  // 단추만 띄웠습니다. 읽던 자리를 뺏지 않으려던 것인데, 이 사이트의
-  // 성격에는 안 맞습니다. 여기는 지난 뉴스를 정독하러 오는 곳이 아니라
-  // **지금 막 터진 걸 제일 먼저 보러 오는 곳**입니다. 한 박자라도 빨리
-  // 보여주는 쪽이 맞습니다. 그래서 단추를 없애고 항상 내려갑니다.
-  //
-  // ★ 되돌리고 싶으면 아래 ALWAYS_FOLLOW를 false로만 바꾸면 됩니다.
-  //   그러면 맨 아래에 붙어 있을 때만 따라 내려가고, 위를 읽는 중이면
-  //   가만히 둡니다.
-  const JUMP_SHOW_PX = 300;
-  const chatRef = useRef(null);
-  const pinnedRef = useRef(true); // 지금 맨 아래에 붙어 있나?
-
-  // [2026-10-22 추가] "최신 속보 보기" 단추를 보여줄지.
-  // 재성님 요청: "대화창 올라가 있을 때 누를 수 있게 최신속보 보기 버튼".
-  // 옛날 속보를 읽으려고 위로 올려 둔 상태에서, 한 번 눌러서 바로 맨 아래
-  // (가장 최근 속보)로 돌아올 수 있게 합니다.
-  // 맨 아래 근처에 있을 때는 필요 없으니 숨깁니다(JUMP_SHOW_PX 참고).
-  const [showJump, setShowJump] = useState(false);
-
-  function scrollChatToBottom(smooth) {
-    const el = chatRef.current;
-    if (!el) return;
-    el.scrollTo({ top: el.scrollHeight, behavior: smooth ? "smooth" : "auto" });
-    pinnedRef.current = true;
-    setShowJump(false); // 맨 아래로 갔으니 단추는 숨김
-  }
-
-  // 스크롤할 때마다 "바닥에 붙어 있는지"를 기록합니다.
-  // (ALWAYS_FOLLOW를 false로 돌렸을 때 쓰입니다.)
-  // 60px은 여유값입니다 — 딱 0px일 때만 인정하면 손가락이 살짝만 움직여도
-  // 붙어있지 않은 것으로 판정돼 버립니다.
-  function onChatScroll() {
-    const el = chatRef.current;
-    if (!el) return;
-    const distance = el.scrollHeight - el.scrollTop - el.clientHeight; // 바닥까지 남은 거리
-    pinnedRef.current = distance < 60;
-
-    // [2026-10-22 추가] 바닥에서 300px 넘게 올라가 있으면 "최신 속보 보기"
-    // 단추를 띄웁니다. 60px(위의 "붙어 있음" 기준)보다 넉넉하게 잡은 이유:
-    // 손가락이 살짝만 움직여도 단추가 깜빡깜빡 나타났다 사라지면 거슬립니다.
-    // 속보 말풍선 하나가 대략 200~300px이라, "한 건 이상 올라갔을 때"쯤
-    // 나타나게 맞췄습니다.
-    // (값이 같으면 React가 화면을 다시 그리지 않으므로, 스크롤할 때마다
-    //  불러도 느려지지 않습니다.)
-    setShowJump(distance > JUMP_SHOW_PX);
-  }
-
-  // 목록이 바뀔 때마다(처음 로딩 / 새 속보 도착 / 필터 변경) 처리합니다.
-  const lastCountRef = useRef(0);
-  const firstFitRef = useRef(false);
+  // 새 속보가 들어온 순간(newIds가 채워짐) 화면이 아래쪽이면 숫자를 올립니다.
   useEffect(() => {
-    const el = chatRef.current;
-    if (!el || chatRows.length === 0) return;
+    if (newIds.size === 0) return;
+    if (!feedTopVisible()) setUnseen((c) => c + newIds.size);
+  }, [newIds]);
 
-    // 처음 한 번은 애니메이션 없이 바로 맨 아래로.
-    // 스르륵 내려가는 걸 보여줄 필요가 없습니다 — 처음부터 거기 있어야 합니다.
-    if (!firstFitRef.current) {
-      firstFitRef.current = true;
-      lastCountRef.current = chatRows.length;
-      scrollChatToBottom(false);
-      return;
-    }
-
-    const grew = chatRows.length - lastCountRef.current;
-    lastCountRef.current = chatRows.length;
-    if (grew <= 0) return;
-
-    if (ALWAYS_FOLLOW || pinnedRef.current) scrollChatToBottom(true);
-  }, [chatRows]);
-
-  // 필터를 바꾸면 목록이 통째로 달라지므로 다시 맨 아래로 보냅니다.
+  // 스크롤해서 다시 맨 위가 보이면 숫자를 지웁니다.
   useEffect(() => {
-    firstFitRef.current = false;
-  }, [filter]);
+    function onScroll() {
+      if (feedTopVisible()) setUnseen(0);
+    }
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
-  // [2026-10-26] 속보 칸 머리의 "뉴스가 몰린 테마" 단추 — 브리핑 데이터에서 8개까지.
-  const themeRows = (brief?.themeRows || []).slice(0, 8);
+  function goFeedTop() {
+    const el = feedTopRef.current;
+    if (el) window.scrollTo({ top: window.scrollY + el.getBoundingClientRect().top - 72, behavior: "smooth" });
+    setUnseen(0);
+  }
 
   // [2026-10-26 삭제] "오늘 많이 불린 종목" 계산(topStocks)을 없앴습니다.
   // 재성님 요청으로 그 자리에 대표 종목(삼성전자·SK하이닉스) 칸이 들어갔습니다.
@@ -855,7 +762,7 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
           {/* ── 가운데 칸: 실시간 속보 ── */}
           <section className="home-col home-center" aria-label="실시간 속보">
             <div className="panel feed-panel">
-              <div className="live-head">
+              <div className="live-head" ref={feedTopRef}>
                 {/* 화면의 대표 제목(h1) — 검색엔진과 화면 읽기 프로그램이 "이 페이지는
                     실시간 속보"라고 알아보게 합니다. 예전엔 페이지에 h1이 없었습니다. */}
                 <h1>
@@ -864,6 +771,11 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
                 </h1>
                 <span className="stories-count">
                   {filter ? `${visible.length}건 / 전체 ${items.length}건` : `${items.length}건`}
+                </span>
+                {/* 예전 채팅방 맨 아래 "새 속보 받는 중" 점 세 개를 머리로 옮겼습니다 */}
+                <span className="nb-waiting" role="status" aria-label="새 속보를 기다리는 중">
+                  <span className="nb-dots" aria-hidden="true"><i /><i /><i /></span>
+                  새 속보 받는 중
                 </span>
                 <div className="watch-toggles">
                   <button type="button" className={`sound-toggle ${soundEnabled ? "on" : ""}`} onClick={toggleSound}>
@@ -882,26 +794,6 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
                 </div>
               </div>
 
-              {/* [2026-10-26] "뉴스가 몰린 테마" — 예전엔 맨 위 남색 띠에 있던 단추들.
-                  누르면 바로 아래 속보가 걸러지니 속보 칸 머리로 옮겼습니다.
-                  속보가 가장 많이 몰린 1위 테마는 숫자가 호박색으로 표시됩니다. */}
-              {themeRows.length > 0 && (
-                <div className="theme-filter" role="group" aria-label="뉴스가 몰린 테마로 거르기">
-                  <span className="lbl">뉴스가 몰린 테마</span>
-                  {themeRows.map((t, i) => (
-                    <button
-                      key={t.theme}
-                      type="button"
-                      data-rank={i === 0 ? 1 : 2}
-                      aria-pressed={filter?.kind === "theme" && filter.value === t.theme}
-                      onClick={() => toggleFilter("theme", t.theme)}
-                    >
-                      {t.theme}
-                      <span className="n">{t.news}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
 
               {loadState === "loading" && (
                 <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--ink-muted)", fontSize: 14, padding: "24px 0" }}>
@@ -922,67 +814,16 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
                 </p>
               )}
 
-              {chatRows.length > 0 && (
-                <div className="chatroom-wrap">
-                  <div className="chatroom" ref={chatRef} onScroll={onChatScroll}>
-                    {chatRows.map((row) =>
-                      row.kind === "day" ? (
-                        <div className="chat-day" key={row.key}>
-                          {dayLabel(row.day)}
-                        </div>
-                      ) : (
-                        <ChatMessage
-                          key={row.key}
-                          n={row.n}
-                          isNew={newIds.has(row.n.id)}
-                          onThemeClick={(t) => toggleFilter("theme", t)}
-                        />
-                      )
-                    )}
-
-                    {/* [2026-10-22 추가] 맨 아래 "입력 중..." 말풍선.
-                        재성님 요청: "맨 밑에 뭔가 입력되고 있는 듯한 모션이 있으면 좋겠다".
-                        카카오톡에서 상대가 글을 쓰는 중일 때 점 세 개가 통통 튀는
-                        것과 같은 모양입니다. 이 사이트는 속보가 오면 자동으로 아래에
-                        붙기 때문에, "이 방은 살아 있고 다음 속보를 받는 중"이라는
-                        느낌을 주려고 넣었습니다.
-                        - 실제로 누가 글을 쓰는 건 아니라서, 화면 읽기 프로그램
-                          (시각장애인용)에는 "새 속보를 기다리는 중"이라고만 읽어주고
-                          점 모양은 건너뛰게 했습니다(aria-hidden).
-                        - 맨 아래에 붙어 있으니 새 속보가 오면 그 바로 위에 쌓이고,
-                          이 말풍선은 항상 제일 아래에 남습니다.
-                        - 움직임 스타일은 app/globals.css의 ".chat-typing" 부분입니다. */}
-                    <div className="chat-row chat-typing" role="status" aria-label="새 속보를 기다리는 중">
-                      <div className="chat-av typing-av" aria-hidden="true">
-                        속보
-                      </div>
-                      <div className="chat-main">
-                        <div className="chat-meta" aria-hidden="true">
-                          <span className="chat-sender as-text">뉴스매매</span>
-                          <span className="typing-text">새 속보 받는 중</span>
-                        </div>
-                        <div className="chat-bubble typing-bubble" aria-hidden="true">
-                          <span className="typing-dot" />
-                          <span className="typing-dot" />
-                          <span className="typing-dot" />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* [2026-10-22 추가] "최신 속보 보기" 단추.
-                      채팅 상자(.chatroom) 바깥, 감싸는 상자(.chatroom-wrap) 안에 둬서
-                      상자 아래쪽 가운데에 떠 있게 했습니다. 상자 안에 넣으면 스크롤과
-                      같이 위로 밀려 올라가 버립니다.
-                      누르면 스르륵 맨 아래(가장 최근 속보)로 내려갑니다. */}
-                  {showJump && (
-                    <button type="button" className="chat-jump-latest" onClick={() => scrollChatToBottom(true)}>
-                      <ArrowDown size={15} />
-                      최신 속보 보기
-                    </button>
-                  )}
-                </div>
+              {/* [2026-10-26] 새 속보 알림 단추 — 아래로 내려가 있을 때만 뜹니다. */}
+              {unseen > 0 && (
+                <button type="button" className="nb-newpill" onClick={goFeedTop}>
+                  <ArrowUp size={14} />
+                  새 속보 {unseen}건
+                </button>
               )}
+
+              {/* [2026-10-26] 속보 본문 — 헤드라인 + 테이프 (components/NewsBoard.js) */}
+              <NewsBoard items={visible} newIds={newIds} />
 
               {filter && visible.length === 0 && (
                 <p style={{ fontSize: 14, color: "var(--ink-muted)", padding: "24px 0" }}>
