@@ -19,17 +19,23 @@
 // 테마를 더하거나 빼고 싶으면 이 배열만 고치면 됩니다. 늘려도 비용은
 // 거의 안 늘어납니다 — 5분에 한 번씩만 부르고 저장해두기 때문입니다.
 
+// [2026-10-26 수정] koreanTheme 이름 몇 개가 실제 테마 목록(lib/themeData.json)에 없는 이름이라
+//   눌러도 아무 테마로 안 이어지고 있었습니다. 실제 있는 이름으로 바꿨습니다:
+//   "바이오시밀러" → "바이오"
+//   "원자력발전" → "원자력발전(SMR)"
+//   "양자암호" → "양자암호통신"
+//   "태양광에너지" → "태양광"
 export const US_THEMES = [
   { etf: "SMH", label: "반도체", koreanTheme: "반도체" },
   { etf: "BOTZ", label: "로봇", koreanTheme: "로봇" },
   { etf: "ITA", label: "방산", koreanTheme: "방산주" },
   { etf: "XLE", label: "에너지", koreanTheme: "석유가스" },
   { etf: "IYT", label: "운송", koreanTheme: "해운" },
-  { etf: "XBI", label: "바이오", koreanTheme: "바이오시밀러" },
-  { etf: "NLR", label: "원자력", koreanTheme: "원자력발전" },
-  { etf: "QTUM", label: "양자·AI", koreanTheme: "양자암호" },
+  { etf: "XBI", label: "바이오", koreanTheme: "바이오" },
+  { etf: "NLR", label: "원자력", koreanTheme: "원자력발전(SMR)" },
+  { etf: "QTUM", label: "양자·AI", koreanTheme: "양자암호통신" },
   { etf: "LIT", label: "2차전지", koreanTheme: "2차전지" },
-  { etf: "TAN", label: "태양광", koreanTheme: "태양광에너지" },
+  { etf: "TAN", label: "태양광", koreanTheme: "태양광" },
   { etf: "SKYY", label: "클라우드", koreanTheme: "클라우드" },
   { etf: "HACK", label: "사이버 보안", koreanTheme: "사이버 보안" },
 ];

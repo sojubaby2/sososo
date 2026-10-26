@@ -1,7 +1,18 @@
 import raw from "./themeData.json";
 
-// raw: [{ theme, name, code, market }, ...]  — 109 themes, 1021 stock rows,
-// built from the theme research we did earlier in the project.
+// raw: [{ theme, name, code, market }, ...]  — built from the theme research we did earlier in the project.
+//
+// [2026-10-26 전체 점검] 재성님 요청: "테마 업데이트 — 싹 검토해서 최신 테마 추가, 기존 테마 종목 검토,
+//   추가할 건 추가, 뺄 건 빼". 지금 157개 테마 · 1,599개 종목행.
+//   ① 2026-10-22 전 종목 목록(2,868개)과 하나하나 대조:
+//      상장폐지·합병 17건 삭제, 다른 회사를 가리키던 종목코드 24건 정정, 회사 이름 변경 31건 반영,
+//      코스피/코스닥 표시 30건 정정, 사업이 바뀐 3건 삭제, 같은 테마 안 중복 4건 제거.
+//   ② 8~10월 일일 시장 정리(주도 테마·상승 이유)를 훑어 새 테마 11개 추가
+//      (호남 반도체 클러스터, HLB그룹, 서울고속버스터미널 재개발, 우주태양광, CPO, 가스터빈·가스발전,
+//       6G, 슈퍼커패시터, 데이터센터 냉각, 피지컬 AI, 여름(폭염)),
+//      기존 테마 24개에 새로 묶이는 종목 추가(로봇·ESS·2차전지·광통신·사이버 보안·우주항공 등).
+//   ③ 기존 테마 이름은 하나도 바꾸지 않았습니다 — 홈 화면·전망 배너가 이름으로 연결돼 있어서입니다.
+//   ※ 정치인 테마는 2026-09-18 결정대로 넣지 않았습니다(오세훈 관련주가 10월에 움직였지만 제외).
 
 export function getAllThemeNames() {
   return Array.from(new Set(raw.map((r) => r.theme))).sort();

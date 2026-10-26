@@ -699,6 +699,24 @@ input::placeholder { color: var(--ink-soft); }
 .brief-ticker { display: flex; overflow-x: auto; scrollbar-width: none; flex: 1; min-width: 0; }
 .brief-ticker::-webkit-scrollbar { display: none; }
 .brief-ticker-empty { display: flex; align-items: center; padding: 0 20px; font-size: 13px; color: var(--on-deep-soft); }
+/* [2026-10-26 추가] 지수 줄 좌우 화살표 (components/BriefingBand.js의 ScrollTicker) */
+.brief-ticker-wrap { position: relative; flex: 1; min-width: 0; display: flex; }
+.brief-ticker-wrap::before, .brief-ticker-wrap::after {
+  content: ""; position: absolute; top: 0; bottom: 0; width: 56px; z-index: 1; pointer-events: none; opacity: 0; transition: opacity 0.15s ease;
+}
+.brief-ticker-wrap::before { left: 0; background: linear-gradient(to right, var(--deep) 30%, transparent); }
+.brief-ticker-wrap::after { right: 0; background: linear-gradient(to left, var(--deep) 30%, transparent); }
+.brief-ticker-wrap.fade-l::before, .brief-ticker-wrap.fade-r::after { opacity: 1; }
+.brief-arrow {
+  position: absolute; top: 50%; transform: translateY(-50%); z-index: 2;
+  width: 30px; height: 30px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center;
+  background: var(--surface); border: 1px solid var(--border-strong); color: var(--on-deep); cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+.brief-arrow.left { left: 6px; }
+.brief-arrow.right { right: 6px; }
+.brief-arrow:hover { border-color: var(--amber); color: var(--amber); }
+.brief-arrow:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
 .brief-tk {
   flex: 0 0 auto; padding: 10px 18px 11px; border-right: 1px solid var(--border);
   display: grid; grid-template-columns: auto auto; column-gap: 8px; row-gap: 1px; white-space: nowrap;

@@ -36,7 +36,64 @@
 //   앞이 가로, 뒤가 세로이고 기준은 원본 그림 1024 x 559 픽셀입니다.
 //   표에 없는 나라는 핀만 생략되고 아래 띠에는 정상으로 나옵니다.
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+
+// [2026-10-26 추가] 지수 줄이 화면보다 길면 양 끝에 화살표 단추를 띄웁니다.
+// 재성님: "티커가 길어서 대만 뒤로 잘리는데 화살표를 만들어 주든가 해 줘"
+//   · 더 볼 게 남은 쪽에만 화살표가 보입니다(끝까지 가면 그쪽 화살표는 사라짐).
+//   · 누르면 보이는 폭의 80%만큼 부드럽게 넘어갑니다.
+//   · 휴대폰은 예전처럼 손가락으로 밀어도 됩니다(화살표는 같이 나옴).
+//   · 화살표 쪽 끝이 살짝 흐려져서 "뒤에 더 있다"는 게 보입니다.
+function ScrollTicker({ children }) {
+  const ref = useRef(null);
+  const [edge, setEdge] = useState({ left: false, right: false });
+
+  const measure = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    const max = el.scrollWidth - el.clientWidth;
+    setEdge({ left: el.scrollLeft > 4, right: el.scrollLeft < max - 4 });
+  }, []);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    measure();
+    el.addEventListener("scroll", measure, { passive: true });
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => {
+      el.removeEventListener("scroll", measure);
+      ro.disconnect();
+    };
+  }, [measure, children]);
+
+  const go = (dir) => {
+    const el = ref.current;
+    if (!el) return;
+    const reduce = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    el.scrollBy({ left: dir * el.clientWidth * 0.8, behavior: reduce ? "auto" : "smooth" });
+  };
+
+  return (
+    <div className={`brief-ticker-wrap ${edge.left ? "fade-l" : ""} ${edge.right ? "fade-r" : ""}`}>
+      {edge.left && (
+        <button type="button" className="brief-arrow left" onClick={() => go(-1)} aria-label="앞쪽 지수 보기">
+          <ChevronLeft size={16} aria-hidden="true" />
+        </button>
+      )}
+      <div className="brief-ticker" ref={ref}>
+        {children}
+      </div>
+      {edge.right && (
+        <button type="button" className="brief-arrow right" onClick={() => go(1)} aria-label="뒤쪽 지수 더 보기">
+          <ChevronRight size={16} aria-hidden="true" />
+        </button>
+      )}
+    </div>
+  );
+}
 
 const MAP_WIDTH = 1024;
 const MAP_HEIGHT = 559;
@@ -178,7 +235,7 @@ export default function BriefingBand({ brief, worldIndices, strip, activeTheme, 
             ))}
           </div>
           {rows.length > 0 ? (
-            <div className="brief-ticker">
+            <ScrollTicker key={tab}>
               {rows.map((r) => (
                 <div className="brief-tk" key={r.key}>
                   <span className="c">{r.label}</span>
@@ -186,7 +243,7 @@ export default function BriefingBand({ brief, worldIndices, strip, activeTheme, 
                   <span className={`p mono ${tone(r.changePct)}`}>{pct(r.changePct)}</span>
                 </div>
               ))}
-            </div>
+            </ScrollTicker>
           ) : (
             <div className="brief-ticker brief-ticker-empty">불러오는 중입니다.</div>
           )}
