@@ -5,6 +5,17 @@
 // [2026-10-19 신설] 홈 화면 맨 위 남색 띠입니다.
 // 예전 components/WorldMarketMap.js(지도 + 지수 카드)를 흡수했습니다.
 //
+// [2026-10-26 변경] 어두운 터미널 디자인으로 바꾸면서 띠를 낮게 줄였습니다.
+//   · 세계지도 배경을 뺐습니다. 장식이 화면 위쪽을 400px 넘게 차지해서
+//     정작 속보가 첫 화면 아래로 밀렸기 때문입니다.
+//     ★ 되돌리려면: 아래 return 안의 "지도" 주석 자리에 예전 brief-mapwrap
+//       블록을 다시 넣으면 됩니다(GitHub History의 2026-10-25 이전 버전 참고).
+//       MAP_POINTS 표와 그림 파일(public/world-map.jpg)은 그대로 남겨뒀습니다.
+//   · "뉴스가 몰린 테마" 단추들은 속보 칸 머리 바로 아래로 옮겼습니다
+//     (app/HomeClient.js의 theme-filter). 누르면 바로 아래 속보가 걸러지니
+//     속보 옆에 있는 게 자연스럽습니다.
+//   · 지수 탭과 지수 줄을 한 줄로 합쳤습니다(왼쪽 탭, 오른쪽 지수).
+//
 // [2026-10-20 변경] 두 가지를 바꿨습니다(재성님 요청).
 //   ① 오늘을 한 문장으로 → 왼쪽 미국 / 오른쪽 한국 두 문장으로
 //      시간대에 따라 둘 중 하나만 보여주던 걸 항상 나란히 띄웁니다.
@@ -119,37 +130,13 @@ export default function BriefingBand({ brief, worldIndices, strip, activeTheme, 
     }));
   }, [tab, indices, strip]);
 
-  const themes = (brief?.themeRows || []).slice(0, MAX_THEMES);
+  // (테마 단추는 2026-10-26부터 app/HomeClient.js에서 그립니다.)
+  void pins; void activeTheme; void onThemeClick; void MAX_THEMES;
 
   return (
     <section className="brief-band">
-      {/* 지도는 장식 겸 데이터입니다. 원본이 "연한 바탕 + 어두운 선"이라
-          그대로 얹으면 남색에 묻혀 사라집니다. 그래서 색을 뒤집어
-          밝은 선으로 만들어 띄웁니다(globals.css의 .brief-map). */}
-      {/* [2026-10-20 수정] 지도와 핀을 한 상자(.brief-mapwrap)로 묶었습니다.
-          넓은 화면에서는 이 상자가 배경으로 깔리고, 휴대폰에서는 글 위쪽에
-          제대로 보이는 띠가 됩니다. 두 개를 따로 두면 휴대폰에서 자리를
-          옮길 때 핀만 엉뚱한 데 가버립니다. */}
-      <div className="brief-mapwrap" aria-hidden="true">
-        <div className="brief-map">
-          <img src="/world-map.jpg" alt="" width={MAP_WIDTH} height={MAP_HEIGHT} />
-        </div>
-        <div className="brief-pins">
-          <svg viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`}>
-          {pins.map((it) => {
-            const up = typeof it.changePct === "number" ? it.changePct >= 0 : true;
-            const color = up ? "var(--up)" : "var(--down)";
-            return (
-              <g key={it.key}>
-                <circle cx={it.px} cy={it.py} r="22" fill={color} opacity="0.22" />
-                <circle cx={it.px} cy={it.py} r="7" fill={color} />
-              </g>
-            );
-            })}
-          </svg>
-        </div>
-      </div>
-
+      {/* 지도: 2026-10-26 디자인 개편 때 뺐습니다(위 주석 참고). pins 계산은
+          되돌릴 때를 위해 남겨둡니다. */}
       <div className="container-wide brief-inner">
         <span className="brief-eyebrow">
           <span className="brief-dot" />
@@ -161,47 +148,28 @@ export default function BriefingBand({ brief, worldIndices, strip, activeTheme, 
           <BriefColumn panel={brief?.domestic} />
         </div>
 
-        {themes.length > 0 && (
-          <>
-            <div className="brief-label">뉴스가 몰린 테마 · 눌러서 거르기</div>
-            <div className="brief-heat">
-              {themes.map((t, i) => (
-                <button
-                  key={t.theme}
-                  type="button"
-                  data-rank={i < 3 ? i + 1 : 4}
-                  aria-pressed={activeTheme === t.theme}
-                  onClick={() => onThemeClick?.(t.theme)}
-                >
-                  <span className="t">{t.theme}</span>
-                  <span className="n">{t.news}</span>
-                </button>
-              ))}
-            </div>
-          </>
-        )}
-
-        <div className="brief-tabs">
-          {TABS.map((t) => (
-            <button key={t.key} type="button" aria-pressed={tab === t.key} onClick={() => setTab(t.key)}>
-              {t.label}
-            </button>
-          ))}
-        </div>
-
-        {rows.length > 0 ? (
-          <div className="brief-ticker">
-            {rows.map((r) => (
-              <div className="brief-tk" key={r.key}>
-                <span className="c">{r.label}</span>
-                <span className="v mono">{num(r.close, r.suffix)}</span>
-                <span className={`p mono ${tone(r.changePct)}`}>{pct(r.changePct)}</span>
-              </div>
+        <div className="brief-strip">
+          <div className="brief-tabs" role="group" aria-label="지수 종류">
+            {TABS.map((t) => (
+              <button key={t.key} type="button" aria-pressed={tab === t.key} onClick={() => setTab(t.key)}>
+                {t.label}
+              </button>
             ))}
           </div>
-        ) : (
-          <div className="brief-ticker brief-ticker-empty">불러오는 중입니다.</div>
-        )}
+          {rows.length > 0 ? (
+            <div className="brief-ticker">
+              {rows.map((r) => (
+                <div className="brief-tk" key={r.key}>
+                  <span className="c">{r.label}</span>
+                  <span className="v mono">{num(r.close, r.suffix)}</span>
+                  <span className={`p mono ${tone(r.changePct)}`}>{pct(r.changePct)}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="brief-ticker brief-ticker-empty">불러오는 중입니다.</div>
+          )}
+        </div>
       </div>
     </section>
   );

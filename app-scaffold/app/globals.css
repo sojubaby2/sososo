@@ -1,66 +1,81 @@
 :root {
   /* ===================================================================
-     [2026-10-19 전면 교체] 색을 주황(amber) 계열에서 남색(navy)으로 바꿨습니다.
-     재성님 결정 — "누가 봐도 기본 사이트 같다"는 피드백에서 출발한 디자인
-     개편의 1단계입니다.
+     [2026-10-26 전면 교체] 어두운 "터미널" 화면으로 바꿨습니다.
+     재성님 요청: "디자인 싹 바꿔봐 — taste 활용하고 UI UX PRO MAX 써서
+     세련되고 고급지게". 시안 A·B·C 중 B(어두운 터미널형)로 결정.
 
-     중요 — 왜 이름은 그대로 두고 값만 바꿨나:
-     이 파일은 색을 전부 변수(--amber 같은 것)로 쓰고 있고, 사이트 전체
-     (칼럼, 패턴검색, 용어사전, 홈…)가 그 변수를 참조합니다. 그래서 아래
-     스무 줄만 고치면 모든 페이지의 색이 한 번에 바뀝니다. 변수 "이름"까지
-     바꾸면 이 파일 외의 수백 군데를 전부 찾아 고쳐야 하고 하나라도 빠뜨리면
-     그 부분만 색이 안 바뀝니다. 그래서 이름은 --amber 그대로 두고 값만
-     남색으로 바꿨습니다. 이름이 amber인데 색은 남색이라 헷갈릴 수 있어
-     이 주석을 남겨둡니다.
+     만든 방법:
+       · Taste Skill의 "Data terminal" 스타일 — 장중 하루 종일 켜두는 시세·
+         속보 화면용. 바탕은 무채색에 가까운 검정, 카드는 바탕보다 살짝
+         어둡게, 색은 데이터(등락률)와 선택 표시에만 씁니다.
+       · UI UX Pro Max의 점검 목록 — 글자 대비 4.5:1 이상, 누르는 곳은
+         손가락 모양 커서와 0.15초 반응, 키보드로 갈 때 테두리 표시,
+         "움직임 줄이기" 설정 존중, 375~1440px 화면 모두 확인.
+
+     왜 이름은 그대로 두고 값만 바꿨나(예전 주석과 같은 이유):
+     사이트 전체(칼럼, 패턴검색, 용어사전, 홈…)가 아래 변수 이름을 쓰고
+     있어서, 값만 바꾸면 모든 페이지가 한 번에 바뀝니다. --amber라는
+     이름은 남색 시절부터 "강조색 자리"라는 뜻으로 써 왔고, 이번에는
+     실제로 호박색(amber)이 됐습니다.
+
+     ★ 예전 밝은 남색 화면으로 되돌리고 싶으면 GitHub Desktop의 History에서
+       2026-10-26 이 커밋을 골라 "Revert"를 누르면 됩니다.
      =================================================================== */
 
-  /* 바탕과 면 — 흰 카드를 살짝 푸른 회색 바탕 위에 띄웁니다. */
-  --bg: #f1f4f9;
-  --surface: #ffffff;
-  --surface-2: #f6f8fc;
+  /* 바탕과 면 — 바탕은 아주 짙은 회색, 카드는 그보다 한 단계 더 어둡게.
+     파랗거나 남색 섞인 검정은 일부러 피했습니다(흔한 "AI 대시보드" 색). */
+  --bg: #141416;
+  --surface: #0f0f11;
+  --surface-2: #1b1a1f;
 
-  /* 글자 — 완전한 검정 대신 남색이 섞인 먹색을 씁니다. */
-  --ink: #0c2039;
-  --ink-muted: #46607e;
-  --ink-soft: #7c8fa6;
-  --border: #e1e8f1;
+  /* 글자 — 세 단계. 셋 다 카드 위에서 4.5:1 넘게 읽힙니다. */
+  --ink: #f3f3f4;
+  --ink-muted: #b3b5bc;
+  --ink-soft: #8e9097;
+  --border: #26252b;
 
-  /* 강조색(옛 amber 자리) — 버튼·선택된 메뉴·링크에 쓰입니다. */
-  --amber: #1f5fd8;
-  --amber-bright: #5c8eff;
-  --amber-tint: #e8effc;
-  --amber-tint-ink: #1a4fb5;
+  /* 강조색 — 선택 표시(1px 밑줄), 링크, 오늘의 주인공 테마.
+     속보 경광등 느낌의 호박색 한 가지만 씁니다. */
+  --amber: #e8b04a;
+  --amber-bright: #f3c46b;
+  --amber-tint: #2a2216;
+  --amber-tint-ink: #f3c46b;
 
-  /* 짙은 남색 — 헤더 띠와 앞으로 만들 브리핑 밴드에 씁니다. */
-  --deep: #081a30;
-  --deep-2: #0e2944;
-  --on-deep: #eaf2fc;
-  --on-deep-soft: #8da7c5;
+  /* 머리띠·브리핑 띠 — 거의 검정 */
+  --deep: #0b0b0d;
+  --deep-2: #1b1a1f;
+  --on-deep: #f3f3f4;
+  --on-deep-soft: #9c9ea5;
 
-  --green-tint: #e9f2ec;
-  --green-tint-ink: #2b6b45;
+  --green-tint: #13261c;
+  --green-tint-ink: #5fc39c;
 
-  /* 등락 색은 국내 관행 그대로 — 오르면 빨강, 내리면 파랑. */
-  --up: #d8342b;
-  --down: #1a5fd0;
+  /* 등락 색은 국내 관행 그대로 — 오르면 빨강, 내리면 파랑.
+     어두운 바탕에서 잘 보이게 밝은 쪽으로 올렸습니다. */
+  --up: #ff5f6a;
+  --down: #5c9dff;
 
-  /* 악재 표시 — 빨강(상승)과 헷갈리지 않게 주황 계열로 분리합니다. */
-  --bad: #a9650b;
-  --bad-tint: #fbf1e0;
-  --bad-tint-ink: #8a5309;
+  /* 악재 표시 — 빨강(상승)·호박색(강조)과 헷갈리지 않게 분홍 계열로.
+     글자 "악재"와 경고 그림이 같이 붙어서 색만으로 구분하지 않습니다. */
+  --bad: #f472b6;
+  --bad-tint: #2c1624;
+  --bad-tint-ink: #f9a8d4;
 
-  --strip: #081a30;
+  --strip: #0b0b0d;
 
-  --font-display: "Noto Serif KR", serif;
-  --font-body: "Noto Sans KR", sans-serif;
-  --font-mono: "Roboto Mono", monospace;
+  /* 글꼴 — 한글이 되는 IBM Plex Sans KR 하나로 통일(제목용 명조 폐지),
+     숫자는 자릿수가 딱딱 맞는 IBM Plex Mono. */
+  --font-display: "IBM Plex Sans KR", "Noto Sans KR", sans-serif;
+  --font-body: "IBM Plex Sans KR", "Noto Sans KR", sans-serif;
+  --font-mono: "IBM Plex Mono", "Roboto Mono", monospace;
 
-  /* 모서리와 그림자 — 선으로 나누는 대신 여백과 옅은 그림자로 나눕니다. */
-  --r-lg: 18px;
-  --r-md: 12px;
-  --r-sm: 9px;
-  --shadow: 0 1px 2px rgba(12, 32, 57, 0.05), 0 8px 24px rgba(12, 32, 57, 0.06);
-  --shadow-hover: 0 2px 4px rgba(12, 32, 57, 0.06), 0 14px 34px rgba(12, 32, 57, 0.1);
+  /* 모서리 — 둥근 정도를 줄여 단단한 느낌으로. 그림자는 거의 쓰지 않고
+     1px 선으로 나눕니다. */
+  --r-lg: 10px;
+  --r-md: 8px;
+  --r-sm: 6px;
+  --shadow: 0 0 0 1px var(--border);
+  --shadow-hover: 0 0 0 1px #3a3940, 0 10px 28px rgba(0, 0, 0, 0.35);
 }
 
 * { box-sizing: border-box; }
@@ -86,6 +101,14 @@ html, body {
 }
 
 button, input { font-family: inherit; }
+/* [2026-10-26 추가] 어두운 화면에서 단추·입력칸 글자가 검게 묻히던 문제.
+   브라우저는 단추 글자를 기본으로 "검정"으로 칠해서, 바탕이 어두워지자
+   테마별 종목정리 목록·차트 가이드 제목 등이 안 보였습니다.
+   단추는 주변 글자색을 그대로 따르게, 입력칸은 밝은 글자로 맞춥니다. */
+button { color: inherit; }
+input, select, textarea { color: var(--ink); background-color: var(--surface); }
+input::placeholder { color: var(--ink-soft); }
+:root { color-scheme: dark; }  /* 스크롤바·체크박스 등 브라우저 기본 부품도 어두운 모양으로 */
 
 .container { max-width: 960px; margin: 0 auto; padding: 0 24px; }
 .container-wide { max-width: 1152px; margin: 0 auto; padding: 0 24px; }
@@ -178,9 +201,9 @@ button, input { font-family: inherit; }
   font-size: 13px; border-radius: 10px; padding: 9px 14px; border: 1px solid transparent;
   text-decoration: none; cursor: pointer; transition: filter 0.12s ease;
 }
-.daily-outlook-row:hover { filter: brightness(0.97); }
-.daily-outlook-row.up { background: rgba(194, 59, 59, 0.1); border-color: rgba(194, 59, 59, 0.35); color: var(--up); }
-.daily-outlook-row.down { background: rgba(46, 95, 163, 0.1); border-color: rgba(46, 95, 163, 0.35); color: var(--down); }
+.daily-outlook-row:hover { filter: brightness(1.15); }
+.daily-outlook-row.up { background: rgba(255, 95, 106, 0.08); border-color: rgba(255, 95, 106, 0.3); color: var(--up); }
+.daily-outlook-row.down { background: rgba(92, 157, 255, 0.08); border-color: rgba(92, 157, 255, 0.3); color: var(--down); }
 .daily-outlook-theme { font-weight: 700; white-space: nowrap; }
 .daily-outlook-reason { color: var(--ink); font-weight: 500; opacity: 0.85; }
 .daily-outlook-verdict { margin-left: auto; font-weight: 700; white-space: nowrap; }
@@ -259,7 +282,7 @@ button, input { font-family: inherit; }
 
 .chip-copied {
   position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
-  background: var(--ink); color: #fff; font-size: 11px; font-weight: 600; padding: 4px 9px;
+  background: var(--ink); color: #141416; font-size: 11px; font-weight: 600; padding: 4px 9px;
   border-radius: 6px; white-space: nowrap; animation: chip-copied-pop 1.4s ease forwards; pointer-events: none;
 }
 @keyframes chip-copied-pop {
@@ -286,11 +309,11 @@ button, input { font-family: inherit; }
 .news-reason strong { color: var(--down); font-weight: 700; }
 .news-link {
   display: inline-flex; align-items: center; gap: 6px;
-  font-size: 13px; font-weight: 700; color: #fff;
+  font-size: 13px; font-weight: 700; color: #141416;
   background: var(--amber); padding: 7px 14px; border-radius: 999px;
   text-decoration: none;
 }
-.news-link:hover { background: var(--amber-tint-ink); }
+.news-link:hover { background: var(--amber-bright); }
 
 /* Two-column home layout */
 .home-layout { display: grid; grid-template-columns: 1fr; gap: 28px; align-items: start; }
@@ -307,12 +330,12 @@ button, input { font-family: inherit; }
    살짝 커지는 애니메이션도 넣어서 지금 뭐가 선택돼 있는지 한눈에 보이게 함. */
 .range-toggle-btn { font-size: 11px; font-weight: 600; color: var(--ink-muted); background: transparent; border: none; border-radius: 999px; padding: 4px 10px; cursor: pointer; line-height: 1.2; transition: background-color 0.15s ease, color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease; }
 .range-toggle-btn:hover:not(.active) { color: var(--amber); background: var(--amber-tint); }
-.range-toggle-btn.active { color: #fff; background: var(--amber); box-shadow: 0 2px 6px rgba(31, 95, 216, 0.35); transform: scale(1.08); }
+.range-toggle-btn.active { color: #141416; background: var(--amber); box-shadow: none; transform: none; }
 .trending-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); }
 .trending-row:last-child { border-bottom: none; }
 /* [2026-09-08 추가] HOT 테마 줄을 누르면 테마별 종목정리로 이동하는 링크로 바뀜 */
 .trending-row-link { color: inherit; text-decoration: none; cursor: pointer; transition: filter 0.12s ease; }
-.trending-row-link:hover { filter: brightness(0.97); }
+.trending-row-link:hover { color: var(--amber); }
 .trending-row-name { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; }
 .trending-row-code { font-family: var(--font-mono); font-size: 11px; color: var(--ink-muted); }
 .trending-empty { font-size: 13px; color: var(--ink-muted); padding: 8px 0; }
@@ -323,8 +346,8 @@ button, input { font-family: inherit; }
 .toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 60; display: flex; flex-direction: column; gap: 8px; }
 .new-toast {
   display: flex; align-items: flex-start; gap: 10px;
-  background: var(--ink); color: #fff; padding: 14px 16px; border-radius: 14px;
-  max-width: 320px; box-shadow: 0 8px 24px rgba(20, 24, 31, 0.25);
+  background: var(--surface-2); color: var(--ink); padding: 14px 16px; border-radius: var(--r-md);
+  max-width: 320px; border: 1px solid #3a3940; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
   animation: toast-slide-in 320ms ease, toast-slide-out 320ms ease 4.2s forwards;
 }
 .new-toast-icon { flex-shrink: 0; margin-top: 1px; color: var(--amber-bright); }
@@ -530,537 +553,434 @@ button, input { font-family: inherit; }
      · 숫자                = 고정폭
    =========================================================================== */
 
-/* ── 헤더 (남색) ──────────────────────────────────────────────────────── */
-.site-header { background: var(--deep); border-bottom: none; }
-.site-header-inner { padding: 11px 0; gap: 18px; }
-.brand { text-decoration: none; gap: 9px; }
-/* [2026-10-19] 헤더에서 로고 그림을 뺐습니다(components/Header.js 참고).
-   .brand-logo 규칙은 다른 페이지에서 로고를 쓸 때를 위해 남겨둡니다. */
-.brand-logo { height: 34px; }
-.brand-name { font-family: var(--font-body); font-size: 19px; font-weight: 800; letter-spacing: -0.04em; color: var(--on-deep); }
-.site-header .nav-btn { color: var(--on-deep-soft); border-radius: 999px; padding: 6px 12px; font-weight: 500; }
-.site-header .nav-btn:hover { color: var(--on-deep); background: rgba(255, 255, 255, 0.08); }
-.site-header .nav-btn.active { color: var(--on-deep); background: rgba(255, 255, 255, 0.14); font-weight: 700; }
+/* 숫자는 자릿수 폭을 똑같이 — 시세가 바뀌어도 글자가 들썩이지 않게 */
+.mono, .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 
-/* ── 브리핑 밴드 ──────────────────────────────────────────────────────── */
-.brief-band { position: relative; background: var(--deep); overflow: hidden; }
-/* 지도와 핀은 같은 자리에 겹쳐 둡니다. 가로세로 비율을 그림과 똑같이
-   고정해야 핀이 제자리에 남습니다. */
-/* [2026-10-20 조정] 머리글이 두 칸이 되면서 오른쪽까지 글자가 찹니다.
-   지도를 위로 올려 글자와 덜 겹치게 하고, 아래 .brief-band::after로
-   글자 뒤에 어두운 그늘을 깔아 읽기 좋게 만듭니다. */
-.brief-mapwrap {
-  position: absolute; top: -20%; right: -4%; width: 52%; min-width: 390px;
-  aspect-ratio: 1024 / 559; pointer-events: none;
-}
-.brief-map, .brief-pins { position: absolute; inset: 0; }
+/* ══════════════════════════════════════════════════════════════════
+   [2026-10-26 전면 교체] 홈 화면 — 어두운 터미널형 3칸 배치
+   ──────────────────────────────────────────────────────────────────
+   재성님 요청: "디자인 싹 바꿔봐 — 세련되고 고급지게" (시안 B로 결정)
 
-/* 글자 뒤 그늘.
-   왼쪽은 완전히 가리고 오른쪽으로 갈수록 투명해져서, 지도는 오른쪽
-   끝에서만 또렷하게 보입니다. 글자(.brief-inner)는 이 그늘 위에 있습니다. */
-.brief-band::after {
-  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 1;
-  background: linear-gradient(
-    100deg,
-    var(--deep) 0%,
-    var(--deep) 34%,
-    rgba(8, 26, 48, 0.9) 52%,
-    rgba(8, 26, 48, 0.62) 72%,
-    rgba(8, 26, 48, 0.18) 92%,
-    transparent 100%
-  );
-}
-/* [2026-10-19 수정] 재성님 리포트 — "지도가 아예 안 보이고 점만 찍혀 있다".
-   원인: 원본 그림은 "연한 하늘색 바탕 + 어두운 해안선"입니다. 남색 배경에
-   그대로 얹으면 어두운 해안선이 어두운 배경에 묻혀서 사라집니다.
-   해결: 색을 뒤집습니다(invert). 그러면 해안선이 밝은 선이 되고 바탕은
-   어두워집니다. 거기에 screen 합성을 쓰면 어두운 바탕은 아예 안 보이고
-   밝은 해안선만 남색 위에 떠오릅니다.
-   더 흐리게/진하게 하려면 opacity 숫자만 고치면 됩니다. */
-.brief-map {
-  opacity: 0.7;
-  filter: grayscale(1) invert(1) contrast(1.35) brightness(1.1);
-  mix-blend-mode: screen;
-  -webkit-mask-image: linear-gradient(to left, #000 30%, transparent 92%);
-  mask-image: linear-gradient(to left, #000 30%, transparent 92%);
-}
-.brief-map img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.brief-pins svg { width: 100%; height: 100%; display: block; }
-.brief-inner { position: relative; z-index: 2; padding: 28px 24px 0; }
+   바뀐 핵심 세 가지:
+   1. 첫 화면에 속보가 바로 보입니다.
+      예전에는 큰 남색 띠(지도 + 큰 제목) 아래로 속보가 밀려서, 큰
+      모니터에서도 스크롤해야 속보가 보였습니다. 띠를 낮게 줄이고
+      3칸 배치로 바꿔 속보 칸이 화면 가운데 위쪽에서 시작합니다.
+   2. 3칸 배치 (넓은 화면 기준)
+        왼쪽  : 오늘의 국장 예측 · HOT 테마
+        가운데: 실시간 속보 (채팅형, 최신이 아래)
+        오른쪽: 대표 종목(삼성전자·SK하이닉스) · 전일 급등주
+      휴대폰에서는 가운데(속보) → 오른쪽 → 왼쪽 순서로 위에서 아래로 쌓입니다.
+   3. 선택 표시는 한 가지 — 글자 아래 1px 호박색 선.
+      메뉴, 탭, 1주일/1개월 버튼 모두 같은 방식이라 눈이 덜 피곤합니다.
 
+   격자 계산(1440px 화면): 바깥 여백 좌우 40 → 안쪽 1360
+     = 왼쪽 280 + 간격 24 + 가운데 732 + 간격 24 + 오른쪽 300
+   ══════════════════════════════════════════════════════════════════ */
+
+/* 넓은 화면에서 3칸이 들어가도록 홈·헤더 폭을 넓힙니다(다른 페이지 본문 폭은 그대로). */
+.container-wide.home-main,
+.site-header .container-wide,
+.brief-band .container-wide { max-width: 1440px; padding-left: 40px; padding-right: 40px; }
+
+/* ── 헤더 ─────────────────────────────────────────────────────────── */
+.site-header { background: var(--deep); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 30; }
+.site-header-inner { padding: 0; height: 56px; gap: 24px; }
+.brand { text-decoration: none; gap: 10px; }
+.brand-logo { height: 30px; }
+.brand-name { font-family: var(--font-body); font-size: 18px; font-weight: 700; letter-spacing: -0.03em; color: var(--on-deep); }
+.brand-tag { font-size: 12px; color: var(--on-deep-soft); font-weight: 400; letter-spacing: 0; }
+.site-header .nav { gap: 22px; height: 100%; }
+/* 메뉴: 알약 모양 대신 글자만. 지금 페이지는 흰 글자 + 아래 1px 호박색 선. */
+.site-header .nav-btn {
+  position: relative; height: 100%; padding: 0; border-radius: 0; background: none;
+  color: var(--on-deep-soft); font-size: 14px; font-weight: 500;
+  transition: color 0.15s ease;
+}
+.site-header .nav-btn:hover { color: var(--on-deep); background: none; }
+.site-header .nav-btn.active { color: var(--on-deep); background: none; font-weight: 600; }
+.site-header .nav-btn.active::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px; background: var(--amber);
+}
+.site-header .nav-btn:focus-visible { outline: 2px solid var(--amber); outline-offset: 4px; }
+
+/* ── 브리핑 띠 (오늘 한 줄 + 지수) ───────────────────────────────────
+   예전: 높이 약 420px(지도 배경 + 34px 큰 제목) → 지금: 약 190px.
+   지도 그림은 장식이 화면을 차지해서 뺐습니다(components/BriefingBand.js
+   주석에 되돌리는 방법을 적어뒀습니다). */
+.brief-band { position: relative; background: var(--deep); border-bottom: 1px solid var(--border); }
+.brief-inner { padding: 18px 40px 0; }
 .brief-eyebrow {
   display: inline-flex; align-items: center; gap: 8px;
-  font-size: 11.5px; font-weight: 700; letter-spacing: 0.14em;
-  color: var(--on-deep-soft); margin-bottom: 13px;
+  font-family: var(--font-mono); font-size: 12px; color: var(--on-deep-soft); margin-bottom: 10px;
 }
-.brief-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--up); flex-shrink: 0; animation: live-pulse 1.4s ease-in-out infinite; }
+.brief-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--up); flex-shrink: 0; animation: live-pulse 1.4s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .brief-dot { animation: none; } }
 
-/* [2026-10-20 변경] 한 문장에서 두 칸(왼쪽 미국 / 오른쪽 한국)으로.
-   두 개를 나란히 놓으려면 글자를 줄여야 해서 최대 52px -> 34px로 낮췄습니다.
-   좁은 화면에서는 위아래로 쌓입니다. */
-.brief-cols {
-  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 22px 26px; align-items: start;
-}
-@media (max-width: 820px) { .brief-cols { grid-template-columns: minmax(0, 1fr); gap: 18px; } }
-.brief-col { min-width: 0; }
-.brief-col-label {
-  font-size: 11px; font-weight: 700; letter-spacing: 0.14em;
-  color: var(--on-deep-soft); margin-bottom: 7px;
-}
-/* [2026-10-20 수정] 재성님 리포트 — "글씨가 어색하게 나눠졌어"
-   ("오늘 한국을 끌어내 / 린 건 방산·우주였습니다")
-
-   원인이 두 개였고, 둘 다 제가 넣은 것입니다.
-     · overflow-wrap: anywhere -> 글자 단위로 아무 데서나 자릅니다.
-       영어는 괜찮지만 한국어는 "끌어내 / 린"처럼 단어가 두 동강 납니다.
-     · text-wrap: balance -> 줄 길이를 일부러 비슷하게 맞춥니다.
-       그래서 오른쪽에 자리가 남아도 앞줄을 짧게 끊어버렸습니다.
-       재성님이 "좀 더 오른쪽으로 펼쳐도 된다"고 한 게 바로 이것입니다.
-
-   바꾼 것:
-     · word-break: keep-all -> 한국어를 띄어쓰기에서만 자릅니다.
-     · balance 제거 -> 오른쪽 끝까지 쓰고 자연스럽게 넘어갑니다.
-     · overflow-wrap: break-word -> 띄어쓰기 없는 아주 긴 단어가 들어와
-       칸을 뚫고 나가는 것만 막는 비상용입니다(평소엔 작동 안 함). */
+.brief-cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 40px; align-items: start; }
+.brief-col { min-width: 0; padding-left: 14px; border-left: 1px solid var(--border); }
+.brief-col-label { font-size: 12px; color: var(--on-deep-soft); margin-bottom: 4px; }
+/* 한국어는 띄어쓰기에서만 자릅니다(예전 "끌어내 / 린" 문제 재발 방지). */
 .brief-lead {
-  margin: 0; font-weight: 900; letter-spacing: -0.04em;
-  font-size: clamp(22px, 2.6vw, 34px); line-height: 1.18;
-  color: var(--on-deep);
-  word-break: keep-all;
-  overflow-wrap: break-word;
+  margin: 0; font-weight: 600; letter-spacing: -0.025em;
+  font-size: 22px; line-height: 1.35; color: var(--on-deep);
+  word-break: keep-all; overflow-wrap: break-word;
 }
-/* 테마 이름은 한 덩어리로 유지합니다. keep-all을 줘도 "방산·우주"의
-   가운뎃점에서는 줄이 갈라져서, 여기만 따로 막았습니다.
-   (테마 이름은 길어야 "IT 소프트웨어" 정도라 넘칠 걱정은 없습니다.) */
-.brief-lead em { font-style: normal; color: var(--up); white-space: nowrap; }
-.brief-sub { margin: 9px 0 0; font-size: 13.5px; line-height: 1.6; color: var(--on-deep-soft); word-break: keep-all; }
+.brief-lead em { font-style: normal; color: var(--amber); white-space: nowrap; }
+.brief-sub { margin: 4px 0 0; font-size: 13px; line-height: 1.55; color: var(--on-deep-soft); word-break: keep-all; }
 
-.brief-label { margin: 22px 0 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.13em; color: var(--on-deep-soft); }
-.brief-heat { display: flex; flex-wrap: wrap; gap: 6px; }
-.brief-heat button {
-  border: none; cursor: pointer; font-family: inherit; color: var(--on-deep);
-  border-radius: 10px; background: rgba(255, 255, 255, 0.08);
-  display: flex; align-items: baseline; gap: 8px; padding: 8px 12px;
-  transition: background 0.15s ease, transform 0.15s ease;
-}
-.brief-heat button:hover { background: rgba(255, 255, 255, 0.17); transform: translateY(-1px); }
-.brief-heat button[aria-pressed="true"] { background: var(--up); }
-.brief-heat .t { font-weight: 700; letter-spacing: -0.02em; }
-.brief-heat .n { font-family: var(--font-mono); font-size: 11.5px; opacity: 0.72; }
-/* 순위에 따라 글자 크기를 달리해서 "어디에 몰렸는지"가 한눈에 보이게 합니다. */
-.brief-heat button[data-rank="1"] { font-size: 16.5px; }
-.brief-heat button[data-rank="2"] { font-size: 14.5px; }
-.brief-heat button[data-rank="3"] { font-size: 13.5px; }
-.brief-heat button[data-rank="4"] { font-size: 12.5px; }
-
-/* [2026-10-20 추가] 지수 띠 탭 — 세계 증시 / 환율·금리 / 원자재 */
-.brief-tabs { display: flex; gap: 4px; margin-top: 22px; flex-wrap: wrap; }
+/* 지수 줄: 왼쪽에 탭 3개, 오른쪽으로 지수가 가로로 이어집니다. */
+.brief-strip { display: flex; align-items: stretch; gap: 0; margin-top: 16px; border-top: 1px solid var(--border); }
+.brief-tabs { display: flex; gap: 16px; padding-right: 20px; border-right: 1px solid var(--border); flex: none; }
 .brief-tabs button {
-  border: none; cursor: pointer; font-family: inherit;
-  font-size: 12px; font-weight: 600; letter-spacing: -0.01em;
-  padding: 6px 13px; border-radius: 999px;
-  background: rgba(255, 255, 255, 0.07); color: var(--on-deep-soft);
-  transition: background 0.15s ease, color 0.15s ease;
+  position: relative; border: none; background: none; cursor: pointer; font-family: inherit;
+  font-size: 13px; color: var(--on-deep-soft); padding: 0; white-space: nowrap;
+  transition: color 0.15s ease;
 }
-.brief-tabs button:hover { background: rgba(255, 255, 255, 0.14); color: var(--on-deep); }
-.brief-tabs button[aria-pressed="true"] { background: var(--on-deep); color: var(--deep); font-weight: 700; }
-
-.brief-ticker {
-  margin-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.1);
-  display: flex; overflow-x: auto; scrollbar-width: none;
-}
-.brief-ticker-empty {
-  display: block; padding: 14px 0 16px; font-size: 12.5px; color: var(--on-deep-soft);
-}
+.brief-tabs button:hover { color: var(--on-deep); }
+.brief-tabs button[aria-pressed="true"] { color: var(--on-deep); font-weight: 600; }
+.brief-tabs button[aria-pressed="true"]::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: var(--amber); }
+.brief-tabs button:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.brief-ticker { display: flex; overflow-x: auto; scrollbar-width: none; flex: 1; min-width: 0; }
 .brief-ticker::-webkit-scrollbar { display: none; }
+.brief-ticker-empty { display: flex; align-items: center; padding: 0 20px; font-size: 13px; color: var(--on-deep-soft); }
 .brief-tk {
-  flex: 0 0 auto; padding: 11px 17px 13px; border-right: 1px solid rgba(255, 255, 255, 0.08);
-  display: flex; flex-direction: column; gap: 1px; white-space: nowrap;
+  flex: 0 0 auto; padding: 10px 18px 11px; border-right: 1px solid var(--border);
+  display: grid; grid-template-columns: auto auto; column-gap: 8px; row-gap: 1px; white-space: nowrap;
 }
-.brief-tk:first-child { padding-left: 0; }
-.brief-tk .c { font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em; color: var(--on-deep-soft); }
-.brief-tk .v { font-size: 13.5px; font-weight: 600; color: var(--on-deep); }
-.brief-tk .p { font-size: 11.5px; font-weight: 600; }
+.brief-tk .c { grid-column: 1 / -1; font-size: 12px; color: var(--on-deep-soft); }
+.brief-tk .v { font-size: 14px; font-weight: 500; color: var(--on-deep); }
+.brief-tk .p { font-size: 12px; font-weight: 500; align-self: end; }
 
-/* ── 본문 ─────────────────────────────────────────────────────────────── */
-.home-main { padding-top: 24px; padding-bottom: 56px; }
-.panel-label { font-size: 11px; font-weight: 700; letter-spacing: 0.13em; color: var(--ink-soft); margin-bottom: 9px; }
+/* ── 본문 3칸 ─────────────────────────────────────────────────────── */
+.home-main { padding-top: 20px; padding-bottom: 64px; }
+.panel-label { font-size: 12px; font-weight: 500; letter-spacing: 0; color: var(--ink-soft); margin-bottom: 8px; }
 
-/* 감시 바 */
-.watch-bar {
-  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-  padding: 12px 18px; border-radius: var(--r-md);
-  background: var(--surface); box-shadow: var(--shadow); margin-bottom: 20px;
+.home-grid {
+  display: grid; grid-template-columns: 280px minmax(0, 1fr) 300px;
+  gap: 24px; align-items: start;
 }
-.watch-live { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; letter-spacing: -0.01em; }
-.watch-toggles { display: flex; gap: 7px; margin-left: auto; flex-wrap: wrap; }
+.home-col { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+/* 양옆 칸은 스크롤을 따라옵니다 — 속보를 읽으며 내려가도 계속 보입니다. */
+.home-left, .home-right { position: sticky; top: 76px; }
 
-/* ── 실시간 속보 머리글 + 최근 3건 ───────────────────────────────────
-   [2026-10-19 교체] 예전에는 "실시간 급등뉴스 감시중" 띠와 "오늘의 머리기사"
-   가 따로 있었습니다. 재성님 요청으로 둘을 합쳤습니다 — 머리글 한 줄에
-   실시간 표시·건수·알림 토글을 모아두고, 바로 아래에 가장 최근 속보 3건을
-   큰 카드로 놓습니다. 이 사이트는 지금 막 들어온 속보를 보러 오는 곳이라
-   한 건만 크게 띄우는 신문식 머리기사보다 이쪽이 맞습니다. */
+/* 칸 하나 = 패널. 바탕보다 어둡고 1px 선, 그림자 없음. */
+.panel {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
+}
+.panel-head { display: flex; align-items: center; gap: 8px; padding: 14px 18px 0; }
+.panel-head h2 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: -0.01em; color: var(--ink); }
+.panel-head .sub { font-size: 12px; color: var(--ink-soft); }
+.panel-head .right { margin-left: auto; }
+
+/* 오른쪽·왼쪽 칸의 기존 패널(HOT 테마, 전일 급등주)을 새 패널 모양으로 */
+.home-col .trending-panel {
+  margin: 0; background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-lg); box-shadow: none; padding: 14px 18px 8px;
+}
+.home-col .trending-panel-title {
+  font-size: 15px; font-weight: 600; text-transform: none; letter-spacing: -0.01em; color: var(--ink); margin: 0 0 8px;
+}
+.home-col .trending-panel-header { margin: 0 0 8px; }
+.home-col .trending-row { padding: 0; height: 38px; border-bottom: 1px solid var(--border); }
+.home-col .trending-row:last-child { border-bottom: none; }
+.home-col .trending-row-name { font-size: 14px; font-weight: 500; }
+.home-col .trending-row .mono { font-size: 13px !important; }
+.home-col .mover-section-label { font-size: 12px; font-weight: 500; color: var(--ink-soft); margin: 12px 0 2px; }
+/* 1주일/1개월: 알약 대신 글자 + 밑줄 */
+.home-col .range-toggle { border: none; padding: 0; gap: 14px; }
+.home-col .range-toggle-btn {
+  position: relative; background: none; border-radius: 0; padding: 4px 0; font-size: 13px; font-weight: 500;
+  color: var(--ink-soft); transform: none; box-shadow: none;
+}
+.home-col .range-toggle-btn:hover:not(.active) { background: none; color: var(--ink); }
+.home-col .range-toggle-btn.active { background: none; color: var(--ink); }
+.home-col .range-toggle-btn.active::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: var(--amber); }
+
+/* 오늘의 국장 예측 — 왼쪽 칸 맨 위 패널 */
+.home-col .daily-outlook-banner {
+  margin: 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 14px 18px;
+}
+.home-col .daily-outlook-heading { font-size: 15px; font-weight: 600; color: var(--ink); margin: 0 0 10px; letter-spacing: -0.01em; }
+.home-col .daily-outlook-row {
+  display: grid; grid-template-columns: auto 1fr auto; gap: 4px 8px; align-items: center;
+  padding: 10px 12px; border-radius: var(--r-md); font-size: 13px; margin-bottom: 8px;
+}
+.home-col .daily-outlook-row svg:last-child { display: none; }
+.home-col .daily-outlook-reason { grid-column: 1 / -1; grid-row: 2; color: var(--ink-muted); opacity: 1; font-size: 13px; line-height: 1.5; }
+.home-col .daily-outlook-verdict { margin-left: 0; font-size: 12px; }
+
+/* 설치 안내 — "홈 화면에 추가" 안내라 휴대폰·태블릿에서만 보여줍니다.
+   큰 화면에서는 속보 칸을 한 줄이라도 더 위로 올리는 게 낫습니다. */
+.install-hint { background: var(--surface); border-color: var(--border); color: var(--ink-muted); font-size: 13px; margin-bottom: 16px; }
+@media (min-width: 861px) { .install-hint { display: none; } }
+
+/* ── 가운데: 실시간 속보 패널 ─────────────────────────────────────── */
+.feed-panel { position: relative; display: flex; flex-direction: column; overflow: hidden; }
 .live-head {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-  padding-bottom: 12px; border-bottom: 2px solid var(--deep-2); margin-bottom: 4px;
+  padding: 14px 18px 12px; border-bottom: 1px solid var(--border); margin: 0;
 }
-.live-head h2 {
+.live-head h1 {
   display: flex; align-items: center; gap: 8px; margin: 0;
-  font-family: var(--font-display); font-size: 21px; font-weight: 700; letter-spacing: -0.03em;
+  font-family: var(--font-body); font-size: 17px; font-weight: 600; letter-spacing: -0.02em;
+}
+.stories-count { font-family: var(--font-mono); font-size: 12px; color: var(--ink-soft); letter-spacing: 0; }
+.watch-toggles { display: flex; gap: 6px; margin-left: auto; flex-wrap: wrap; }
+.sound-toggle {
+  height: 30px; padding: 0 12px; font-size: 12px; font-weight: 500; color: var(--ink-muted);
+  background: transparent; border: 1px solid var(--border); border-radius: 999px;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.sound-toggle:hover { border-color: #3a3940; color: var(--ink); }
+.sound-toggle.on { color: var(--ink); background: transparent; border-color: var(--amber); }
+.sound-toggle:focus-visible, .clear-filter:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.clear-filter {
+  border: 1px solid var(--amber); cursor: pointer; font-family: inherit; height: 30px;
+  font-weight: 500; font-size: 12px; background: var(--amber-tint); color: var(--amber-bright);
+  padding: 0 12px; border-radius: 999px;
 }
 
-.top-stories { display: flex; flex-direction: column; margin-bottom: 4px; }
-
-/* 최근 3건은 가로로 넓고 글씨가 큽니다. 나머지 모양은 아래 .story와 같습니다. */
-.story-top { padding: 20px 0; }
-.story-top .story-meta { font-size: 11.5px; margin-bottom: 9px; }
-.story-top .story-title { font-size: clamp(20px, 2.1vw, 25px); line-height: 1.34; margin-bottom: 10px; }
-.story-top .story-summary {
-  font-size: 15px; line-height: 1.7; margin-bottom: 13px; max-width: 60ch;
-  -webkit-line-clamp: 3;
+/* 뉴스가 몰린 테마 — 속보 칸 머리 아래 한 줄. 누르면 그 테마 속보만. */
+.theme-filter {
+  display: flex; align-items: center; gap: 6px; padding: 10px 18px; border-bottom: 1px solid var(--border);
+  overflow-x: auto; scrollbar-width: none;
 }
-.story-top .chip-row { margin-bottom: 13px; gap: 8px; }
-.story-top .story-why { padding: 13px 16px; margin-bottom: 12px; }
-.story-top .story-why li { font-size: 13.5px; }
-.story-top .story-link { font-size: 12.5px; }
+.theme-filter::-webkit-scrollbar { display: none; }
+.theme-filter .lbl { font-size: 12px; color: var(--ink-soft); margin-right: 4px; white-space: nowrap; }
+.theme-filter button {
+  flex: none; display: inline-flex; align-items: baseline; gap: 6px; height: 30px; padding: 0 12px;
+  border: 1px solid var(--border); border-radius: 999px; background: transparent; color: var(--ink-muted);
+  font-family: inherit; font-size: 13px; cursor: pointer; white-space: nowrap; line-height: 28px;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.theme-filter button:hover { border-color: #3a3940; color: var(--ink); }
+.theme-filter button .n { font-family: var(--font-mono); font-size: 12px; color: var(--ink-soft); }
+.theme-filter button[data-rank="1"] { color: var(--ink); border-color: #3a3940; }
+.theme-filter button[data-rank="1"] .n { color: var(--amber); }
+.theme-filter button[aria-pressed="true"] { border-color: var(--amber); color: var(--ink); background: var(--amber-tint); }
+.theme-filter button:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
 
-/* ── 대표 종목 (삼성전자·SK하이닉스) ──────────────────────────────────────
-   [2026-10-26] 예전 "많이 불린 종목" 띠(.hitstrip) 자리입니다.
-   두 칸을 나란히 놓고, 휴대폰에서는 위아래로 쌓습니다.
-   칸 = 단추입니다(누르면 그 종목 속보만 보기). 눌린 칸은 남색 테두리. */
-.flagship { border-bottom: 1px solid var(--border); padding: 14px 0 16px; }
-.flagship .panel-label { margin: 0 0 10px; }
-.flagship-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+/* ── 대표 종목 (오른쪽 칸 맨 위) ──────────────────────────────────── */
+.flagship { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 14px 18px 16px; }
+.flagship .panel-label { font-size: 15px; font-weight: 600; color: var(--ink); margin: 0 0 10px; letter-spacing: -0.01em; }
+.flagship-list { display: flex; flex-direction: column; gap: 0; }
 .flag-card {
   display: flex; flex-direction: column; gap: 2px; text-align: left; cursor: pointer;
-  font-family: inherit; color: var(--ink); background: var(--surface);
-  border: 1px solid var(--border); border-radius: var(--r-md); padding: 12px 14px;
-  transition: border-color 0.15s ease;
+  font-family: inherit; color: var(--ink); background: none;
+  border: none; border-top: 1px solid var(--border); border-radius: 0; padding: 12px 0 2px;
 }
-.flag-card:hover { border-color: #b9c8dc; }
-.flag-card[aria-pressed="true"] { border-color: var(--deep-2); box-shadow: inset 0 0 0 1px var(--deep-2); }
-.flag-card:focus-visible { outline: 3px solid var(--amber-tint); outline-offset: 2px; }
-.flag-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
-.flag-nm { font-size: 15px; font-weight: 700; letter-spacing: -0.02em; white-space: nowrap; }
-.flag-code { font-size: 11.5px; font-weight: 400; color: var(--ink-soft); margin-left: 6px; }
-.flag-px { display: inline-flex; align-items: baseline; gap: 2px; white-space: nowrap; }
-.flag-px > .mono:first-child { font-size: 19px; font-weight: 600; }
-.flag-px small { font-size: 12px; color: var(--ink-muted); margin-right: 8px; }
-.flag-chg { font-size: 13px; font-weight: 600; }
-.flag-when { font-size: 11.5px; color: var(--ink-soft); text-align: right; }
-/* 해외 시세 줄 — 회색 바탕 상자 */
+.flag-card:first-child { border-top: none; padding-top: 2px; }
+.flag-card:hover .flag-nm { color: var(--amber); }
+.flag-card[aria-pressed="true"] .flag-nm { color: var(--amber); }
+.flag-card:focus-visible { outline: 2px solid var(--amber); outline-offset: 4px; border-radius: 4px; }
+/* 오른쪽 칸이 300px로 좁아서 종목코드는 이름 아래 줄로 내렸습니다. */
+.flag-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.flag-nm { font-size: 15px; font-weight: 600; letter-spacing: -0.02em; white-space: nowrap; transition: color 0.15s ease; display: flex; flex-direction: column; }
+.flag-code { font-family: var(--font-mono); font-size: 12px; font-weight: 400; color: var(--ink-soft); margin-left: 0; margin-top: 1px; }
+.flag-px { display: inline-flex; align-items: baseline; flex-wrap: wrap; justify-content: flex-end; column-gap: 2px; white-space: nowrap; }
+.flag-px > .mono:first-child { font-size: 20px; font-weight: 500; }
+.flag-px small { font-size: 12px; color: var(--ink-soft); margin-right: 0; }
+.flag-chg { font-size: 13px; font-weight: 500; flex-basis: 100%; text-align: right; }
+.flag-when { font-size: 12px; color: var(--ink-soft); text-align: right; margin-top: 2px; }
 .flag-abroad {
-  margin-top: 8px; padding: 8px 10px; background: var(--surface-2); border-radius: 8px;
+  margin-top: 8px; padding: 8px 10px; background: var(--surface-2); border-radius: var(--r-sm);
   display: flex; flex-direction: column; gap: 2px; font-size: 12.5px; color: var(--ink-muted); min-height: 50px;
 }
-.flag-venue b { color: var(--ink); font-weight: 700; }
+.flag-venue b { color: var(--ink); font-weight: 600; }
 .flag-venue .mono { color: var(--ink); }
 .flag-when-abroad { color: var(--ink-soft); }
 .flag-gap .mono { color: var(--ink); }
-.flag-gap-pct.up, .flag-gap-pct.up .mono { color: var(--up); } .flag-gap-pct.down, .flag-gap-pct.down .mono { color: var(--down); }
-/* 처음 불러오는 동안 숫자 자리를 채우는 회색 막대(화면 출렁임 방지) */
-.flag-skel { display: block; height: 14px; width: 70%; border-radius: 4px; background: #e6ecf4; }
-.flag-skel-px { width: 140px; height: 20px; }
-@media (max-width: 640px) {
-  .flagship-list { grid-template-columns: minmax(0, 1fr); }
-}
+.flag-gap-pct { display: block; }
+.flag-gap-pct.up, .flag-gap-pct.up .mono { color: var(--up); }
+.flag-gap-pct.down, .flag-gap-pct.down .mono { color: var(--down); }
+.flag-skel { display: block; height: 14px; width: 70%; border-radius: 4px; background: var(--surface-2); }
+.flag-skel-px { width: 120px; height: 20px; }
 
-/* ── 그 밖의 속보 ─────────────────────────────────────────────────────── */
-.stories-head { padding: 26px 0 6px; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
-.stories-head h2 { font-family: var(--font-display); margin: 0; font-size: 21px; font-weight: 700; letter-spacing: -0.03em; }
-.stories-count { font-size: 11.5px; color: var(--ink-soft); letter-spacing: 0.06em; }
-.clear-filter {
-  margin-left: auto; border: none; cursor: pointer; font-family: inherit;
-  font-weight: 700; font-size: 12.5px; background: var(--amber-tint); color: var(--amber);
-  padding: 5px 12px; border-radius: 999px;
-}
-/* 오른쪽에 사이드가 생기면서 왼쪽 폭이 줄어, 3단에서 2단으로 바꿨습니다. */
-.stories { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; }
-@media (max-width: 700px) { .stories { grid-template-columns: minmax(0, 1fr); } }
-
+/* ── 옛 카드형 속보(.story) — 다른 곳에서 쓸 때를 위해 남겨둠 ───────── */
 .story { padding: 17px 0; border-top: 1px solid var(--border); min-width: 0; }
-.story.new-enter { animation: card-slide-in 900ms ease; }
-.story-meta { font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-soft); letter-spacing: 0.05em; margin-bottom: 7px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.story-meta b { color: var(--up); font-weight: 600; }
-.story-bad { background: var(--bad-tint); color: var(--bad-tint-ink); font-weight: 700; padding: 1px 6px; border-radius: 4px; letter-spacing: 0; }
-.story-title {
-  font-family: var(--font-display); margin: 0 0 8px; font-size: 17.5px; font-weight: 700;
-  line-height: 1.42; letter-spacing: -0.03em; overflow-wrap: anywhere;
-}
-.story-summary {
-  margin: 0 0 10px; font-size: 13.5px; color: var(--ink-muted); line-height: 1.62; overflow-wrap: anywhere;
-  display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;
-}
-.story .chip-row { margin-bottom: 10px; gap: 6px; }
+.story-meta { font-family: var(--font-mono); font-size: 11px; color: var(--ink-soft); margin-bottom: 7px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.story-bad { background: var(--bad-tint); color: var(--bad-tint-ink); font-weight: 600; padding: 1px 6px; border-radius: 4px; }
+.story-title { font-family: var(--font-display); margin: 0 0 8px; font-size: 17px; font-weight: 600; line-height: 1.45; letter-spacing: -0.02em; overflow-wrap: anywhere; }
+.story-summary { margin: 0 0 10px; font-size: 13.5px; color: var(--ink-muted); line-height: 1.62; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
 .story-why { background: var(--surface-2); border-radius: var(--r-sm); padding: 10px 12px; margin-bottom: 10px; }
-.story-why .panel-label { margin-bottom: 5px; }
 .story-why ul { margin: 0; padding-left: 15px; display: flex; flex-direction: column; gap: 4px; }
-.story-why li { font-size: 12.5px; color: var(--ink-muted); line-height: 1.55; overflow-wrap: anywhere; }
+.story-why li { font-size: 12.5px; color: var(--ink-muted); line-height: 1.55; }
 .story-foot { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.story-link { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; font-size: 12px; font-weight: 700; color: var(--amber); text-decoration: none; }
-.story-link:hover { text-decoration: underline; }
-
-/* ── 본문 2단 + 따라다니는 사이드 ─────────────────────────────────────
-   [2026-10-19 변경] 보조 패널 3개를 속보 아래 가로줄에서 오른쪽 세로줄로
-   옮기고, 스크롤을 따라오게 했습니다(재성님 요청).
-
-   따라오게 만드는 것은 아래 position: sticky 한 줄이지만, 그게 동작하려면
-   위쪽 html/body의 overflow-x가 clip이어야 합니다(hidden이면 안 됨 —
-   그 이유는 파일 위쪽 주석에 적어뒀습니다). */
-.home-split { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 28px; align-items: start; }
-@media (max-width: 1000px) { .home-split { grid-template-columns: minmax(0, 1fr); } }
-.home-main-col { min-width: 0; }
-
-.side-rail { display: flex; flex-direction: column; gap: 14px; position: sticky; top: 16px; }
-/* 패널이 화면보다 길어지면 사이드 안에서만 스크롤되게 해서, 아래쪽 패널이
-   영영 안 보이는 일이 없게 합니다. */
-@media (min-width: 1001px) {
-  .side-rail { max-height: calc(100vh - 32px); overflow-y: auto; scrollbar-width: thin; }
-  .side-rail::-webkit-scrollbar { width: 6px; }
-  .side-rail::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-}
-.side-rail .trending-panel { margin: 0; }
-
-/* ── 좁은 화면(휴대폰) ───────────────────────────────────────────────
-   [2026-10-20 수정] 재성님 리포트 — "모바일로 보면 지도랑 핀이 아예 안
-   보인다". 맞습니다. 좁은 화면에서는 지도를 거의 투명하게(0.18) 깔아뒀고,
-   그 위에 글자 그늘까지 겹쳐서 사실상 안 보였습니다.
-
-   넓은 화면에서는 지도가 "배경"이어도 오른쪽에 여백이 남아 보이지만,
-   휴대폰은 글이 화면을 꽉 채워서 배경으로 깔면 무조건 묻힙니다.
-   그래서 휴대폰에서는 배경을 그만두고, 글 위쪽에 제대로 보이는 띠로
-   자리를 따로 내줍니다. 그늘(.brief-band::after)도 끕니다. */
-@media (max-width: 760px) {
-  .brief-mapwrap {
-    position: relative; top: auto; right: auto;
-    width: 100%; min-width: 0; margin-bottom: 2px;
-  }
-  .brief-map {
-    opacity: 0.8;
-    -webkit-mask-image: none;
-    mask-image: none;
-  }
-  .brief-band::after { display: none; }
-  .brief-inner { padding: 18px 16px 0; }
-  .brief-lead { font-size: 24px; }
-  .watch-bar { padding: 11px 14px; }
-}
-
+.story-link { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; font-size: 12px; font-weight: 600; color: var(--amber); text-decoration: none; }
 
 /* ══════════════════════════════════════════════════════════════════
-   속보 채팅방  [2026-10-21 신설]
-
-   재성님 요청: "실시간 속보 UI를 채팅창처럼, 진짜 채팅처럼 최신이 아래로"
-
-   왜 자체 스크롤 상자(.chatroom)인가:
-   최신을 맨 아래에 두면서 페이지 전체를 그렇게 만들면, 속보를 보려고
-   매번 페이지 끝까지 내려야 합니다. 그래서 속보만 따로 상자에 담고,
-   그 상자를 열자마자 맨 아래로 보냅니다(app/HomeClient.js의 chatRef).
-   카카오톡을 열면 바로 마지막 대화가 보이는 것과 같은 방식입니다.
+   속보 채팅방 — 최신이 아래 (2026-10-21 구조 그대로, 모양만 새로)
    ══════════════════════════════════════════════════════════════════ */
-
-.chatroom-wrap { position: relative; margin-top: 16px; }
-
+.chatroom-wrap { position: relative; }
+/* 높이: 화면 높이에서 머리띠·속보 머리를 뺀 만큼. 그래서 큰 화면에서도
+   작은 노트북에서도 칸 아래 끝이 화면 안에 들어옵니다. */
 .chatroom {
-  height: clamp(520px, 72vh, 820px);
-  overflow-y: auto;
-  overscroll-behavior: contain; /* 끝까지 내려도 페이지가 같이 밀리지 않게 */
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  padding: 18px 18px 22px;
-  display: flex; flex-direction: column; gap: 18px;
-  scrollbar-width: thin;
+  /* 1440×900 화면 기준 속보 칸 위쪽이 약 390px → 아래 끝이 화면 안에 들어오게 */
+  height: clamp(440px, calc(100vh - 400px), 860px);
+  overflow-y: auto; overscroll-behavior: contain;
+  background: var(--surface); border: none; border-radius: 0;
+  padding: 8px 18px 20px;
+  display: flex; flex-direction: column; gap: 4px;
+  scrollbar-width: thin; scrollbar-color: #3a3940 transparent;
 }
-.chatroom::-webkit-scrollbar { width: 9px; }
-.chatroom::-webkit-scrollbar-thumb { background: #cfd9e8; border-radius: 20px; border: 2px solid var(--surface-2); }
+.chatroom::-webkit-scrollbar { width: 8px; }
+.chatroom::-webkit-scrollbar-thumb { background: #3a3940; border-radius: 8px; }
 .chatroom::-webkit-scrollbar-track { background: transparent; }
 
 /* 날짜 구분선 */
 .chat-day {
   display: flex; align-items: center; gap: 12px;
-  font-size: 11.5px; font-weight: 700; color: var(--ink-soft);
-  margin: 4px 0 2px;
+  font-family: var(--font-mono); font-size: 12px; color: var(--ink-soft); margin: 14px 0 6px;
 }
 .chat-day::before, .chat-day::after { content: ""; height: 1px; background: var(--border); flex: 1; }
 
-/* 말풍선 한 줄 */
-.chat-row { display: flex; gap: 11px; align-items: flex-start; }
+/* 속보 한 건 */
+.chat-row { display: flex; gap: 12px; align-items: flex-start; padding: 12px 0; border-bottom: 1px solid var(--border); }
+.chat-row.new-enter { animation: chat-arrive 0.6s ease; }
+@keyframes chat-arrive { from { background: var(--amber-tint); } to { background: transparent; } }
+@media (prefers-reduced-motion: reduce) { .chat-row.new-enter { animation: none; } }
 
+/* 왼쪽 네모: 테마 약칭. 원형 대신 모서리만 살짝 둥근 사각형. */
 .chat-av {
-  width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0; margin-top: 20px;
+  width: 40px; height: 36px; border-radius: 8px; flex-shrink: 0; margin-top: 2px;
   display: flex; align-items: center; justify-content: center;
-  font-size: 11px; font-weight: 800; letter-spacing: -0.03em;
-  background: var(--amber-tint); color: var(--amber-tint-ink);
+  font-size: 11px; font-weight: 600; letter-spacing: -0.03em;
+  background: var(--surface-2); color: var(--ink-muted); border: 1px solid var(--border);
 }
-.chat-av.bad { background: var(--bad-tint); color: var(--bad-tint-ink); }
-.chat-av.rumor { background: #eef1f6; color: var(--ink-soft); }
+.chat-av.bad { background: var(--bad-tint); color: var(--bad-tint-ink); border-color: transparent; }
+.chat-av.rumor { background: transparent; color: var(--ink-soft); border-style: dashed; }
 
 .chat-main { min-width: 0; flex: 1; }
-
-.chat-meta {
-  display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
-  margin-bottom: 5px; font-size: 11.5px; color: var(--ink-soft);
-}
+.chat-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; font-size: 12px; color: var(--ink-soft); }
 .chat-sender {
-  font-weight: 800; color: var(--ink-muted); letter-spacing: -0.01em;
-  background: none; border: none; padding: 0; font-family: inherit;
-  font-size: 11.5px; cursor: pointer;
+  font-weight: 500; color: var(--ink-muted); background: none; border: none; padding: 0;
+  font-family: inherit; font-size: 13px; cursor: pointer; transition: color 0.15s ease;
 }
-.chat-sender:hover { color: var(--amber-tint-ink); text-decoration: underline; }
+.chat-sender:hover { color: var(--amber); text-decoration: none; }
 .chat-sender.as-text { cursor: default; }
-.chat-clock { font-size: 11px; }
-.chat-new {
-  font-size: 10px; font-weight: 800; padding: 1px 6px; border-radius: 20px;
-  background: var(--up); color: #fff;
-}
-.chat-flag {
-  display: inline-flex; align-items: center; gap: 3px;
-  font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 20px;
-}
-.chat-flag.ok { background: #e9f3ea; color: #2f6b36; }
+.chat-sender:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.chat-clock { font-family: var(--font-mono); font-size: 12px; }
+.chat-new { font-size: 11px; font-weight: 600; padding: 0 6px; border-radius: 4px; background: var(--up); color: #141416; line-height: 18px; }
+.chat-flag { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 500; padding: 0 6px; border-radius: 4px; line-height: 18px; }
+/* "관련주 확정"은 대부분의 속보가 해당돼서 매번 붙이면 소음이 됩니다 — 숨기고,
+   예외인 "시장 추정"·"악재"만 보여줍니다(시안 B와 같은 원칙). */
+.chat-flag.ok { display: none; }
 .chat-flag.bad { background: var(--bad-tint); color: var(--bad-tint-ink); }
-.chat-flag.rumor { background: #eef1f6; color: var(--ink-soft); }
+.chat-flag.rumor { background: var(--surface-2); color: var(--ink-muted); }
 
-/* ── [2026-10-22 추가] 맨 아래 "입력 중..." 말풍선 ─────────────────────
-   재성님 요청: "맨 밑에 뭔가 입력되고 있는 듯한 모션".
-   카카오톡의 "상대가 입력 중" 표시처럼 점 세 개가 차례로 통통 튑니다.
-   점마다 시작 시간을 0.18초씩 늦춰서(animation-delay) 물결처럼 보이게
-   했습니다. 화면 구성은 app/HomeClient.js의 "chat-typing" 부분입니다. */
-.chat-typing { opacity: 0.92; }
-/* 보낸 사람 동그라미는 남색 계열로 — 기사 말풍선(주황 계열)과 구분해서
-   "이건 기사가 아니라 사이트가 보내는 표시"라는 걸 알 수 있게 합니다. */
-.chat-av.typing-av { background: #e8eef8; color: #1f3a68; font-size: 10.5px; }
-.typing-text { font-size: 11px; color: var(--ink-soft); }
-.chat-bubble.typing-bubble {
-  display: inline-flex; align-items: center; gap: 5px;
-  padding: 13px 16px; width: auto;
-}
-.typing-dot {
-  width: 7px; height: 7px; border-radius: 50%;
-  background: #8a9bb8;
-  animation: typing-bounce 1.3s ease-in-out infinite;
-}
-.typing-dot:nth-child(2) { animation-delay: 0.18s; }
-.typing-dot:nth-child(3) { animation-delay: 0.36s; }
-@keyframes typing-bounce {
-  0%, 60%, 100% { transform: translateY(0); opacity: 0.45; }
-  30% { transform: translateY(-5px); opacity: 1; }
-}
-/* 컴퓨터 설정에서 "움직임 줄이기"를 켜 둔 사람에게는 튀지 않고 가만히 보이게 */
-@media (prefers-reduced-motion: reduce) {
-  .typing-dot { animation: none; opacity: 0.7; }
-}
-
-/* 말풍선 — 왼쪽 위 모서리만 각지게 해서 "받은 메시지" 모양을 냅니다. */
+/* 말풍선 대신 "제목 블록" — 채팅 느낌은 유지하되 테두리·그림자 없이 깔끔하게. */
 .chat-bubble {
-  background: var(--surface);
-  border-radius: 4px 16px 16px 16px;
-  padding: 13px 16px 14px;
-  box-shadow: var(--shadow);
-  max-width: 680px;
-  word-break: keep-all;
+  background: none; border-radius: 0; padding: 0; box-shadow: none; max-width: 720px; word-break: keep-all;
 }
-.chat-bubble.unread { box-shadow: 0 0 0 2px var(--amber-bright), var(--shadow); }
-.chat-title {
-  margin: 0; font-family: var(--font-display); font-weight: 700;
-  font-size: 16.5px; line-height: 1.45; color: var(--ink); letter-spacing: -0.02em;
-}
+.chat-bubble.unread .chat-title { color: var(--amber-bright); }
+.chat-title { margin: 0; font-family: var(--font-body); font-weight: 600; font-size: 16px; line-height: 1.5; color: var(--ink); letter-spacing: -0.02em; }
 .chat-sum {
-  margin: 7px 0 0; font-size: 13px; line-height: 1.62; color: var(--ink-muted);
-  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+  margin: 3px 0 0; font-size: 13.5px; line-height: 1.6; color: var(--ink-muted);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
+.chat-chips { margin-top: 8px; margin-bottom: 0; max-width: 720px; gap: 6px; }
 
-/* .chip-row가 가진 아래 여백 14px은 채팅에서는 너무 떠 보입니다. */
-.chat-chips { margin-top: 9px; margin-bottom: 0; max-width: 680px; }
+/* 종목 칩 — 어두운 화면용 */
+.chip {
+  background: transparent; border: 1px solid var(--border); border-radius: 6px;
+  color: var(--ink); transition: border-color 0.15s ease, background 0.15s ease;
+}
+.chip:hover { border-color: #4a4950; background: var(--surface-2); }
+.chip .code { color: var(--ink-soft); font-size: 12px; }
+.chip-bad { border-color: rgba(244, 114, 182, 0.55); }
+.chip-bad:hover { background: var(--bad-tint); border-color: var(--bad); }
 
-.chat-foot { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+.chat-foot { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; margin-top: 8px; }
 .chat-more {
-  display: inline-flex; align-items: center; gap: 3px;
-  font-size: 12px; font-weight: 700; color: var(--amber-tint-ink);
-  background: none; border: none; padding: 0; cursor: pointer; font-family: inherit;
+  display: inline-flex; align-items: center; gap: 3px; font-size: 13px; font-weight: 500; color: var(--ink-soft);
+  background: none; border: none; padding: 0; cursor: pointer; font-family: inherit; transition: color 0.15s ease;
 }
+.chat-more:hover { color: var(--ink); }
 .chat-more svg { transition: transform 0.15s ease; }
 .chat-more svg.flip { transform: rotate(180deg); }
-/* [2026-10-21 수정] 원문 링크를 작은 회색 글씨에서 알약 단추로.
-   재성님: "원문 보러 가기 있어야 되고" — 있긴 했는데 너무 작아서
-   안 보였습니다. 기사를 끝까지 읽으려는 사람에게는 이게 목적지입니다. */
-/* [2026-10-21 재수정] 재성님 — "원문 보러 가기는 색깔을 다르게".
-   옆의 "왜 이 종목인가"와 같은 파란 계열이라 둘이 섞여 보였습니다.
-   남색을 꽉 채운 단추로 바꿔서 확실히 구분되게 했습니다.
-   빨강·파랑 글씨는 이 사이트에서 등락률 색이라 일부러 피했습니다
-   (종목 숫자로 오해할 여지를 없애려고요).
-
-   ★ 색을 바꾸고 싶으면 아래 background 한 줄만 고치면 됩니다.
-     · 초록  background: #1f7a47;
-     · 보라  background: #5b3fa8;
-     · 검정  background: #1b2430;
-     · 테두리만(연하게)
-         background: transparent; color: var(--ink-muted);
-         box-shadow: inset 0 0 0 1px var(--border); */
+/* 원문 보기 — 흰 글자 대신 "흰 바탕 검은 글자"로 뒤집어서 가장 눈에 띄는 단추로. */
 .chat-link {
-  display: inline-flex; align-items: center; gap: 4px;
-  font-size: 12px; font-weight: 700; text-decoration: none;
-  color: #fff; background: var(--deep);
-  padding: 6px 12px; border-radius: 20px;
+  display: inline-flex; align-items: center; gap: 4px; height: 28px;
+  font-size: 12px; font-weight: 600; text-decoration: none;
+  color: #141416; background: var(--ink); padding: 0 12px; border-radius: 999px;
   transition: background 0.15s ease;
 }
-.chat-link:hover { background: var(--deep-2); }
-
+.chat-link:hover { background: #d9d9dc; }
+.chat-link:focus-visible, .chat-more:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
 .chat-why {
-  margin: 9px 0 0; padding: 10px 14px 10px 28px;
-  background: var(--surface); border-radius: 12px; box-shadow: var(--shadow);
-  max-width: 680px; font-size: 12.5px; line-height: 1.6; color: var(--ink-muted);
+  margin: 8px 0 0; padding: 10px 14px 10px 28px; background: var(--surface-2); border-radius: var(--r-md);
+  box-shadow: none; max-width: 720px; font-size: 13px; line-height: 1.6; color: var(--ink-muted);
 }
 .chat-why li { margin: 3px 0; word-break: keep-all; }
 
-/* 참고: 예전에 있던 "새 속보 N건 ↓" 단추(.chat-jump)는 없앴습니다.
-   이제 새 속보가 오면 항상 자동으로 따라 내려갑니다
-   (app/HomeClient.js의 ALWAYS_FOLLOW). */
+/* 맨 아래 "새 속보 받는 중" — 점 세 개 (2026-10-22 기능 유지) */
+.chat-typing { border-bottom: none; opacity: 0.95; }
+.chat-av.typing-av { background: transparent; color: var(--amber); border-color: var(--border); font-size: 11px; }
+.typing-text { font-size: 12px; color: var(--ink-soft); }
+.chat-bubble.typing-bubble { display: inline-flex; align-items: center; gap: 5px; padding: 6px 0 0; width: auto; }
+.typing-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--amber); animation: typing-bounce 1.3s ease-in-out infinite; }
+.typing-dot:nth-child(2) { animation-delay: 0.18s; }
+.typing-dot:nth-child(3) { animation-delay: 0.36s; }
+@keyframes typing-bounce { 0%, 60%, 100% { transform: translateY(0); opacity: 0.35; } 30% { transform: translateY(-4px); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .typing-dot { animation: none; opacity: 0.7; } }
 
-/* ── [2026-10-22 추가] "최신 속보 보기" 단추 ─────────────────────────
-   재성님 요청: 위로 올려서 옛날 속보를 읽고 있을 때 눌러서 바로
-   맨 아래(최신)로 돌아오는 단추.
-   - 채팅 상자 아래쪽 가운데에 둥둥 떠 있습니다(position: absolute).
-   - 색은 "원문 보러 가기" 단추와 같은 진한 남색이라 사이트와 잘 어울립니다.
-   - 나타날 때 아래에서 살짝 올라오게 했습니다(jump-pop).
-   위의 예전 .chat-jump(새 속보 N건)와는 다른 단추입니다 — 그건 새 글이
-   왔을 때만 떴고, 이건 위로 올려 두기만 하면 언제든 뜹니다. */
+/* "최신 속보 보기" (2026-10-22 기능 유지) — 흰 바탕 검은 글자 알약 */
 .chat-jump-latest {
-  position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%);
-  z-index: 5;
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 10px 18px; border: none; border-radius: 999px;
-  background: var(--deep, #0b1f3f); color: #fff;
-  font-family: inherit; font-size: 13.5px; font-weight: 700; letter-spacing: -0.01em;
-  box-shadow: 0 6px 18px rgba(11, 31, 63, 0.28);
-  cursor: pointer;
-  animation: jump-pop 0.22s ease-out;
+  position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 5;
+  display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 16px;
+  border: none; border-radius: 999px; background: var(--ink); color: #141416;
+  font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.55); animation: jump-pop 0.22s ease-out;
 }
-.chat-jump-latest:hover { background: var(--deep-2, #16305c); }
-.chat-jump-latest:focus-visible { outline: 3px solid #9db8e6; outline-offset: 2px; }
-@keyframes jump-pop {
-  from { opacity: 0; transform: translate(-50%, 8px); }
-  to { opacity: 1; transform: translate(-50%, 0); }
-}
+.chat-jump-latest:hover { background: #d9d9dc; }
+.chat-jump-latest:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+@keyframes jump-pop { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
 @media (prefers-reduced-motion: reduce) { .chat-jump-latest { animation: none; } }
-@media (max-width: 760px) {
-  .chat-jump-latest { bottom: 14px; padding: 9px 16px; font-size: 13px; }
+
+/* 사이트 설명(애드센스용 본문) */
+.about-site { max-width: 760px; margin-top: 56px; padding-top: 28px; border-top: 1px solid var(--border); color: var(--ink-muted); font-size: 15px; line-height: 1.8; }
+.about-site h2 { font-size: 19px; font-weight: 600; margin: 0 0 12px; color: var(--ink); letter-spacing: -0.02em; }
+.about-site h3 { font-size: 15.5px; font-weight: 600; margin: 22px 0 8px; color: var(--ink); }
+.about-site p { margin: 0 0 12px; word-break: keep-all; }
+.about-site a { color: var(--amber); }
+
+/* ── 화면 폭별 ───────────────────────────────────────────────────── */
+/* 중간 폭(노트북·태블릿 가로): 가운데 + 오른쪽 2칸, 왼쪽 칸은 아래로 */
+@media (max-width: 1180px) {
+  .home-grid { grid-template-columns: minmax(0, 1fr) 300px; }
+  .home-left { grid-column: 1 / -1; grid-row: 2; position: static; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  .home-center { grid-column: 1; grid-row: 1; }
+  .home-right { grid-column: 2; grid-row: 1; }
 }
-
-@media (max-width: 760px) {
-  .chatroom { height: clamp(460px, 68vh, 640px); padding: 14px 12px 18px; gap: 15px; border-radius: var(--r-md); }
-  .chat-row { gap: 9px; }
-  .chat-av { width: 30px; height: 30px; font-size: 10px; margin-top: 19px; }
+/* 태블릿 세로 이하: 한 줄로 쌓기 — 속보 → 대표 종목·급등주 → 예측·HOT 테마 */
+@media (max-width: 860px) {
+  .container-wide.home-main, .site-header .container-wide, .brief-band .container-wide { padding-left: 16px; padding-right: 16px; }
+  .brief-inner { padding: 14px 16px 0; }
+  .home-grid { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .home-left, .home-right { position: static; }
+  .home-left { grid-column: 1; grid-row: 3; display: flex; }
+  .home-center { grid-row: 1; }
+  .home-right { grid-column: 1; grid-row: 2; }
+  .brief-cols { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .brief-lead { font-size: 18px; }
+  .brief-sub { display: none; }
+  .brief-strip { flex-direction: column; }
+  .brief-tabs { border-right: none; padding: 10px 0 0; }
+  .brief-tk { padding: 8px 14px 9px; }
+  .brief-tk:first-child { padding-left: 0; }
+  .chatroom { height: 64vh; padding: 4px 14px 18px; }
+  .live-head { padding: 12px 14px 10px; }
+  .theme-filter { padding: 8px 14px; }
+}
+@media (max-width: 480px) {
+  .site-header-inner { height: auto; padding: 10px 0 0; flex-wrap: wrap; gap: 6px; }
+  .site-header .nav { height: 40px; gap: 18px; width: 100%; }
+  .site-header .nav-btn { font-size: 13.5px; }
+  .watch-toggles { margin-left: 0; width: 100%; }
+  .chat-av { width: 36px; height: 32px; font-size: 11px; letter-spacing: -0.06em; }
+  .chat-row { gap: 10px; }
   .chat-title { font-size: 15.5px; }
-  .chat-bubble { padding: 12px 14px 13px; }
-
-  /* 휴대폰에서는 종목칩이 한 줄에 하나씩만 들어가 너무 길어집니다.
-     종목코드를 감춰서 두세 개가 한 줄에 들어가게 합니다.
-     (칩을 누르면 코드가 복사되는 기능은 그대로입니다.) */
   .chat-chips .chip { padding: 5px 10px; font-size: 12.5px; gap: 5px; }
   .chat-chips .chip .code { display: none; }
 }

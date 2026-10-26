@@ -63,15 +63,19 @@ export const viewport = {
   initialScale: 1,
   // [2026-10-19 변경] 휴대폰에서 브라우저 주소창 색입니다. 사이트 색을
   // 남색으로 바꾸면서 같이 맞췄습니다(주황으로 두면 주소창만 따로 놀았음).
-  themeColor: "#081a30",
+  // [2026-10-26 변경] 어두운 터미널 디자인으로 바꾸면서 주소창 색도 거의 검정으로.
+  themeColor: "#0b0b0d",
 };
 
+// [2026-10-26] 글꼴 교체: Noto Serif KR(제목)·Noto Sans KR(본문)·Roboto Mono(숫자)
+// → IBM Plex Sans KR(제목·본문 하나로) + IBM Plex Mono(숫자).
+// 어두운 터미널 화면에 맞는 단단한 글꼴이고, 숫자 자릿수가 딱딱 맞습니다.
 export default function RootLayout({ children }) {
   return (
     <html lang="ko">
       <head>
         <link
-          href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@600;700&family=Noto+Sans+KR:wght@400;500;600;700;900&family=Roboto+Mono:wght@500;600;700&display=swap"
+          href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
           rel="stylesheet"
         />
         {/* Google AdSense site verification / ad loader */}

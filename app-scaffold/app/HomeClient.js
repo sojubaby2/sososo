@@ -414,7 +414,7 @@ function FlagshipStrip({ filter, onPick }) {
                       <span className="flag-gap">
                         1주 환산 <span className="mono">{fmtWon(a.krwPerShare)}원</span>
                         {typeof a.gapPct === "number" && (
-                          <span className={`flag-gap-pct ${toneOf(a.gapPct)}`}> · {a.gapBase} 대비 <span className="mono">{fmtPct(a.gapPct)}</span></span>
+                          <span className={`flag-gap-pct ${toneOf(a.gapPct)}`}>{a.gapBase} 대비 <span className="mono">{fmtPct(a.gapPct)}</span></span>
                         )}
                       </span>
                     ) : (
@@ -464,45 +464,33 @@ function InstallHintBanner() {
 // 이 블록은 자바스크립트와 무관한 고정 글이라 서버가 보내는 첫 HTML에
 // 그대로 담깁니다 — 크롤러도, 심사자도, 처음 온 방문자도 똑같이 봅니다.
 //
-// 스타일은 globals.css에 새 클래스를 추가하는 대신 인라인으로 넣었습니다 —
-// 기존 디자인 파일을 건드리지 않아야 다른 화면이 깨질 위험이 없기 때문입니다.
-const aboutSectionStyle = {
-  marginTop: 40,
-  paddingTop: 28,
-  borderTop: "1px solid var(--border)",
-  maxWidth: 760,
-  lineHeight: 1.75,
-  fontSize: 14.5,
-  color: "var(--ink-muted)",
-};
-const aboutH2Style = { fontSize: 19, fontWeight: 700, margin: "0 0 12px", color: "var(--ink)" };
-const aboutH3Style = { fontSize: 15.5, fontWeight: 700, margin: "22px 0 8px", color: "var(--ink)" };
-const aboutPStyle = { margin: "0 0 12px" };
+// [2026-10-26 변경] 스타일을 인라인에서 globals.css의 .about-site로 옮겼습니다.
+// 어두운 화면으로 바꾸면서 색·글꼴을 한 곳에서 관리하려고요.
 
 function AboutSiteSection() {
   return (
-    <section style={aboutSectionStyle}>
-      <h2 style={aboutH2Style}>뉴스매매는 어떤 사이트인가요</h2>
-      <p style={aboutPStyle}>
+    <section className="about-site">
+      <h2>뉴스매매는 어떤 사이트인가요</h2>
+      <p>
         장중에 속보가 하나 뜨면, 그 뉴스와 사업적으로 연결된 상장 종목을 찾아내는 데만 보통 몇 분이 걸립니다.
         기사를 읽고, 사업보고서를 떠올리고, 테마를 짚어보는 과정을 사람이 매번 반복해야 하기 때문입니다.
         뉴스매매는 그 과정을 자동화해서, 기사와 함께 관련 종목을 바로 보여주는 것을 목표로 만든 사이트입니다.
       </p>
-      <h3 style={aboutH3Style}>관련주는 어떻게 고르나요</h3>
-      <p style={aboutPStyle}>
+      <h3>관련주는 어떻게 고르나요</h3>
+      <p>
         기사 제목과 요약에서 먼저 기업명이 직접 언급됐는지를 찾습니다. 그다음 기사에 등장한 제품·기술·사건과
         연결되는 테마를 추려, 그 테마에 속한 종목들을 후보로 올립니다. 마지막으로 그 후보들 가운데 기사 내용과
         실제로 연결되는 종목만 남깁니다. 종목마다 왜 붙었는지를 한 줄로 같이 적어두는 이유가 여기 있습니다 —
         근거 없이 종목 이름만 나열하면 읽는 사람이 판단할 수가 없기 때문입니다.
       </p>
-      <h3 style={aboutH3Style}>무엇을 보여주지 않나요</h3>
-      <p style={aboutPStyle}>
+      <h3>무엇을 보여주지 않나요</h3>
+      <p>
         목표 주가, 매수·매도 의견, 수익률 전망은 제공하지 않습니다. 이 사이트가 보여주는 것은 &ldquo;이 뉴스와
         이 종목이 이런 이유로 연결되어 있다&rdquo;는 사실 관계까지이며, 그 종목이 오를지 내릴지에 대한 판단은
         담지 않습니다. 관련주로 표시됐다는 것이 주가 상승을 뜻하지 않는다는 점을 분명히 해둡니다.
       </p>
-      <h3 style={aboutH3Style}>다른 메뉴들</h3>
-      <p style={aboutPStyle}>
+      <h3>다른 메뉴들</h3>
+      <p>
         <Link href="/patterns">패턴검색</Link>은 국내 상장 종목의 최근 시세 흐름을 차트 패턴과 대조해 비슷한
         모양이 나타난 종목을 모아 보여줍니다. <Link href="/themes">테마별 종목정리</Link>는 테마마다 어떤 종목이
         묶여 있는지와 기간별 등락률을 정리한 표입니다. <Link href="/blog">칼럼</Link>에는 튤립 버블부터 최근
@@ -830,6 +818,9 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
     firstFitRef.current = false;
   }, [filter]);
 
+  // [2026-10-26] 속보 칸 머리의 "뉴스가 몰린 테마" 단추 — 브리핑 데이터에서 8개까지.
+  const themeRows = (brief?.themeRows || []).slice(0, 8);
+
   // [2026-10-26 삭제] "오늘 많이 불린 종목" 계산(topStocks)을 없앴습니다.
   // 재성님 요청으로 그 자리에 대표 종목(삼성전자·SK하이닉스) 칸이 들어갔습니다.
 
@@ -848,145 +839,168 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
         onThemeClick={(t) => toggleFilter("theme", t)}
       />
 
+      {/* [2026-10-26 전면 개편] 3칸 배치 — 왼쪽(예측·HOT 테마) / 가운데(속보) /
+          오른쪽(대표 종목·전일 급등주). 스타일 설명은 app/globals.css의
+          "홈 화면 — 어두운 터미널형 3칸 배치" 부분에 있습니다. */}
       <main className="container-wide home-main">
-        <DailyOutlookBanner />
         <InstallHintBanner />
 
-        <div className="home-split">
-          <div className="home-main-col">
+        <div className="home-grid">
+          {/* ── 왼쪽 칸 ── */}
+          <aside className="home-col home-left" aria-label="오늘의 예측과 HOT 테마">
+            <DailyOutlookBanner />
+            <HotThemePanel />
+          </aside>
 
-        {/* [2026-10-19 변경] "실시간 급등뉴스 감시중" 띠와 "오늘의 머리기사"를
-            하나로 합쳤습니다. 머리글에 실시간 표시와 알림 토글이 같이 있고,
-            바로 아래에 가장 최근 속보 3건이 큰 카드로 들어갑니다. */}
-        <div className="live-head">
-          <h2>
-            <span className="live-dot" />
-            실시간 속보
-          </h2>
-          <span className="stories-count mono">
-            {filter ? `${visible.length}건 / 전체 ${items.length}건` : `${items.length}건`}
-          </span>
-          <div className="watch-toggles">
-            <button type="button" className={`sound-toggle ${soundEnabled ? "on" : ""}`} onClick={toggleSound}>
-              {soundEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
-              알림음 {soundEnabled ? "켜짐" : "꺼짐"}
-            </button>
-            <button type="button" className={`sound-toggle ${notifyEnabled ? "on" : ""}`} onClick={toggleNotify}>
-              {notifyEnabled ? <Bell size={14} /> : <BellOff size={14} />}
-              데스크톱 알림 {notifyEnabled ? "켜짐" : "꺼짐"}
-            </button>
-            {filter && (
-              <button type="button" className="clear-filter" onClick={() => setFilter(null)}>
-                필터 해제 · {filter.value} ✕
-              </button>
-            )}
-          </div>
-        </div>
-
-        {loadState === "loading" && (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--ink-muted)", fontSize: 14, padding: "24px 0" }}>
-            <Loader2 size={16} />
-            불러오는 중...
-          </div>
-        )}
-
-        {loadState === "error" && (
-          <p style={{ fontSize: 13, color: "var(--amber-tint-ink)", background: "var(--amber-tint)", padding: "8px 12px", borderRadius: 8 }}>
-            피드를 불러오지 못했습니다. Redis(Upstash) 환경변수 설정을 확인해주세요.
-          </p>
-        )}
-
-        {loadState === "ready" && items.length === 0 && (
-          <p style={{ fontSize: 14, color: "var(--ink-muted)", padding: "24px 0" }}>
-            아직 자동 수집된 뉴스가 없어요. 스케줄러가 연결되면 여기 자동으로 쌓이기 시작해요.
-          </p>
-        )}
-
-        {/* [2026-10-26 변경] "오늘 많이 불린 종목" 띠를 지우고 그 자리에
-            대표 종목(삼성전자·SK하이닉스) 칸을 넣었습니다. 위 FlagshipStrip 설명 참고. */}
-        <FlagshipStrip filter={filter} onPick={(name) => toggleFilter("stock", name)} />
-
-
-        {/* [2026-10-21 신설] 속보 채팅방.
-            onScroll로 "바닥에 붙어 있는지"를 계속 확인합니다 — 위를 읽는
-            중에 새 글이 와도 화면을 끌어내리지 않기 위해서입니다. */}
-        {chatRows.length > 0 && (
-          <div className="chatroom-wrap">
-            <div className="chatroom" ref={chatRef} onScroll={onChatScroll}>
-              {chatRows.map((row) =>
-                row.kind === "day" ? (
-                  <div className="chat-day" key={row.key}>
-                    {dayLabel(row.day)}
-                  </div>
-                ) : (
-                  <ChatMessage
-                    key={row.key}
-                    n={row.n}
-                    isNew={newIds.has(row.n.id)}
-                    onThemeClick={(t) => toggleFilter("theme", t)}
-                  />
-                )
-              )}
-
-              {/* [2026-10-22 추가] 맨 아래 "입력 중..." 말풍선.
-                  재성님 요청: "맨 밑에 뭔가 입력되고 있는 듯한 모션이 있으면 좋겠다".
-                  카카오톡에서 상대가 글을 쓰는 중일 때 점 세 개가 통통 튀는
-                  것과 같은 모양입니다. 이 사이트는 속보가 오면 자동으로 아래에
-                  붙기 때문에, "이 방은 살아 있고 다음 속보를 받는 중"이라는
-                  느낌을 주려고 넣었습니다.
-                  - 실제로 누가 글을 쓰는 건 아니라서, 화면 읽기 프로그램
-                    (시각장애인용)에는 "새 속보를 기다리는 중"이라고만 읽어주고
-                    점 모양은 건너뛰게 했습니다(aria-hidden).
-                  - 맨 아래에 붙어 있으니 새 속보가 오면 그 바로 위에 쌓이고,
-                    이 말풍선은 항상 제일 아래에 남습니다.
-                  - 움직임 스타일은 app/globals.css의 ".chat-typing" 부분입니다. */}
-              <div className="chat-row chat-typing" role="status" aria-label="새 속보를 기다리는 중">
-                <div className="chat-av typing-av" aria-hidden="true">
-                  속보
-                </div>
-                <div className="chat-main">
-                  <div className="chat-meta" aria-hidden="true">
-                    <span className="chat-sender as-text">뉴스매매</span>
-                    <span className="typing-text">새 속보 받는 중</span>
-                  </div>
-                  <div className="chat-bubble typing-bubble" aria-hidden="true">
-                    <span className="typing-dot" />
-                    <span className="typing-dot" />
-                    <span className="typing-dot" />
-                  </div>
+          {/* ── 가운데 칸: 실시간 속보 ── */}
+          <section className="home-col home-center" aria-label="실시간 속보">
+            <div className="panel feed-panel">
+              <div className="live-head">
+                {/* 화면의 대표 제목(h1) — 검색엔진과 화면 읽기 프로그램이 "이 페이지는
+                    실시간 속보"라고 알아보게 합니다. 예전엔 페이지에 h1이 없었습니다. */}
+                <h1>
+                  <span className="live-dot" />
+                  실시간 속보
+                </h1>
+                <span className="stories-count">
+                  {filter ? `${visible.length}건 / 전체 ${items.length}건` : `${items.length}건`}
+                </span>
+                <div className="watch-toggles">
+                  <button type="button" className={`sound-toggle ${soundEnabled ? "on" : ""}`} onClick={toggleSound}>
+                    {soundEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
+                    알림음 {soundEnabled ? "켜짐" : "꺼짐"}
+                  </button>
+                  <button type="button" className={`sound-toggle ${notifyEnabled ? "on" : ""}`} onClick={toggleNotify}>
+                    {notifyEnabled ? <Bell size={14} /> : <BellOff size={14} />}
+                    데스크톱 알림 {notifyEnabled ? "켜짐" : "꺼짐"}
+                  </button>
+                  {filter && (
+                    <button type="button" className="clear-filter" onClick={() => setFilter(null)}>
+                      필터 해제 · {filter.value} ✕
+                    </button>
+                  )}
                 </div>
               </div>
+
+              {/* [2026-10-26] "뉴스가 몰린 테마" — 예전엔 맨 위 남색 띠에 있던 단추들.
+                  누르면 바로 아래 속보가 걸러지니 속보 칸 머리로 옮겼습니다.
+                  속보가 가장 많이 몰린 1위 테마는 숫자가 호박색으로 표시됩니다. */}
+              {themeRows.length > 0 && (
+                <div className="theme-filter" role="group" aria-label="뉴스가 몰린 테마로 거르기">
+                  <span className="lbl">뉴스가 몰린 테마</span>
+                  {themeRows.map((t, i) => (
+                    <button
+                      key={t.theme}
+                      type="button"
+                      data-rank={i === 0 ? 1 : 2}
+                      aria-pressed={filter?.kind === "theme" && filter.value === t.theme}
+                      onClick={() => toggleFilter("theme", t.theme)}
+                    >
+                      {t.theme}
+                      <span className="n">{t.news}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {loadState === "loading" && (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--ink-muted)", fontSize: 14, padding: "24px 0" }}>
+                  <Loader2 size={16} />
+                  불러오는 중...
+                </div>
+              )}
+
+              {loadState === "error" && (
+                <p style={{ fontSize: 13, color: "var(--amber-tint-ink)", background: "var(--amber-tint)", padding: "8px 12px", borderRadius: 8 }}>
+                  피드를 불러오지 못했습니다. Redis(Upstash) 환경변수 설정을 확인해주세요.
+                </p>
+              )}
+
+              {loadState === "ready" && items.length === 0 && (
+                <p style={{ fontSize: 14, color: "var(--ink-muted)", padding: "24px 0" }}>
+                  아직 자동 수집된 뉴스가 없어요. 스케줄러가 연결되면 여기 자동으로 쌓이기 시작해요.
+                </p>
+              )}
+
+              {chatRows.length > 0 && (
+                <div className="chatroom-wrap">
+                  <div className="chatroom" ref={chatRef} onScroll={onChatScroll}>
+                    {chatRows.map((row) =>
+                      row.kind === "day" ? (
+                        <div className="chat-day" key={row.key}>
+                          {dayLabel(row.day)}
+                        </div>
+                      ) : (
+                        <ChatMessage
+                          key={row.key}
+                          n={row.n}
+                          isNew={newIds.has(row.n.id)}
+                          onThemeClick={(t) => toggleFilter("theme", t)}
+                        />
+                      )
+                    )}
+
+                    {/* [2026-10-22 추가] 맨 아래 "입력 중..." 말풍선.
+                        재성님 요청: "맨 밑에 뭔가 입력되고 있는 듯한 모션이 있으면 좋겠다".
+                        카카오톡에서 상대가 글을 쓰는 중일 때 점 세 개가 통통 튀는
+                        것과 같은 모양입니다. 이 사이트는 속보가 오면 자동으로 아래에
+                        붙기 때문에, "이 방은 살아 있고 다음 속보를 받는 중"이라는
+                        느낌을 주려고 넣었습니다.
+                        - 실제로 누가 글을 쓰는 건 아니라서, 화면 읽기 프로그램
+                          (시각장애인용)에는 "새 속보를 기다리는 중"이라고만 읽어주고
+                          점 모양은 건너뛰게 했습니다(aria-hidden).
+                        - 맨 아래에 붙어 있으니 새 속보가 오면 그 바로 위에 쌓이고,
+                          이 말풍선은 항상 제일 아래에 남습니다.
+                        - 움직임 스타일은 app/globals.css의 ".chat-typing" 부분입니다. */}
+                    <div className="chat-row chat-typing" role="status" aria-label="새 속보를 기다리는 중">
+                      <div className="chat-av typing-av" aria-hidden="true">
+                        속보
+                      </div>
+                      <div className="chat-main">
+                        <div className="chat-meta" aria-hidden="true">
+                          <span className="chat-sender as-text">뉴스매매</span>
+                          <span className="typing-text">새 속보 받는 중</span>
+                        </div>
+                        <div className="chat-bubble typing-bubble" aria-hidden="true">
+                          <span className="typing-dot" />
+                          <span className="typing-dot" />
+                          <span className="typing-dot" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* [2026-10-22 추가] "최신 속보 보기" 단추.
+                      채팅 상자(.chatroom) 바깥, 감싸는 상자(.chatroom-wrap) 안에 둬서
+                      상자 아래쪽 가운데에 떠 있게 했습니다. 상자 안에 넣으면 스크롤과
+                      같이 위로 밀려 올라가 버립니다.
+                      누르면 스르륵 맨 아래(가장 최근 속보)로 내려갑니다. */}
+                  {showJump && (
+                    <button type="button" className="chat-jump-latest" onClick={() => scrollChatToBottom(true)}>
+                      <ArrowDown size={15} />
+                      최신 속보 보기
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {filter && visible.length === 0 && (
+                <p style={{ fontSize: 14, color: "var(--ink-muted)", padding: "24px 0" }}>
+                  {filter.value}에 해당하는 속보가 아직 없습니다.{" "}
+                  <button type="button" className="clear-filter" onClick={() => setFilter(null)}>
+                    필터 해제 ✕
+                  </button>
+                </p>
+              )}
+
             </div>
+          </section>
 
-            {/* [2026-10-22 추가] "최신 속보 보기" 단추.
-                채팅 상자(.chatroom) 바깥, 감싸는 상자(.chatroom-wrap) 안에 둬서
-                상자 아래쪽 가운데에 떠 있게 했습니다. 상자 안에 넣으면 스크롤과
-                같이 위로 밀려 올라가 버립니다.
-                누르면 스르륵 맨 아래(가장 최근 속보)로 내려갑니다. */}
-            {showJump && (
-              <button type="button" className="chat-jump-latest" onClick={() => scrollChatToBottom(true)}>
-                <ArrowDown size={15} />
-                최신 속보 보기
-              </button>
-            )}
-          </div>
-        )}
-
-        {filter && visible.length === 0 && (
-          <p style={{ fontSize: 14, color: "var(--ink-muted)", padding: "24px 0" }}>
-            {filter.value}에 해당하는 속보가 아직 없습니다.{" "}
-            <button type="button" className="clear-filter" onClick={() => setFilter(null)}>
-              필터 해제 ✕
-            </button>
-          </p>
-        )}
-
-          </div>
-
-          {/* 오른쪽 — 스크롤을 따라오는 보조 패널들 */}
-          <aside className="side-rail">
+          {/* ── 오른쪽 칸 ── */}
+          <aside className="home-col home-right" aria-label="대표 종목과 전일 급등주">
+            {/* 대표 종목(삼성전자·SK하이닉스) — 2026-10-26 추가, FlagshipStrip 설명 참고 */}
+            <FlagshipStrip filter={filter} onPick={(name) => toggleFilter("stock", name)} />
             <DailyMoversPanel />
-            <HotThemePanel />
           </aside>
         </div>
 

@@ -62,6 +62,8 @@ export default function Header() {
           <span className="brand-name">
             <span style={{ color: BRAND_ACCENT }}>뉴</span>스매매
           </span>
+          {/* [2026-10-26 추가] 이름 옆에 무슨 사이트인지 작게 — 처음 온 사람용 */}
+          <span className="brand-tag">실시간 속보 · 관련주</span>
         </Link>
 
         <nav className="nav">
