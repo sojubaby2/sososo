@@ -17,6 +17,7 @@ import { Newspaper, Loader2, Flame, Bell, BellOff, Volume2, VolumeX, Smartphone,
 import { decodeEntities } from "../lib/decodeEntities";
 // [2026-10-21 추가] 속보를 채팅 말풍선으로 보여주는 컴포넌트.
 import NewsBoard from "../components/NewsBoard";
+import { openStockChart } from "../lib/openStockChart";
 import Header from "../components/Header";
 import DailyOutlookBanner from "../components/DailyOutlookBanner";
 import BriefingBand from "../components/BriefingBand";
@@ -286,8 +287,15 @@ function DailyMoversPanel() {
       ) : (
         <>
           <p className="mover-section-label">종목</p>
+          {/* [2026-10-26 변경] 종목 줄을 누르면 일봉 차트 창이 뜹니다 */}
           {movers.map((s) => (
-            <div key={s.code} className="trending-row">
+            <button
+              type="button"
+              key={s.code}
+              className="trending-row trending-row-btn"
+              onClick={() => openStockChart({ code: s.code, name: s.name, market: s.market })}
+              title={`${s.name} 일봉 차트 보기`}
+            >
               <span className="trending-row-name">
                 {s.name}
                 <span className="trending-row-code">{s.code}</span>
@@ -296,7 +304,7 @@ function DailyMoversPanel() {
                 {s.change > 0 ? "+" : ""}
                 {s.change.toFixed(1)}%
               </span>
-            </div>
+            </button>
           ))}
           <p className="mover-section-label">테마</p>
           {themes.map((t) => (
@@ -396,8 +404,10 @@ function FlagshipStrip({ filter, onPick }) {
               type="button"
               className="flag-card"
               aria-pressed={pressed}
-              onClick={() => onPick(r.name)}
-              title={`${r.name} 관련 속보만 보기`}
+              // [2026-10-26 변경] 누르면 일봉 차트 창이 뜹니다. 예전 기능("관련 속보만
+              // 보기")은 차트 창 아래 단추로 옮겼습니다.
+              onClick={() => openStockChart({ code: r.code, name: r.name, market: "코스피", onFilter: () => onPick(r.name) })}
+              title={`${r.name} 일봉 차트 보기`}
             >
               <span className="flag-top">
                 <span className="flag-nm">

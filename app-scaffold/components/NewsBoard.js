@@ -42,6 +42,7 @@
 import { useEffect, useState } from "react";
 import { ChevronRight, AlertTriangle, ShieldAlert, ExternalLink } from "lucide-react";
 import StockChip from "./StockChip";
+import { openStockChart } from "../lib/openStockChart";
 
 const FRESH_MINUTES = 15; // 이 시간 안에 들어온 속보에 빨간 "속보" 딱지 + 시각 빨강
 const CRAWL_COUNT = 6; // 자막 띠에 흘릴 최근 속보 개수
@@ -249,8 +250,15 @@ export default function NewsBoard({ items, newIds }) {
         {lead.stocks?.length > 0 && (
           <aside className="nb-lead-side" aria-label="관련 종목">
             <p className="nb-label">관련 종목</p>
+            {/* [2026-10-26 변경] 종목 한 줄을 누르면 일봉 차트 창이 뜹니다 */}
             {lead.stocks.map((s, i) => (
-              <div className="nb-stk" key={s.code}>
+              <button
+                type="button"
+                className="nb-stk"
+                key={s.code}
+                onClick={() => openStockChart({ code: s.code, name: s.name, market: s.market })}
+                title={`${s.name} 일봉 차트 보기`}
+              >
                 <span className="nb-stk-nm">
                   {s.catalyst && <AlertTriangle size={12} className="chip-bad-icon" aria-label="악재" />}
                   {s.name}
@@ -258,7 +266,7 @@ export default function NewsBoard({ items, newIds }) {
                 </span>
                 <span className={`mono nb-stk-pct ${tone(s.change)}`}>{pct(s.change)}</span>
                 {lead.reasons?.[i] && <span className="nb-stk-why">{lead.reasons[i]}</span>}
-              </div>
+              </button>
             ))}
           </aside>
         )}

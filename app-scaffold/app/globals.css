@@ -1054,3 +1054,109 @@ input::placeholder { color: var(--ink-soft); }
   .nb-chips .chip .code { display: none; }
   .watch-toggles { margin-left: 0; width: 100%; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   [2026-10-26 추가] 종목 일봉 차트 창 (components/StockChartModal.js)
+   재성님 요청: "종목을 누르면 당일을 포함한 일봉이 보이는 차트"
+   ─ 오르면 빨강(--up), 내리면 파랑(--down) — 국내 관례
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* 누를 수 있게 바뀐 곳들: 버튼 기본 모양을 지우고 원래 모양 그대로 */
+button.nb-stk { width: 100%; text-align: left; background: none; border: 0; border-bottom: 1px solid var(--border); font: inherit; cursor: pointer; border-radius: 0; }
+button.nb-stk:last-child { border-bottom: none; }
+button.nb-stk:hover .nb-stk-nm { color: var(--amber-bright); }
+button.nb-stk:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.trending-row-btn { width: 100%; background: none; border: 0; border-bottom: 1px solid var(--border); font: inherit; cursor: pointer; text-align: left; }
+.trending-row-btn:last-of-type { border-bottom: none; }
+.trending-row-btn:hover .trending-row-name { color: var(--amber-bright); }
+.chip-chart-icon { color: var(--ink-soft); flex-shrink: 0; }
+.chip:hover .chip-chart-icon { color: var(--amber); }
+
+/* 바탕(어둡게 덮는 막) + 창 */
+.sc-backdrop {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(5, 5, 7, 0.72);
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+  animation: sc-fade 0.14s ease-out;
+}
+.sc-modal {
+  width: min(680px, 100%); max-height: calc(100dvh - 32px); overflow-y: auto;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+  padding: 18px 18px 14px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+  animation: sc-rise 0.18s ease-out;
+}
+@keyframes sc-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sc-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .sc-backdrop, .sc-modal { animation: none; } }
+
+.sc-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.sc-titlebox { min-width: 0; }
+.sc-title { margin: 0; font-size: 20px; font-weight: 700; color: var(--ink); display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; }
+.sc-code { font-size: 13px; font-weight: 400; color: var(--ink-soft); }
+.sc-mkt { font-size: 11px; font-weight: 500; color: var(--ink-muted); border: 1px solid var(--border); border-radius: 999px; padding: 1px 8px; }
+.sc-price { margin: 6px 0 0; display: flex; align-items: baseline; gap: 8px; font-size: 16px; color: var(--ink-muted); }
+.sc-price .mono:first-child { color: var(--ink); font-size: 17px; font-weight: 600; }
+.sc-price .up, .sc-ohlc .up { color: var(--up); }
+.sc-price .down, .sc-ohlc .down { color: var(--down); }
+.sc-close {
+  flex-shrink: 0; width: 36px; height: 36px; border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--surface-2); border: 1px solid var(--border); color: var(--ink-muted); cursor: pointer;
+}
+.sc-close:hover { color: var(--ink); border-color: var(--ink-soft); }
+.sc-close:focus-visible, .sc-btn:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+
+.sc-ohlc { margin: 12px 0 6px; font-size: 12.5px; line-height: 1.6; color: var(--ink-muted); min-height: 20px; }
+.sc-ohlc b { color: var(--ink); font-weight: 600; }
+.sc-today { margin-left: 6px; font-size: 10.5px; font-weight: 700; color: var(--deep); background: var(--amber); border-radius: 4px; padding: 0 5px; font-family: var(--font-body, inherit); }
+
+/* 차트 */
+.sc-chart { width: 100%; touch-action: pan-y; user-select: none; }
+.sc-chart svg { display: block; cursor: crosshair; }
+.sc-grid { stroke: var(--border); stroke-width: 1; }
+.sc-grid-v { stroke-dasharray: 2 3; }
+.sc-axis { fill: var(--ink-soft); font-size: 10.5px; font-family: var(--font-mono, monospace); }
+.sc-up line { stroke: var(--up); stroke-width: 1; }
+.sc-up rect { fill: var(--up); }
+.sc-down line { stroke: var(--down); stroke-width: 1; }
+.sc-down rect { fill: var(--down); }
+.sc-vol-up { fill: var(--up); opacity: 0.45; }
+.sc-vol-down { fill: var(--down); opacity: 0.45; }
+.sc-ma5 { fill: none; stroke: var(--ink); stroke-width: 1.2; opacity: 0.85; }
+.sc-ma20 { fill: none; stroke: var(--amber); stroke-width: 1.4; }
+.sc-last { stroke-dasharray: 3 3; stroke-width: 1; stroke: var(--ink-soft); }
+.sc-last.up { stroke: var(--up); }
+.sc-last.down { stroke: var(--down); }
+.sc-last-tag { fill: var(--ink-soft); }
+.sc-last-tag.up { fill: var(--up); }
+.sc-last-tag.down { fill: var(--down); }
+.sc-last-txt { fill: #fff; font-size: 10.5px; font-weight: 600; font-family: var(--font-mono, monospace); }
+.sc-cross { stroke: var(--ink-muted); stroke-width: 1; stroke-dasharray: 2 2; }
+
+.sc-skel { height: 302px; border-radius: 10px; background: linear-gradient(90deg, var(--surface-2) 0%, #232229 50%, var(--surface-2) 100%); background-size: 200% 100%; animation: sc-shimmer 1.2s linear infinite; }
+@keyframes sc-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+.sc-empty { height: 302px; display: flex; align-items: center; justify-content: center; text-align: center; color: var(--ink-muted); font-size: 14px; line-height: 1.6; border: 1px dashed var(--border); border-radius: 10px; }
+
+.sc-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; margin-top: 10px; font-size: 12px; color: var(--ink-muted); }
+.sc-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sc-key { display: inline-block; width: 16px; height: 2px; border-radius: 2px; }
+.sc-key.ma5 { background: var(--ink); }
+.sc-key.ma20 { background: var(--amber); }
+.sc-note { color: var(--ink-soft); }
+
+.sc-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
+.sc-btn {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 36px;
+  padding: 0 12px; border-radius: 8px; font-size: 13px; font-weight: 500;
+  background: var(--surface-2); border: 1px solid var(--border); color: var(--ink-muted);
+  text-decoration: none; cursor: pointer;
+}
+.sc-btn:hover { color: var(--ink); border-color: var(--amber); }
+
+@media (max-width: 520px) {
+  .sc-backdrop { align-items: flex-end; padding: 0; }
+  .sc-modal { width: 100%; border-radius: 16px 16px 0 0; max-height: 92dvh; padding: 16px 14px 18px; }
+  .sc-title { font-size: 18px; }
+}
