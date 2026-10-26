@@ -48,7 +48,8 @@ const MENU = [
   { href: "/", label: "홈 · 뉴스", match: (p) => p === "/" },
   { href: "/patterns", label: "패턴검색" },
   { href: "/themes", label: "테마별 종목정리" },
-  { href: "https://dart.fss.or.kr/dsac008/main.do", label: "공모주 정보", external: true },
+  // [2026-10-26 변경] 바깥 DART 링크 → 우리 사이트 공모주 페이지(app/ipo, 3시간마다 자동 갱신)
+  { href: "/ipo", label: "공모주 정보" },
   { href: "/guide", label: "차트 가이드" },
   { href: "/blog", label: "칼럼" },
 ];

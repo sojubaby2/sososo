@@ -51,6 +51,8 @@ export default function sitemap() {
     // 들어오는 길이 되므로 조금 더 높게 잡았습니다.
     { path: "/glossary", changeFrequency: "monthly", priority: 0.7 },
     { path: "/faq", changeFrequency: "monthly", priority: 0.6 },
+    // [2026-10-26 추가] 공모주 일정 — DART에서 3시간마다 자동 갱신
+    { path: "/ipo", changeFrequency: "daily", priority: 0.8 },
     { path: "/disclaimer", changeFrequency: "yearly", priority: 0.4 },
     { path: "/about", changeFrequency: "yearly", priority: 0.4 },
     { path: "/contact", changeFrequency: "yearly", priority: 0.4 },
