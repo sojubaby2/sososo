@@ -54,15 +54,27 @@ export const FLAGSHIPS = [
     code: "005930",
     name: "삼성전자",
     domesticSymbol: "005930.KS",
-    abroad: { symbol: "SMSN.L", venue: "런던 GDR", ticker: "SMSN", sharesPerUnit: 25 },
+    // [2026-10-27 수정] 야후는 런던 GDR(국제주문장)을 ".IL"로 적습니다. "SMSN.L"은
+    // 야후에 없는 기호라 "해외 시세를 못 받아왔어요"가 떴습니다. 앞에서부터 차례로
+    // 시도해서 먼저 값이 오는 기호를 씁니다.
+    abroad: { symbols: ["SMSN.IL", "SMSN.L"], venue: "런던 GDR", ticker: "SMSN", sharesPerUnit: 25 },
   },
   {
     code: "000660",
     name: "SK하이닉스",
     domesticSymbol: "000660.KS",
-    abroad: { symbol: "SKHY", venue: "나스닥", ticker: "SKHY", sharesPerUnit: 0.1 },
+    abroad: { symbols: ["SKHY"], venue: "나스닥", ticker: "SKHY", sharesPerUnit: 0.1 },
   },
 ];
+
+// 후보 기호를 앞에서부터 차례로 시도해 처음 성공한 값을 돌려줍니다. 전부 실패하면 null.
+async function fetchFirstQuote(symbols) {
+  for (const s of symbols) {
+    const q = await fetchQuote(s);
+    if (q) return q;
+  }
+  return null;
+}
 
 function toNum(v) {
   const n = Number(v);
@@ -121,20 +133,23 @@ function unitScale(currency) {
 
 // 대표 종목 전체를 계산해서 돌려줍니다.
 export async function fetchFlagships() {
-  // 1단계: 국내·해외 시세를 한꺼번에
-  const symbols = FLAGSHIPS.flatMap((f) => [f.domesticSymbol, f.abroad.symbol]);
-  const quotes = await Promise.all(symbols.map((s) => fetchQuote(s)));
-  const bySymbol = new Map(symbols.map((s, i) => [s, quotes[i]]));
+  // 1단계: 국내·해외 시세를 한꺼번에 (해외는 후보 기호를 차례로 시도)
+  const [domQuotes, abrQuotes] = await Promise.all([
+    Promise.all(FLAGSHIPS.map((f) => fetchQuote(f.domesticSymbol))),
+    Promise.all(FLAGSHIPS.map((f) => fetchFirstQuote(f.abroad.symbols))),
+  ]);
+  const domBy = new Map(FLAGSHIPS.map((f, i) => [f.code, domQuotes[i]]));
+  const abrBy = new Map(FLAGSHIPS.map((f, i) => [f.code, abrQuotes[i]]));
 
   // 2단계: 필요한 환율만 가져오기 (보통 원/달러 하나)
-  const fxSymbols = [...new Set(FLAGSHIPS.map((f) => fxSymbolFor(bySymbol.get(f.abroad.symbol)?.currency)).filter(Boolean))];
+  const fxSymbols = [...new Set(FLAGSHIPS.map((f) => fxSymbolFor(abrBy.get(f.code)?.currency)).filter(Boolean))];
   const fxQuotes = await Promise.all(fxSymbols.map((s) => fetchQuote(s)));
   const fx = new Map(fxSymbols.map((s, i) => [s, fxQuotes[i]?.price ?? null]));
 
   // 3단계: 종목별로 환산·비교
   const items = FLAGSHIPS.map((f) => {
-    const dom = bySymbol.get(f.domesticSymbol);
-    const abr = bySymbol.get(f.abroad.symbol);
+    const dom = domBy.get(f.code);
+    const abr = abrBy.get(f.code);
 
     const out = {
       code: f.code,

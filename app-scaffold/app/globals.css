@@ -220,8 +220,10 @@ input::placeholder { color: var(--ink-soft); }
   text-decoration: none; cursor: pointer; transition: filter 0.12s ease;
 }
 .daily-outlook-row:hover { filter: brightness(1.15); }
-.daily-outlook-row.up { background: rgba(255, 95, 106, 0.08); border-color: rgba(255, 95, 106, 0.3); color: var(--up); }
-.daily-outlook-row.down { background: rgba(92, 157, 255, 0.08); border-color: rgba(92, 157, 255, 0.3); color: var(--down); }
+/* [2026-10-26 디자인 점검] 옅은 바탕·테두리를 숫자 대신 --up/--down에서 섞어 만듦 →
+   밝은/어두운 화면 각각의 빨강·파랑을 그대로 따라감 */
+.daily-outlook-row.up { background: color-mix(in oklab, var(--up) 8%, transparent); border-color: color-mix(in oklab, var(--up) 30%, transparent); color: var(--up); }
+.daily-outlook-row.down { background: color-mix(in oklab, var(--down) 8%, transparent); border-color: color-mix(in oklab, var(--down) 30%, transparent); color: var(--down); }
 .daily-outlook-theme { font-weight: 700; white-space: nowrap; }
 .daily-outlook-reason { color: var(--ink); font-weight: 500; opacity: 0.85; }
 .daily-outlook-verdict { margin-left: auto; font-weight: 700; white-space: nowrap; }
@@ -378,6 +380,8 @@ input::placeholder { color: var(--ink-soft); }
 /* Theme explorer */
 .search-box { position: relative; max-width: 360px; margin-bottom: 20px; }
 .search-box input { width: 100%; padding: 8px 12px 8px 34px; font-size: 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); outline: none; }
+/* [2026-10-26 디자인 점검] 검색칸을 눌렀을 때(키보드로 왔을 때 포함) 어디에 입력 중인지 보이게 */
+.search-box input:focus-visible, .search-box input:focus { border-color: var(--amber); box-shadow: 0 0 0 3px color-mix(in oklab, var(--amber) 22%, transparent); }
 .search-box svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--ink-muted); }
 
 .theme-layout { display: grid; grid-template-columns: 1fr; gap: 24px; }
@@ -499,8 +503,8 @@ input::placeholder { color: var(--ink-soft); }
 .blog-thumb-amber { background: var(--amber-tint); color: var(--amber-tint-ink); }
 .blog-thumb-green { background: var(--green-tint); color: var(--green-tint-ink); }
 .blog-thumb-bad { background: var(--bad-tint); color: var(--bad-tint-ink); }
-.blog-thumb-up { background: rgba(194, 59, 59, 0.12); color: var(--up); }
-.blog-thumb-down { background: rgba(46, 95, 163, 0.12); color: var(--down); }
+.blog-thumb-up { background: color-mix(in oklab, var(--up) 12%, transparent); color: var(--up); }
+.blog-thumb-down { background: color-mix(in oklab, var(--down) 12%, transparent); color: var(--down); }
 
 /* 차트 가이드 */
 .guide-intro { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 24px; }
@@ -1235,8 +1239,12 @@ button.nb-stk:focus-visible { outline: 2px solid var(--amber); outline-offset: 2
   --ink-soft: #686a72;
   --border: #e3e2dd;
 
-  --amber: #a5600a;
-  --amber-bright: #8a4f06;
+  /* [2026-10-26 디자인 점검] 대비 기준(4.5:1) 미달 3색을 한 단계 진하게:
+       호박색 #a5600a → #965606  (바탕 위 4.46 → 5.25, 연한 호박 바탕 위 4.35 → 5.13)
+       상승 빨강 #d42f3a → #c8283a (회색 상자 위 4.28 → 4.78)
+       속보 빨강 글자 #e53935 → #c62828 (바탕 위 3.84 → 5.10) */
+  --amber: #965606;
+  --amber-bright: #7d4704;
   --amber-tint: #fbf0dd;
   --amber-tint-ink: #8a4f06;
 
@@ -1248,7 +1256,7 @@ button.nb-stk:focus-visible { outline: 2px solid var(--amber); outline-offset: 2
   --green-tint: #e4f3eb;
   --green-tint-ink: #16704a;
 
-  --up: #d42f3a;
+  --up: #c8283a;
   --down: #1f5fd1;
 
   --bad: #be2a7b;
@@ -1258,7 +1266,7 @@ button.nb-stk:focus-visible { outline: 2px solid var(--amber); outline-offset: 2
   --strip: #fbfbf9;
 
   --breaking: #d62b2f;
-  --breaking-bright: #e53935;
+  --breaking-bright: #c62828;
   --breaking-tint: #fde9e9;
 
   --shadow-hover: 0 0 0 1px var(--border-strong), 0 10px 28px rgba(20, 20, 30, 0.08);
@@ -1414,3 +1422,38 @@ button.nb-stk:focus-visible { outline: 2px solid var(--amber); outline-offset: 2
 .stock-row-click:focus-visible { outline: 2px solid var(--amber); outline-offset: -2px; }
 .stock-row-chart { margin-left: 6px; vertical-align: -2px; color: var(--ink-soft); opacity: 0.7; }
 .stock-row-click:hover .stock-row-chart { color: var(--amber); opacity: 1; }
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   [2026-10-26 디자인 점검 — design-quality-kit]
+   ═══════════════════════════════════════════════════════════════════ */
+/* 키보드(Tab)로 이동할 때 지금 어디에 있는지 사이트 어디서나 같은 모양으로 보이게.
+   :where()라서 따로 정해 둔 포커스 모양이 있으면 그쪽이 이깁니다. 마우스 클릭에는 안 보입니다. */
+:where(a, button, [role="button"], [tabindex], summary, select):focus-visible {
+  outline: 2px solid var(--amber); outline-offset: 2px; border-radius: 4px;
+}
+/* 휴대폰: 위 메뉴 줄이 화면 밖으로 이어지는데("차트 가…") 옆으로 밀 수 있다는 표시가 없었음
+   → 오른쪽 끝을 살짝 흐리게 해서 "더 있다"는 게 보이게. 오른쪽 여백도 줘서 마지막 메뉴가 흐림에 묻히지 않게.
+   (메뉴가 실제로 넘치는 휴대폰 폭에서만 — 태블릿 폭에서는 다 들어가므로 흐리지 않음) */
+@media (max-width: 480px) {
+  .site-header .nav {
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent);
+    padding-right: 28px;
+  }
+}
+
+/* ── [2026-10-26 추가] 칼럼 본문 사진 (components/BlogFigure.js) ── */
+.blog-figure { margin: 26px 0 28px; }
+.blog-figure img {
+  display: block; width: 100%; height: auto; max-height: 520px; object-fit: contain;
+  border-radius: 8px; background: var(--surface-2); border: 1px solid var(--border);
+}
+.blog-figure figcaption { margin-top: 8px; display: grid; gap: 2px; }
+.blog-figure-cap { font-size: 13.5px; line-height: 1.55; color: var(--ink-muted); }
+.blog-figure-credit { font-size: 11.5px; line-height: 1.5; color: var(--ink-soft); }
+.blog-figure-credit a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+
+/* [2026-10-26 추가] 칼럼·안내 글: 줄 끝에서 한글 낱말이 중간에 끊기지 않게("금/융회사" → "금융회사").
+   낱말 단위로만 줄을 바꾸고, 아주 긴 영어 주소 같은 것만 예외로 끊습니다. */
+.legal-page p, .legal-page li, .legal-page h1, .legal-page h2, .blog-figure-cap { word-break: keep-all; overflow-wrap: anywhere; }
