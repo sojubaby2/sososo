@@ -66,7 +66,7 @@ export const viewport = {
   // [2026-10-19 변경] 휴대폰에서 브라우저 주소창 색입니다. 사이트 색을
   // 남색으로 바꾸면서 같이 맞췄습니다(주황으로 두면 주소창만 따로 놀았음).
   // [2026-10-26 변경] 어두운 터미널 디자인으로 바꾸면서 주소창 색도 거의 검정으로.
-  themeColor: "#0b0b0d",
+  themeColor: "#fbfbf9", // [2026-10-26] 기본 화면을 밝게 바꾸면서 휴대폰 주소창 색도 밝게
 };
 
 // [2026-10-26] 글꼴 교체: Noto Serif KR(제목)·Noto Sans KR(본문)·Roboto Mono(숫자)
@@ -74,17 +74,20 @@ export const viewport = {
 // 어두운 터미널 화면에 맞는 단단한 글꼴이고, 숫자 자릿수가 딱딱 맞습니다.
 export default function RootLayout({ children }) {
   return (
-    // suppressHydrationWarning: 아래 짧은 코드가 화면 뜨기 전에 data-theme을 붙이므로
+    // [2026-10-26 변경] 기본 화면을 밝은 화면으로 — 재성님: "밝은 화면이 더 나은 것 같다, 기본을 밝게 하자"
+    //   처음부터 data-theme="light"를 붙여서 내보내고, 어두운 화면을 골라 둔 사람만
+    //   아래 짧은 코드가 화면 뜨기 전에 떼어 냅니다.
+    // suppressHydrationWarning: 그 짧은 코드가 data-theme을 바꿀 수 있으므로
     // "서버가 그린 것과 다르다"는 경고를 이 한 줄(html 태그)에 한해서만 끕니다.
-    <html lang="ko" suppressHydrationWarning>
+    <html lang="ko" data-theme="light" suppressHydrationWarning>
       <head>
         {/* [2026-10-26 추가] 밝은/어두운 화면 기억값을 화면이 그려지기 "전에" 적용 —
-            이게 없으면 밝은 화면을 고른 사람도 페이지를 열 때마다 잠깐 검게
+            이게 없으면 어두운 화면을 고른 사람도 페이지를 열 때마다 잠깐 하얗게
             번쩍였다가 바뀝니다. (components/ThemeToggle.js 참고) */}
         <script
           dangerouslySetInnerHTML={{
             __html:
-              "try{if(localStorage.getItem('nm-theme')==='light')document.documentElement.setAttribute('data-theme','light')}catch(e){}",
+              "try{if(localStorage.getItem('nm-theme')==='dark')document.documentElement.removeAttribute('data-theme')}catch(e){}",
           }}
         />
         <link

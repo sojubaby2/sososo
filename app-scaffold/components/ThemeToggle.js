@@ -10,7 +10,7 @@
 //     색은 전부 app/globals.css 맨 아래 ":root[data-theme="light"]"에 있습니다.
 //   · 고른 화면은 이 브라우저에 기억합니다(localStorage "nm-theme").
 //     다음에 와도, 다른 페이지로 가도 그대로입니다.
-//   · 처음 오는 사람은 어두운 화면으로 시작합니다(지금 사이트 기본).
+//   · [2026-10-26 변경] 처음 오는 사람은 밝은 화면으로 시작합니다(재성님 결정). 어두운 화면을 고른 사람은 계속 어둡게.
 //   · 페이지가 뜨는 순간 화면이 깜빡이며 바뀌지 않도록, 기억된 값을 먼저 읽는
 //     짧은 코드가 app/layout.js <head>에 따로 있습니다.
 //   · 휴대폰 주소창 색(theme-color)도 같이 바꿉니다.
@@ -42,8 +42,8 @@ function applyTheme(theme) {
 }
 
 export default function ThemeToggle() {
-  // 첫 그림은 서버와 똑같이 "dark"로 그리고, 화면이 뜬 직후 실제 값으로 맞춥니다.
-  const [theme, setTheme] = useState("dark");
+  // 첫 그림은 서버와 똑같이 "light"(기본)로 그리고, 화면이 뜬 직후 실제 값으로 맞춥니다.
+  const [theme, setTheme] = useState("light");
   useEffect(() => {
     const t = currentTheme();
     setTheme(t);
