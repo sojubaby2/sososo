@@ -307,6 +307,132 @@ function DailyMoversPanel() {
 // 더 정확하게(야후 기준) 보여주게 되면서 완전히 겹쳤습니다.
 // 이 패널은 /api/market-ticker를 쓰던 예전 방식이었습니다.
 
+// [2026-10-26 신설] 대표 종목 칸 — 삼성전자·SK하이닉스.
+//
+// 재성님 요청: "많이 불린 종목은 삭제하고, 그 위치에 삼성·하이닉스를 넣자.
+//              해외 시세도 가져와서 보여주자."
+//
+// 각 칸에 보여주는 것:
+//   · 국내 현재가·등락률 (야후, 15~20분 지연)
+//   · 해외 시세 — 삼성전자는 런던 GDR, SK하이닉스는 나스닥 ADR.
+//     해외 가격을 국내 1주 값(원)으로 바꾼 금액과, 그게 국내 종가보다
+//     몇 % 높은지/낮은지. 밤사이 해외 반응 = 다음 날 아침 참고값입니다.
+//
+// 데이터는 /api/flagships(계산은 lib/flagships.js)에서 1분마다 새로 받습니다.
+// 처음 뜰 때는 숫자 자리에 회색 막대를 그려 둬서, 값이 들어와도 화면이
+// 출렁이지 않게 했습니다.
+//
+// 칸을 누르면 그 종목이 걸린 속보만 아래에 남습니다(다시 누르면 해제) —
+// 예전 "많이 불린 종목" 단추가 하던 거르기 기능을 그대로 이어받았습니다.
+const FLAGSHIP_POLL_MS = 60000;
+const FLAGSHIP_PLACEHOLDERS = [
+  { code: "005930", name: "삼성전자" },
+  { code: "000660", name: "SK하이닉스" },
+];
+
+// "2026-10-26T00:04:00Z" → "09:04" (한국 시간). 오늘이 아니면 "10/24 05:00".
+function kstClock(iso) {
+  if (!iso) return "";
+  const d = new Date(new Date(iso).getTime() + 9 * 3600 * 1000);
+  const now = new Date(Date.now() + 9 * 3600 * 1000);
+  const hm = `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
+  const sameDay = d.getUTCFullYear() === now.getUTCFullYear() && d.getUTCMonth() === now.getUTCMonth() && d.getUTCDate() === now.getUTCDate();
+  return sameDay ? hm : `${d.getUTCMonth() + 1}/${d.getUTCDate()} ${hm}`;
+}
+function fmtWon(v) {
+  return typeof v === "number" && Number.isFinite(v) ? Math.round(v).toLocaleString("ko-KR") : "—";
+}
+function fmtForeign(v, currency) {
+  if (typeof v !== "number" || !Number.isFinite(v)) return "—";
+  const sign = currency === "USD" ? "$" : currency === "EUR" ? "€" : currency === "GBP" ? "£" : "";
+  const body = v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return sign ? `${sign}${body}` : `${body} ${currency || ""}`.trim();
+}
+
+function FlagshipStrip({ filter, onPick }) {
+  const [data, setData] = useState(null);
+
+  useEffect(() => {
+    let alive = true;
+    const load = () =>
+      fetch("/api/flagships")
+        .then((r) => r.json())
+        .then((d) => { if (alive && Array.isArray(d?.items) && d.items.length) setData(d.items); })
+        .catch(() => {});
+    load();
+    const t = setInterval(load, FLAGSHIP_POLL_MS);
+    return () => { alive = false; clearInterval(t); };
+  }, []);
+
+  const rows = data || FLAGSHIP_PLACEHOLDERS;
+
+  return (
+    <section className="flagship" aria-label="대표 종목">
+      <div className="panel-label">대표 종목</div>
+      <div className="flagship-list">
+        {rows.map((r) => {
+          const d = r.domestic;
+          const a = r.abroad;
+          const loading = !data;
+          const pressed = filter?.kind === "stock" && filter.value === r.name;
+          return (
+            <button
+              key={r.code}
+              type="button"
+              className="flag-card"
+              aria-pressed={pressed}
+              onClick={() => onPick(r.name)}
+              title={`${r.name} 관련 속보만 보기`}
+            >
+              <span className="flag-top">
+                <span className="flag-nm">
+                  {r.name}
+                  <span className="flag-code mono">{r.code}</span>
+                </span>
+                {loading ? (
+                  <span className="flag-skel flag-skel-px" />
+                ) : (
+                  <span className="flag-px">
+                    <span className="mono">{fmtWon(d?.price)}</span>
+                    <small>원</small>
+                    <span className={`flag-chg mono ${toneOf(d?.changePct)}`}>{fmtPct(d?.changePct)}</span>
+                  </span>
+                )}
+              </span>
+              <span className="flag-when">{loading ? "\u00a0" : d ? `국내 ${kstClock(d.asOf)} 기준` : "국내 시세를 못 받아왔어요"}</span>
+
+              <span className="flag-abroad">
+                {loading ? (
+                  <span className="flag-skel" />
+                ) : a ? (
+                  <>
+                    <span className="flag-venue">
+                      {a.venue} <b className="mono">{a.ticker}</b> <span className="mono">{fmtForeign(a.price, a.currency)}</span>
+                      <span className="flag-when-abroad"> · {kstClock(a.asOf)}</span>
+                    </span>
+                    {a.krwPerShare ? (
+                      <span className="flag-gap">
+                        1주 환산 <span className="mono">{fmtWon(a.krwPerShare)}원</span>
+                        {typeof a.gapPct === "number" && (
+                          <span className={`flag-gap-pct ${toneOf(a.gapPct)}`}> · {a.gapBase} 대비 <span className="mono">{fmtPct(a.gapPct)}</span></span>
+                        )}
+                      </span>
+                    ) : (
+                      <span className="flag-gap">원화 환산은 잠시 쉬고 있어요</span>
+                    )}
+                  </>
+                ) : (
+                  <span className="flag-venue">해외 시세를 못 받아왔어요</span>
+                )}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 function InstallHintBanner() {
   const [dismissed, setDismissed] = useState(true); // hidden until localStorage check to avoid a flash
   useEffect(() => {
@@ -704,21 +830,8 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
     firstFitRef.current = false;
   }, [filter]);
 
-  // 오늘 가장 많이 불린 종목 — 오늘 올라온 기사에서 종목이 몇 번 나왔는지 셉니다.
-  const topStocks = useMemo(() => {
-    const tally = new Map();
-    for (const n of items) {
-      for (const s of n.stocks || []) {
-        const row = tally.get(s.name) || { name: s.name, code: s.code, hits: 0, change: s.change };
-        row.hits += 1;
-        if (typeof s.change === "number") row.change = s.change;
-        tally.set(s.name, row);
-      }
-    }
-    return [...tally.values()]
-      .sort((a, b) => b.hits - a.hits || (b.change ?? -99) - (a.change ?? -99))
-      .slice(0, 8);
-  }, [items]);
+  // [2026-10-26 삭제] "오늘 많이 불린 종목" 계산(topStocks)을 없앴습니다.
+  // 재성님 요청으로 그 자리에 대표 종목(삼성전자·SK하이닉스) 칸이 들어갔습니다.
 
   return (
     <div>
@@ -789,32 +902,9 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
           </p>
         )}
 
-        {/* 오늘 많이 불린 종목 — 막대 한 칸이 속보 한 건입니다.
-            누르면 그 종목이 걸린 속보만 아래에 남습니다. */}
-        {topStocks.length > 0 && (
-          <section className="hitstrip">
-            <div className="panel-label">오늘 많이 불린 종목</div>
-            <div className="hitstrip-list">
-              {topStocks.map((st) => (
-                <button
-                  key={st.name}
-                  type="button"
-                  className="hit"
-                  aria-pressed={filter?.kind === "stock" && filter.value === st.name}
-                  onClick={() => toggleFilter("stock", st.name)}
-                >
-                  <span className="nm">{st.name}</span>
-                  <span className="bars">
-                    {Array.from({ length: Math.min(st.hits, 5) }).map((_, i) => (
-                      <span className="b" key={i} />
-                    ))}
-                  </span>
-                  <span className={`pc mono ${toneOf(st.change)}`}>{fmtPct(st.change)}</span>
-                </button>
-              ))}
-            </div>
-          </section>
-        )}
+        {/* [2026-10-26 변경] "오늘 많이 불린 종목" 띠를 지우고 그 자리에
+            대표 종목(삼성전자·SK하이닉스) 칸을 넣었습니다. 위 FlagshipStrip 설명 참고. */}
+        <FlagshipStrip filter={filter} onPick={(name) => toggleFilter("stock", name)} />
 
 
         {/* [2026-10-21 신설] 속보 채팅방.
