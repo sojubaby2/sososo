@@ -24,12 +24,93 @@
 //   · 헤드라인 오른쪽 "관련 종목" 칸에 종목마다 왜 붙었는지 한 줄씩(시안 3)
 //
 // ChatMessage.js 파일은 지우지 않았습니다(되돌릴 때를 위해). 지금은 안 쓰입니다.
+//
+// [2026-10-26 오후 추가] "속보 느낌" — 재성님: "뭔가 속보 느낌이 안 난다"
+//   TV 뉴스 속보 화면에서 가져온 네 가지:
+//   ① 빨간 "속보" 딱지 — 15분 안에 들어온 속보에만 붙습니다. 그래서 딱지가
+//      붙어 있으면 "지금 막 터진 것"이라는 뜻이 됩니다.
+//   ② 아래로 흐르는 자막 띠 — 맨 위에 최근 속보 제목 6개가 오른쪽→왼쪽으로
+//      흘러갑니다(마우스를 올리면 멈춤). 오른쪽 끝에 초 단위 시계.
+//   ③ 말머리 딱지 — 제목 앞의 [단독]·[속보]·[특징주] 같은 말머리를 글자에서
+//      떼어내 딱지로 붙입니다. [단독]·[속보]는 빨간 테두리라 눈에 띕니다.
+//   ④ 새 속보가 들어오면 빨갛게 번쩍였다가 사라집니다(예전엔 호박색).
+//   빨강(#e5383b 계열)은 "속보 표시" 전용입니다. 주가 상승 빨강(--up)과는
+//   모양으로 구분됩니다 — 속보는 꽉 찬 딱지, 주가는 숫자 글자색.
+//   ★ 컴퓨터에서 "움직임 줄이기"를 켜둔 사람에게는 자막이 흐르지 않고
+//     첫 제목만 가만히 보입니다.
 
 import { useEffect, useState } from "react";
 import { ChevronRight, AlertTriangle, ShieldAlert, ExternalLink } from "lucide-react";
 import StockChip from "./StockChip";
 
-const FRESH_MINUTES = 15; // 이 시간 안에 들어온 속보는 시각을 호박색으로
+const FRESH_MINUTES = 15; // 이 시간 안에 들어온 속보에 빨간 "속보" 딱지 + 시각 빨강
+const CRAWL_COUNT = 6; // 자막 띠에 흘릴 최근 속보 개수
+
+// 제목 앞 말머리 떼어내기: "[단독] 삼성..." → { tags: ["단독"], text: "삼성..." }
+// 여러 개가 붙어 있어도 됩니다("[속보][단독] ..."). 7글자 넘는 괄호는 말머리로 안 봅니다.
+const HOT_TAGS = new Set(["단독", "속보", "긴급", "1보", "2보"]);
+function splitTags(headline) {
+  let text = String(headline || "");
+  const tags = [];
+  for (;;) {
+    const m = text.match(/^\s*[\[【]([^\]】]{1,7})[\]】]\s*/);
+    if (!m) break;
+    tags.push(m[1].trim());
+    text = text.slice(m[0].length);
+  }
+  return { tags, text };
+}
+function TagBadges({ tags }) {
+  if (!tags.length) return null;
+  return tags.map((t) => (
+    <span key={t} className={`nb-tag ${HOT_TAGS.has(t) ? "hot" : ""}`}>{t}</span>
+  ));
+}
+function BreakingBadge() {
+  return <span className="nb-breaking">속보</span>;
+}
+
+// 자막 띠 오른쪽 끝 시계 — 1초마다 바뀝니다(한국 시간).
+function LiveClock() {
+  const [t, setT] = useState(null);
+  useEffect(() => {
+    const tick = () => {
+      const k = new Date(Date.now() + 9 * 3600 * 1000);
+      setT([k.getUTCHours(), k.getUTCMinutes(), k.getUTCSeconds()].map((x) => String(x).padStart(2, "0")).join(":"));
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, []);
+  return <span className="nb-clock mono" aria-hidden="true">{t || "\u00a0"}</span>;
+}
+
+// 흐르는 자막 띠. 같은 목록을 두 번 이어 붙여서 끊김 없이 돌게 합니다.
+function Crawl({ items }) {
+  const list = items.slice(0, CRAWL_COUNT).map((n) => ({ id: n.id, ...splitTags(n.headline) }));
+  if (!list.length) return null;
+  const seq = (dup) =>
+    list.map((n) => (
+      <span className="nb-crawl-item" key={`${dup}-${n.id}`} aria-hidden={dup ? "true" : undefined}>
+        {n.text}
+      </span>
+    ));
+  return (
+    <div className="nb-crawl" role="marquee" aria-label="최근 속보 제목">
+      <span className="nb-crawl-label">
+        <span className="nb-live-dot" aria-hidden="true" />
+        속보
+      </span>
+      <div className="nb-crawl-view">
+        <div className="nb-crawl-track" style={{ animationDuration: `${Math.max(28, list.length * 9)}s` }}>
+          {seq(0)}
+          {seq(1)}
+        </div>
+      </div>
+      <LiveClock />
+    </div>
+  );
+}
 
 function minutesAgo(ts, now) {
   const t = Date.parse(ts || "");
@@ -120,7 +201,7 @@ export default function NewsBoard({ items, newIds }) {
   // "몇 분 전"을 1분마다 다시 계산하기 위한 시계
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 60000);
+    const t = setInterval(() => setNow(Date.now()), 30000);
     return () => clearInterval(t);
   }, []);
 
@@ -141,19 +222,25 @@ export default function NewsBoard({ items, newIds }) {
   const isNew = (n) => newIds?.has(n.id);
 
   const leadM = minutesAgo(lead.ts, now);
+  const isFresh = (m) => m !== null && m < FRESH_MINUTES;
+  const leadT = splitTags(lead.headline);
 
   return (
     <div className="nb">
+      <Crawl items={items} />
+
       {/* ── 헤드라인: 가장 최근 1건 ── */}
-      <article className={`nb-lead ${isNew(lead) ? "nb-arrive" : ""}`}>
+      <article className={`nb-lead ${isFresh(leadM) ? "is-fresh" : ""} ${isNew(lead) ? "nb-arrive" : ""}`}>
         <div className="nb-lead-main">
           <div className="nb-meta">
-            <span className={`nb-ago ${leadM !== null && leadM < FRESH_MINUTES ? "fresh" : ""}`}>{agoText(leadM)}</span>
+            {isFresh(leadM) && <BreakingBadge />}
+            <TagBadges tags={leadT.tags} />
+            <span className={`nb-ago ${isFresh(leadM) ? "fresh" : ""}`}>{agoText(leadM)}</span>
             <span className="mono">{clockText(lead.time, leadM)}</span>
             {lead.theme && <span>{lead.theme}</span>}
             <Flags n={lead} />
           </div>
-          <h2 className="nb-lead-title">{lead.headline}</h2>
+          <h2 className="nb-lead-title">{leadT.text}</h2>
           {lead.summary && <p className="nb-lead-sum">{lead.summary}</p>}
           <div className="nb-actions">
             <OriginalLink n={lead} />
@@ -182,15 +269,18 @@ export default function NewsBoard({ items, newIds }) {
         <div className="nb-second">
           {second.map((n) => {
             const m = minutesAgo(n.ts, now);
+            const tt = splitTags(n.headline);
             return (
-              <article key={n.id} className={isNew(n) ? "nb-arrive" : ""}>
+              <article key={n.id} className={`${isFresh(m) ? "is-fresh" : ""} ${isNew(n) ? "nb-arrive" : ""}`}>
                 <div className="nb-meta">
-                  <span className={`nb-ago ${m !== null && m < FRESH_MINUTES ? "fresh" : ""}`}>{agoText(m)}</span>
+                  {isFresh(m) && <BreakingBadge />}
+                  <TagBadges tags={tt.tags} />
+                  <span className={`nb-ago ${isFresh(m) ? "fresh" : ""}`}>{agoText(m)}</span>
                   <span className="mono">{clockText(n.time, m)}</span>
                   {n.theme && <span>{n.theme}</span>}
                   <Flags n={n} />
                 </div>
-                <h3 className="nb-second-title">{n.headline}</h3>
+                <h3 className="nb-second-title">{tt.text}</h3>
                 <Chips n={n} />
                 <div className="nb-actions">
                   <OriginalLink n={n} />
@@ -208,15 +298,18 @@ export default function NewsBoard({ items, newIds }) {
             const m = minutesAgo(n.ts, now);
             const lead0 = n.stocks?.[0];
             const isOpen = open.has(n.id);
+            const tt = splitTags(n.headline);
             return (
               <li key={n.id} className={`${isOpen ? "open" : ""} ${isNew(n) ? "nb-arrive" : ""}`}>
                 <button type="button" className="nb-row" aria-expanded={isOpen} onClick={() => toggle(n.id)}>
-                  <span className={`nb-time mono ${m !== null && m < FRESH_MINUTES ? "fresh" : ""}`} title={agoText(m)}>
+                  <span className={`nb-time mono ${isFresh(m) ? "fresh" : ""}`} title={agoText(m)}>
                     {clockText(n.time, m)}
                   </span>
                   <span className="nb-theme">{n.theme || ""}</span>
                   <span className="nb-head">
-                    <span className="nb-head-text">{n.headline}</span>
+                    {isFresh(m) && <BreakingBadge />}
+                    <TagBadges tags={tt.tags} />
+                    <span className="nb-head-text">{tt.text}</span>
                     <Flags n={n} />
                   </span>
                   {lead0 ? (
