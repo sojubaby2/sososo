@@ -24,12 +24,25 @@ import { extractThemes } from "../lib/todayBrief";
 import { isPoliticalTheme } from "../lib/themeData";
 
 const HOT_THEME_COUNT = 8;
-const FEED_POLL_MS = 10000; // check for new articles every 10s
-// [2026-09-09 추가] 폴링(재조회) 때는 전체 250개 대신 최근 30개만 받아옴 —
-// 새 글은 보통 폴링 주기 사이에 0~2개뿐이라 30개면 충분히 여유 있고,
-// Upstash 대역폭 사용량을 크게 줄여줌(자세한 이유는 app/api/feed/route.js
-// 주석 참고). 최초 로딩 때는 이 값을 안 쓰고 기본값(250개)을 그대로 받음.
-const FEED_POLL_LIMIT = 30;
+// [2026-10-26 변경 — 속보 지연 줄이기, 비용 그대로]
+// 예전: 화면을 보든 안 보든 늘 10초마다 새 속보를 확인했습니다.
+// 이제: 상황에 따라 확인 간격을 바꿉니다.
+//   · 이 탭을 보고 있을 때          → 5초마다 (속보가 더 빨리 뜸)
+//   · 다른 탭/최소화 + 알림 켜짐    → 10초마다 (예전과 같음 — 알림이 늦으면 안 되니까)
+//   · 다른 탭/최소화 + 알림 꺼짐    → 60초마다 (아무도 안 보는 화면이라 아껴 둠)
+//   · 다시 이 탭으로 돌아오는 순간  → 즉시 한 번 확인
+// 비용: 보고 있는 탭은 확인이 2배로 늘지만, 대신 한 번에 받는 양을 30개 → 15개로
+// 반으로 줄여서 주고받는 데이터 양은 예전과 같고, 안 보는 탭에서 크게 아낍니다.
+// Redis 읽기는 app/api/feed/route.js의 8초 공용 저장 덕분에 방문자 수·확인 횟수와
+// 상관없이 "8초에 최대 1번"이라 늘지 않습니다.
+const FEED_POLL_VISIBLE_MS = 5000;
+const FEED_POLL_HIDDEN_NOTIFY_MS = 10000;
+const FEED_POLL_HIDDEN_MS = 60000;
+// [2026-09-09 추가 / 2026-10-26 30→15] 폴링(재조회) 때는 전체 250개 대신 최근
+// 몇 개만 받아옴 — 새 글은 5초 사이에 보통 0~1개라 15개면 충분히 여유 있음.
+// (60초 쉬었다 돌아와도 1분에 15건 넘게 게재되는 일은 없습니다.)
+// 최초 로딩 때는 이 값을 안 쓰고 기본값(250개)을 그대로 받음.
+const FEED_POLL_LIMIT = 15;
 const FEED_DISPLAY_CAP = 250; // 화면에 유지하는 최대 개수 — 기존 동작과 동일
 const ALERT_KEYWORDS = ["공급계약", "특허", "FDA", "무상증자", "단독", "세계 최초", "국내 최초", "인수", "합병", "수주", "유상증자"];
 
@@ -522,7 +535,7 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
   // 명시적으로 허용해야만 알림을 띄울 수 있어서 토글 버튼으로 만듦.
   const [notifyEnabled, setNotifyEnabled] = useState(false);
   // 서버가 넘겨준 기사들의 id를 "이미 아는 글"로 등록해둡니다 — 이게 없으면
-  // 10초 뒤 첫 확인 때 이미 보고 있는 글들이 전부 "새 글"로 잡혀서 알림이
+  // 첫 확인 때 이미 보고 있는 글들이 전부 "새 글"로 잡혀서 알림이
   // 한꺼번에 울립니다.
   const knownIdsRef = useRef(new Set(initialItems.map((it) => it.id)));
   const toastTimerRef = useRef(null);
@@ -658,15 +671,47 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
     }
 
     // [2026-10-14 변경] 서버가 이미 기사를 채워줬다면 처음에 전체를 다시
-    // 불러올 이유가 없습니다 — 그래서 바로 10초 주기 확인만 시작합니다.
+    // 불러올 이유가 없습니다 — 그래서 바로 주기 확인만 시작합니다.
     // (이 한 줄이 방문자 한 명당 서버 호출 한 번을 통째로 없애줍니다.)
     // 서버 쪽에서 못 가져왔을 때만 예전처럼 전체를 불러옵니다.
     if (initialItems.length === 0) load(true);
 
-    const interval = setInterval(() => load(false), FEED_POLL_MS);
+    // [2026-10-26 변경] setInterval(늘 같은 간격) 대신 "한 번 확인 → 다음
+    // 확인 예약"을 반복합니다. 그래야 탭을 보고 있는지에 따라 간격을 바꿀 수
+    // 있습니다(간격은 맨 위 FEED_POLL_* 설명 참고).
+    //
+    // 첫 확인은 1초 뒤에 합니다. 첫 화면은 서버가 최대 1분 전에 만들어 둔
+    // 것이라, 예전처럼 10초를 기다리면 방문자가 1분 넘게 지난 목록을 보고
+    // 있을 수 있었습니다. 확인 횟수는 그대로이고 "첫 확인 시점"만 당긴 것입니다.
+    let timer = null;
+    function nextDelay() {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+        return notifyEnabledRef.current ? FEED_POLL_HIDDEN_NOTIFY_MS : FEED_POLL_HIDDEN_MS;
+      }
+      return FEED_POLL_VISIBLE_MS;
+    }
+    function schedule(ms) {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        if (cancelled) return;
+        load(false);
+        schedule(nextDelay());
+      }, ms);
+    }
+    schedule(1000);
+
+    // 다른 탭에 있다가 이 탭으로 돌아오면, 남은 대기시간(최대 60초)을 기다리지
+    // 않고 바로 확인합니다. 숨겨질 때는 다음 확인을 긴 간격으로 다시 예약합니다.
+    function onVisibility() {
+      if (document.visibilityState === "visible") schedule(0);
+      else schedule(nextDelay());
+    }
+    document.addEventListener("visibilitychange", onVisibility);
+
     return () => {
       cancelled = true;
-      clearInterval(interval);
+      clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisibility);
       clearTimeout(toastTimerRef.current);
       clearTimeout(newIdsTimerRef.current);
     };

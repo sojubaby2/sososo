@@ -366,6 +366,16 @@ function looksLikeOperatorComment(text) {
   return /(습니다|입니다|같아요|보여요|네요)[.!?~…]*$/.test((text || "").trim());
 }
 
+// [2026-10-26 추가 — "서버 깨워두기" 전용 입구]
+// 사이트 서버(Vercel)는 한동안 요청이 없으면 잠들고, 잠든 상태에서 첫 속보가
+// 오면 깨어나는 데만 1~3초를 더 씁니다. 그래서 오라클 서버의 리스너가 4분마다
+// 이 주소를 한 번씩 "똑똑" 두드려서 서버가 잠들지 않게 합니다.
+// 여기서는 Redis도 AI도 전혀 부르지 않고 "ok"만 돌려주므로 비용이 0입니다.
+// 비밀번호도 필요 없습니다 — 아무 정보도 돌려주지 않으니까요.
+export async function GET() {
+  return Response.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
+}
+
 export async function POST(request) {
   const ingestSecret = process.env.TELEGRAM_INGEST_SECRET;
   if (!ingestSecret) {
@@ -442,6 +452,15 @@ export async function POST(request) {
   // 제목+링크만 왔거나, 제목 자리에 운영자 코멘트만 있거나) 실제 기사
   // 페이지에서 제목·요약을 대신 가져옴 — 위 fetchArticleMetaFallback 주석
   // 참고. fetch는 필요할 때만(제목 또는 요약 중 하나라도 부족할 때) 한 번만 함.
+  // [2026-10-26 추가 — 속보 지연 줄이기, 비용 그대로]
+  // 예전에는 "원문 기사 제목 가져오기(최대 8초)"가 끝난 다음에야 "종목 목록
+  // 불러오기(Redis)"를 시작했습니다. 두 일은 서로 기다릴 필요가 없어서, 이제
+  // 여기서 종목 목록을 먼저 출발시켜 두고 기사 제목을 가져오는 동안 같이
+  // 진행되게 했습니다. 어차피 바로 아래에서 꼭 쓰는 값이라 Redis 읽기 횟수는
+  // 예전과 똑같이 1번입니다(돈이 더 들지 않음). 실패해도 null로 받아서 아래
+  // 기존 오류 처리("시세 목록 가져오기" 오류 기록)가 그대로 동작합니다.
+  const universePromise = getCachedUniverse(redis).catch(() => null);
+
   const isBareUrl = looksLikeBareUrl(rawTitle);
   const isOperatorComment = !isBareUrl && looksLikeOperatorComment(rawTitle);
   const needsTitleFallback = isBareUrl || isOperatorComment;
@@ -476,7 +495,9 @@ export async function POST(request) {
   // 종목 후보가 하나라도 있는지 공짜로 먼저 확인합니다. 후보가 아예 없으면
   // 어차피 관련주를 못 붙여서 게재되지 않을 메시지이므로, AI를 한 번도 부르지
   // 않고 여기서 끝냅니다(잡담·공지·해외 일반뉴스 등이 여기서 걸러집니다).
-  const universe = await getCachedUniverse(redis);
+  // (위에서 미리 출발시켜 둔 종목 목록을 여기서 받기만 합니다 — 대부분은
+  //  이미 도착해 있어서 기다리는 시간이 0에 가깝습니다.)
+  const universe = await universePromise;
   if (!universe) {
     await logIngest({ stage: "오류", step: "시세 목록(KRX) 가져오기", error: "getCachedUniverse가 null을 반환" });
     return Response.json(

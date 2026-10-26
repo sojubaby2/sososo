@@ -52,8 +52,15 @@ export async function GET(request) {
     })
     .filter(Boolean);
 
+  // [2026-10-26 변경 — 속보 지연 줄이기, 비용 그대로]
+  // 예전 끝에 붙어 있던 "stale-while-revalidate=20"을 뺐습니다.
+  // 그 설정은 "8초가 지나도 최대 20초 동안은 옛날 목록을 먼저 보여주고
+  // 뒤에서 새로 받아온다"는 뜻이라, 방문자 화면이 최대 28초까지 늦을 수
+  // 있었습니다. 이제는 8초가 지나면 그 다음 요청이 새 목록을 받습니다.
+  // Redis 읽기는 예전처럼 "8초에 한 번"이 최대라 횟수가 늘지 않습니다
+  // (뒤에서 몰래 받아오던 것을 앞에서 받아오는 것으로 바뀌었을 뿐).
   return Response.json(
     { items },
-    { headers: { "Cache-Control": "public, max-age=0, s-maxage=8, stale-while-revalidate=20" } }
+    { headers: { "Cache-Control": "public, max-age=0, s-maxage=8" } }
   );
 }
