@@ -635,9 +635,15 @@ input::placeholder { color: var(--ink-soft); }
    핀이 제자리에 남습니다. 띠보다 큰 지도를 세로 가운데에 맞춰 두고,
    위아래 넘치는 부분(극지방)은 잘라냅니다 — 핀이 있는 중위도만 보입니다. */
 .brief-mapwrap {
-  position: absolute; z-index: 0; right: 2%; top: -38%;
-  /* [2026-10-26 변경] 48%/700px → 54%/780px: 지도를 조금 더 크게 */
-  width: min(54%, 780px); aspect-ratio: 1024 / 559; pointer-events: none;
+  /* [2026-10-26 오후 변경] 재성님: "지도 아래쪽이 대부분 가려져, 위로 살짝 올려 줘"
+     예전엔 top: -38%로 고정이라 화면 폭(=지도 크기)에 따라 핀(유럽~홍콩·인도)이
+     아래 지수 줄에 가려졌습니다. 이제 "핀이 모여 있는 높이(지도 세로 37~75% 구간,
+     가운데 56%)"를 지수 줄 위 보이는 칸의 한가운데에 맞춥니다 — 화면 폭이 달라도 같은 자리.
+       · top: 띠 높이의 절반에서 지수 줄 높이(약 60px)의 절반만큼 위 = 보이는 칸의 가운데
+       · translateY(-56%): 지도 자기 높이의 56% 지점을 그 가운데에 놓음
+     폭은 최대 640px로 — 더 크면 핀 구간이 보이는 칸보다 길어져 위아래가 잘립니다. */
+  position: absolute; z-index: 0; right: 2%; top: calc(50% - 30px); transform: translateY(-56%);
+  width: min(54%, 640px); aspect-ratio: 1024 / 559; pointer-events: none;
 }
 .brief-map, .brief-pins { position: absolute; inset: 0; }
 /* 원본 그림은 "연한 바탕 + 어두운 해안선"이라 색을 뒤집어 밝은 선만 띄웁니다.
