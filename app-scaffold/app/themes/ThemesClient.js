@@ -11,7 +11,9 @@
 // 이름만 146개 나열된 페이지로 보였습니다.
 
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { Search, ShieldAlert, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { Search, ShieldAlert, TrendingUp, TrendingDown, Minus, CandlestickChart } from "lucide-react";
+// [2026-10-26 추가] 종목 줄을 누르면 일봉 차트 창(components/StockChartModal.js)이 뜹니다
+import { openStockChart } from "../../lib/openStockChart";
 import Header from "../../components/Header";
 import { getThemesGrouped, isPoliticalTheme } from "../../lib/themeData";
 
@@ -190,9 +192,26 @@ export default function ThemesClient() {
             </tr>
           </thead>
           <tbody>
+            {/* [2026-10-26 변경] 재성님: "테마별 종목정리의 종목들 클릭했을 때도 차트 뜨게"
+                줄 아무 데나 누르거나, 키보드로 줄에 와서 Enter를 누르면 차트 창이 뜹니다. */}
             {stocks.map((s) => (
-              <tr key={s.code}>
-                <td style={{ fontWeight: 500 }}>{s.name}</td>
+              <tr
+                key={s.code}
+                className="stock-row-click"
+                tabIndex={0}
+                title={`${s.name} 일봉 차트 보기`}
+                onClick={() => openStockChart({ code: s.code, name: s.name, market: s.market })}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    openStockChart({ code: s.code, name: s.name, market: s.market });
+                  }
+                }}
+              >
+                <td style={{ fontWeight: 500 }}>
+                  {s.name}
+                  <CandlestickChart size={13} className="stock-row-chart" aria-hidden="true" />
+                </td>
                 <td className="mono" style={{ color: "var(--ink-muted)" }}>{s.code}</td>
                 <td><span className="market-tag">{s.market}</span></td>
                 <td><ChangeTag value={stockChangeMap[s.code]} /></td>

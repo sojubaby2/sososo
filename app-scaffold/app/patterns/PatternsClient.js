@@ -13,7 +13,9 @@
 // 방문자에게는 전체를 보여주기 위함입니다).
 
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { Search, Info } from "lucide-react";
+import { Search, Info, CandlestickChart } from "lucide-react";
+// [2026-10-26 추가] 종목 줄을 누르면 일봉 차트 창(components/StockChartModal.js)이 뜹니다
+import { openStockChart } from "../../lib/openStockChart";
 import Header from "../../components/Header";
 
 // lib/patternDetection.js의 PATTERN_DEFS와 category 값이 일치해야 함.
@@ -130,19 +132,8 @@ export default function PatternsClient({ initialData = null }) {
         ? "패턴 계산 결과를 아직 준비 중이에요. 최대 30분 이내에 자동으로 채워지니 잠시 후 새로고침해주세요."
         : "")
   );
-  // [2026-09-07 추가] 재성님 요청 — 종목 행 클릭 시 종목코드를 클립보드에
-  // 복사하고, 방금 복사된 코드 옆에 짧게 "복사됨" 표시를 보여줌.
-  const [copiedCode, setCopiedCode] = useState(null);
-
-  async function handleCopyCode(code) {
-    try {
-      await navigator.clipboard.writeText(code);
-      setCopiedCode(code);
-      setTimeout(() => setCopiedCode((c) => (c === code ? null : c)), 1500);
-    } catch {
-      // 클립보드 권한이 없거나 지원 안 되는 환경 — 조용히 무시(다른 기능엔 영향 없음)
-    }
-  }
+  // [2026-09-07 추가 → 2026-10-26 옮김] 종목 행을 누르면 종목코드를 복사하던 기능은
+  // 일봉 차트 창 아래 "코드 복사" 단추로 옮겼습니다(components/StockChartModal.js).
 
   useEffect(() => {
     fetch("/api/patterns")
@@ -226,7 +217,7 @@ export default function PatternsClient({ initialData = null }) {
         ) : (
           <>
             <p style={{ fontSize: 12, color: "var(--ink-muted)", margin: "0 0 8px" }}>
-              종목을 클릭하면 종목코드가 복사됩니다.
+              종목을 누르면 일봉 차트가 열립니다. (종목코드 복사는 차트 창 아래 단추로)
             </p>
             <table className="stock-table">
               <thead>
@@ -239,18 +230,28 @@ export default function PatternsClient({ initialData = null }) {
               </thead>
               <tbody>
                 {results.map((r) => (
+                  // [2026-10-26 변경] 재성님: "패턴검색 종목들 클릭했을 때도 차트 뜨게"
+                  //   예전엔 누르면 종목코드가 복사됐습니다 → 이제 일봉 차트 창이 뜹니다.
+                  //   코드 복사는 차트 창 아래 "코드 복사" 단추로 옮겨졌습니다(홈 화면과 같은 방식).
                   <tr
                     key={r.code}
-                    onClick={() => handleCopyCode(r.code)}
-                    style={{ cursor: "pointer" }}
-                    title="클릭하면 종목코드가 복사됩니다"
+                    className="stock-row-click"
+                    tabIndex={0}
+                    title={`${r.name} 일봉 차트 보기`}
+                    onClick={() => openStockChart({ code: r.code, name: r.name, market: r.market })}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        openStockChart({ code: r.code, name: r.name, market: r.market });
+                      }
+                    }}
                   >
-                    <td style={{ fontWeight: 500 }}>{r.name}</td>
+                    <td style={{ fontWeight: 500 }}>
+                      {r.name}
+                      <CandlestickChart size={13} className="stock-row-chart" aria-hidden="true" />
+                    </td>
                     <td className="mono" style={{ color: "var(--ink-muted)" }}>
                       {r.code}
-                      {copiedCode === r.code && (
-                        <span style={{ marginLeft: 6, fontSize: 11, color: "var(--up)" }}>복사됨</span>
-                      )}
                     </td>
                     <td>
                       <span className="market-tag">{r.market}</span>

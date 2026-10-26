@@ -1407,3 +1407,10 @@ button.nb-stk:focus-visible { outline: 2px solid var(--amber); outline-offset: 2
   .ipo-cal-ev.pay b { display: none; }
   .ipo-cal-day { font-size: 11.5px; }
 }
+
+/* ── [2026-10-26 추가] 패턴검색·테마별 종목정리 표: 줄을 누르면 일봉 차트 ── */
+.stock-row-click { cursor: pointer; transition: background-color 0.12s ease; }
+.stock-row-click:hover { background: var(--row-hover); }
+.stock-row-click:focus-visible { outline: 2px solid var(--amber); outline-offset: -2px; }
+.stock-row-chart { margin-left: 6px; vertical-align: -2px; color: var(--ink-soft); opacity: 0.7; }
+.stock-row-click:hover .stock-row-chart { color: var(--amber); opacity: 1; }
