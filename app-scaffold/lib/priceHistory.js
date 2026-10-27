@@ -89,6 +89,8 @@ export async function storeDaySnapshot(redis, basDt, krxItems) {
 
   await redis.set(dayKey(basDt), records);
   await redis.zadd(DATES_INDEX_KEY, { score: Number(basDt), member: basDt });
+  // [2026-10-28] 그날 "잠정(장 마감 직후 야후)" 자료가 있었으면 확정 자료가 들어왔으니 지움(lib/marketClose.js)
+  await redis.del("hist:prelim:" + basDt, "hist:prelim-work:" + basDt).catch(() => {});
 
   // Prune: keep only the most recent HISTORY_LOOKBACK_DAYS dates.
   const total = await redis.zcard(DATES_INDEX_KEY);

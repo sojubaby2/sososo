@@ -5,6 +5,8 @@ import StockChartModal from "../components/StockChartModal";
 import NoDrag from "../components/NoDrag";
 // [2026-10-27 추가] 휴대폰 전용 맨 아래 탭 줄(속보·시장·관심·일정·전체). PC에서는 안 보임.
 import MobileTabBar from "../components/MobileTabBar";
+// [2026-10-28 추가] 구글 앵커 광고가 뜨면 탭 줄·머리띠를 비켜 줌
+import AnchorAdSpacer from "../components/AnchorAdSpacer";
 
 const SITE_URL = "https://newsmeme.co.kr";
 const TITLE = "뉴스매매 — 실시간 뉴스 속보와 관련주 매칭";
@@ -112,6 +114,8 @@ export default function RootLayout({ children }) {
         <NoDrag />
         {/* [2026-10-27] 휴대폰 전용 맨 아래 탭 줄 (components/MobileTabBar.js) */}
         <MobileTabBar />
+        {/* [2026-10-28] 앵커 광고와 겹치지 않게 (components/AnchorAdSpacer.js) */}
+        <AnchorAdSpacer />
       </body>
     </html>
   );

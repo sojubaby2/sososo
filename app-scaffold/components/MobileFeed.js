@@ -403,7 +403,9 @@ function groupSummary(list) {
   return { themes: stats.map((t) => t.theme), word, wordTone: word === "보합" ? "flat" : tone(avg), mover };
 }
 
-// ad: 첫 시간대 묶음 바로 아래에 끼울 광고 칸(app/HomeClient.js가 <AdSlot />을 넘김)
+// ad: 시간대 묶음 사이에 끼울 광고 칸(app/HomeClient.js가 <AdSlot />을 넘김)
+//   [2026-10-28] 첫 묶음 아래 + 6번째 묶음 아래, 최대 2개(AD_AFTER_GROUPS). 맨 위 큰 카드·테마 지도엔 광고 없음.
+const AD_AFTER_GROUPS = [1, 6];
 export function HourTimeline({ items, newIds, filterKey, ad = null }) {
   const now = useNow();
   const todayKey = dayKey(kstParts(new Date().toISOString()));
@@ -445,7 +447,7 @@ export function HourTimeline({ items, newIds, filterKey, ad = null }) {
         const { themes, word, wordTone, mover } = g.sum;
         return (
           <Fragment key={g.key}>
-          {gi === 1 && ad}
+          {ad && AD_AFTER_GROUPS.includes(gi) && <Fragment key={`ad-${gi}`}>{ad}</Fragment>}
           <section className={`mf-hour ${open ? "open" : ""}`}>
             <button type="button" className="mf-hour-head" aria-expanded={open} onClick={() => flip(g.key)}>
               <span className="mf-hour-lb">{g.label}</span>

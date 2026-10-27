@@ -2001,3 +2001,27 @@ img { -webkit-user-drag: none; }
 /* 속보 목록 안에 끼는 광고: 목록과 같은 안쪽 여백 + 위아래 줄 */
 .ad-in-feed:has(ins[data-ad-status="filled"]) { margin: 0; padding: 14px 16px; border-top: 1px solid var(--border); }
 .m-market-ad .ad-wrap:has(ins[data-ad-status="filled"]) { margin: 4px 0; }
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   [2026-10-28 추가] 광고 배치 다듬기 — 재성님: "거슬리지 않으면서 광고 효율은 좋게"
+   ═══════════════════════════════════════════════════════════════════ */
+/* 앵커 광고(화면 끝에 붙는 구글 띠 광고)가 뜨면 그만큼 비켜 주기 — 값은 components/AnchorAdSpacer.js가 넣음 */
+:root { --nm-anchor-top: 0px; --nm-anchor-bottom: 0px; }
+.site-header { top: var(--nm-anchor-top); }
+@media (max-width: 760px) {
+  .m-tabbar { bottom: var(--nm-anchor-bottom); transition: bottom 0.2s ease; }
+  body { padding-bottom: calc(64px + env(safe-area-inset-bottom) + var(--nm-anchor-bottom)); }
+  .m-menu { bottom: calc(70px + env(safe-area-inset-bottom) + var(--nm-anchor-bottom)); }
+  .toast-container { bottom: calc(74px + env(safe-area-inset-bottom) + var(--nm-anchor-bottom)); }
+  .nb-newpill { top: calc(62px + var(--nm-anchor-top)); }
+}
+/* PC 한 줄 목록 사이 광고 줄 */
+.nb-tape li.nb-adrow { list-style: none; border-bottom: 1px solid var(--border); }
+.nb-adrow .ad-in-feed:has(ins[data-ad-status="filled"]) { border-top: 0; }
+/* 칼럼 끝 "추천 글"(멀티플렉스) — 위에 줄 하나로 본문과 구분 */
+.ad-multiplex:has(ins[data-ad-status="filled"]) { margin-top: 36px; padding-top: 18px; border-top: 1px solid var(--border); }
+
+/* [2026-10-28] 장 마감 정리 "잠정" 딱지 — 장 마감 직후 야후 시세로 먼저 올린 정리(다음 날 아침 확정치로 바뀜) */
+.mk-provisional { display: inline-block; margin: 0 6px 0 0; padding: 1px 7px; border-radius: 5px; font-size: 11.5px; font-weight: 700; vertical-align: 1px; background: var(--amber-tint); color: var(--amber-tint-ink); }
+.stock-h2 .mk-provisional { margin-left: 8px; }

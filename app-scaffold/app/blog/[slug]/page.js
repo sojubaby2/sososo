@@ -98,8 +98,8 @@ export default function BlogPostPage({ params }) {
           ));
         })()}
 
-        {/* [2026-10-27] 광고 — 글 끝 */}
-        <AdSlot />
+        {/* [2026-10-27] 광고 — 글 끝 / [2026-10-28] "추천 글" 모양(멀티플렉스) — 번호가 없으면 일반 광고로 */}
+        <AdSlot kind="multiplex" />
       </main>
     </div>
   );

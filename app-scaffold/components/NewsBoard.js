@@ -39,7 +39,7 @@
 //   ★ 컴퓨터에서 "움직임 줄이기"를 켜둔 사람에게는 자막이 흐르지 않고
 //     첫 제목만 가만히 보입니다.
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { ChevronRight, AlertTriangle, ShieldAlert, ExternalLink } from "lucide-react";
 import StockChip from "./StockChip";
 import { openStockChart } from "../lib/openStockChart";
@@ -203,6 +203,8 @@ function OriginalLink({ n }) {
 const MOBILE_TAPE = 30;
 
 // [2026-10-27 추가] ad: 큰 기사 3건 바로 아래에 끼울 광고 칸(app/HomeClient.js가 <AdSlot />을 넘김)
+// [2026-10-28 추가] 같은 광고 칸을 한 줄 목록 20번째 줄 뒤에도 하나 더(AD_TAPE_AT) — 목록이 길 때만
+const AD_TAPE_AT = 20;
 export default function NewsBoard({ items, newIds, ad = null }) {
   // "몇 분 전"을 1분마다 다시 계산하기 위한 시계
   const [now, setNow] = useState(() => Date.now());
@@ -320,7 +322,11 @@ export default function NewsBoard({ items, newIds, ad = null }) {
             const tt = splitTags(n.headline);
             const mHide = !showAll && idx >= MOBILE_TAPE;
             return (
-              <li key={n.id} className={`${isOpen ? "open" : ""} ${isNew(n) ? "nb-arrive" : ""} ${mHide ? "nb-mhide" : ""}`}>
+              <Fragment key={n.id}>
+              {ad && idx === AD_TAPE_AT && (
+                <li className={`nb-adrow ${mHide ? "nb-mhide" : ""}`}>{ad}</li>
+              )}
+              <li className={`${isOpen ? "open" : ""} ${isNew(n) ? "nb-arrive" : ""} ${mHide ? "nb-mhide" : ""}`}>
                 <button type="button" className="nb-row" aria-expanded={isOpen} onClick={() => toggle(n.id)}>
                   <span className={`nb-time mono ${isFresh(m) ? "fresh" : ""}`} title={agoText(m)}>
                     {clockText(n.time, m)}
@@ -355,6 +361,7 @@ export default function NewsBoard({ items, newIds, ad = null }) {
                   </div>
                 )}
               </li>
+              </Fragment>
             );
           })}
         </ul>

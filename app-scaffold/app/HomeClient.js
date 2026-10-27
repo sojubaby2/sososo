@@ -1135,13 +1135,13 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
               {/* [2026-10-26] 속보 본문 — 헤드라인 + 테이프 (components/NewsBoard.js) */}
               {/* PC: 헤드라인 + 테이프 / 휴대폰: 시간대별 묶음 목록(components/MobileFeed.js) */}
               <div className="desk-only">
-                <NewsBoard items={visible} newIds={newIds} ad={<AdSlot className="ad-in-feed" />} />
+                <NewsBoard items={visible} newIds={newIds} ad={<AdSlot kind="inFeed" className="ad-in-feed" />} />
               </div>
               <HourTimeline
                 items={visible}
                 newIds={newIds}
                 filterKey={filter ? `${filter.kind}:${filter.value}` : ""}
-                ad={<AdSlot className="ad-in-feed" />}
+                ad={<AdSlot kind="inFeed" className="ad-in-feed" />}
               />
 
               {filter && visible.length === 0 && (

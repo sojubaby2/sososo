@@ -37,12 +37,16 @@ export default async function MarketIndexPage() {
       <Header />
       <main className="stock-page market-page">
         <h1 className="mk-title">장 마감 정리</h1>
-        <p className="stock-asof">한국거래소 일별 시세로 매 거래일 자동 정리 · 장 마감 뒤 자료가 들어오면 새 날짜가 생깁니다</p>
+        {/* [2026-10-28 변경] 장 마감(15:30) 직후 잠정 정리가 먼저 올라오고, 다음 날 아침 확정치로 바뀜 */}
+        <p className="stock-asof">
+          매 거래일 장 마감 뒤 자동 정리 · 오후 4시 전후 잠정 정리가 먼저 올라오고, 다음 날 아침 한국거래소 확정치로 바뀝니다
+        </p>
 
         {latest && (
           <section className="panel stock-section">
             <h2 className="stock-h2">
               <Link href={`/market/${latest.date}`}>최신: {koreanDate(latest.date)} →</Link>
+              {latest.provisional && <span className="mk-provisional">잠정</span>}
             </h2>
             {lines.map((t, i) => (
               <p key={i} className="stock-text">

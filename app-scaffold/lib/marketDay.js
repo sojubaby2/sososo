@@ -20,6 +20,8 @@
 import { unstable_cache } from "next/cache";
 import { getRedis } from "./redis";
 import { allThemes, themeMembers } from "./stockDirectory";
+// [2026-10-28 추가] 장 마감 직후 잠정 시세(야후) — 한국거래소 확정 자료가 다음 날 아침에야 나와서
+import { readPrelim, readPrelimLatest } from "./marketClose";
 
 const DATES_KEY = "hist:dates";
 const DAY_PREFIX = "hist:day:";
@@ -36,20 +38,30 @@ async function readDates() {
   const total = await redis.zcard(DATES_KEY);
   if (!total) return [];
   const raw = await redis.zrange(DATES_KEY, 0, total - 1);
-  return raw.map((d) => String(d)).filter((d) => /^\d{8}$/.test(d)).sort();
+  const dates = raw.map((d) => String(d)).filter((d) => /^\d{8}$/.test(d)).sort();
+  // [2026-10-28] 확정 자료보다 새로운 "잠정(장 마감 직후)" 날짜가 완성돼 있으면 맨 끝에 붙임
+  const pre = await readPrelimLatest(redis).catch(() => null);
+  if (pre && /^\d{8}$/.test(pre) && pre > (dates[dates.length - 1] || "") && (await readPrelim(redis, pre).catch(() => null))) {
+    dates.push(pre);
+  }
+  return dates;
 }
 
-// 저장된 거래일 목록(오래된 → 최신), "2026-10-27" 모양. 1시간 저장.
+// 저장된 거래일 목록(오래된 → 최신), "2026-10-27" 모양.
+// [2026-10-28 변경] 1시간 → 5분 저장 — 장 마감 직후 잠정 정리가 늦지 않게 뜨도록
 export const getMarketDates = unstable_cache(
   async () => (await readDates()).map(toIso),
-  ["market-dates-v1"],
-  { revalidate: 3600 }
+  ["market-dates-v2"],
+  { revalidate: 300 }
 );
 
+// 그날 전 종목 시세. 확정 자료(hist:day)가 없으면 잠정 자료(hist:prelim)를 씀 → { rows, provisional }
 async function readDay(redis, basDt) {
   const raw = await redis.get(DAY_PREFIX + basDt);
   const rows = typeof raw === "string" ? JSON.parse(raw) : raw;
-  return Array.isArray(rows) ? rows : null;
+  if (Array.isArray(rows)) return { rows, provisional: false };
+  const pre = await readPrelim(redis, basDt).catch(() => null);
+  return pre ? { rows: pre.records, provisional: true, at: pre.at } : null;
 }
 
 function round2(v) {
@@ -63,8 +75,10 @@ async function computeDay(iso) {
   const idx = dates.indexOf(iso);
   if (idx <= 0) return null; // 그날 자료가 없거나, 비교할 전 거래일이 없음
   const prevIso = dates[idx - 1];
-  const [today, prev] = await Promise.all([readDay(redis, toBas(iso)), readDay(redis, toBas(prevIso))]);
-  if (!today || !prev) return null;
+  const [todayDay, prevDay] = await Promise.all([readDay(redis, toBas(iso)), readDay(redis, toBas(prevIso))]);
+  if (!todayDay || !prevDay) return null;
+  const today = todayDay.rows;
+  const prev = prevDay.rows;
 
   const prevClose = new Map(prev.map((r) => [r.code, r.c]));
   const rows = [];
@@ -134,10 +148,15 @@ async function computeDay(iso) {
     themesUp: themes.slice(0, THEME_N),
     themesDown: themes.slice(-THEME_N).reverse(),
     stockCount: rows.length,
+    // [2026-10-28] 잠정(장 마감 직후 야후 시세) 여부 — 다음 날 아침 한국거래소 확정치로 바뀜
+    provisional: todayDay.provisional,
+    provisionalAt: todayDay.at || null,
   };
 }
 
 const cachedRecent = unstable_cache(computeDay, ["market-day-recent-v1"], { revalidate: 3600 });
+// [2026-10-28] 가장 최근 날짜가 잠정 자료일 때 — 짧게 저장하고 이름표를 따로 둬서, 확정 자료가 오면 새로 계산됨
+const cachedProvisional = unstable_cache(computeDay, ["market-day-provisional-v1"], { revalidate: 600 });
 const cachedPast = unstable_cache(computeDay, ["market-day-past-v1"], { revalidate: 7 * 86400 });
 
 // 날짜 "2026-10-27" → 정리 결과(없으면 null)
@@ -147,6 +166,11 @@ export async function getMarketDay(iso) {
   if (!dates.includes(iso)) return null;
   const isLatest = dates[dates.length - 1] === iso;
   try {
+    if (isLatest) {
+      const redis = getRedis();
+      const official = redis ? await redis.zscore(DATES_KEY, toBas(iso)) : 1;
+      if (official === null || official === undefined) return await cachedProvisional(iso);
+    }
     return await (isLatest ? cachedRecent(iso) : cachedPast(iso));
   } catch {
     return null;

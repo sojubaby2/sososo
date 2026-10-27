@@ -122,7 +122,15 @@ export default async function MarketDayPage({ params }) {
           <Link href="/">홈</Link> › <Link href="/market">장 마감 정리</Link> › <span>{d.date}</span>
         </nav>
         <h1 className="mk-title">{koreanDate(d.date)} 장 마감 정리</h1>
-        <p className="stock-asof">한국거래소 일별 시세 기준 · 전 거래일({d.prevDate}) 종가 대비</p>
+        {/* [2026-10-28] 장 마감 직후 잠정 정리면 그렇다고 표시(다음 날 아침 한국거래소 확정치로 자동 교체) */}
+        {d.provisional ? (
+          <p className="stock-asof">
+            <span className="mk-provisional">잠정</span> 장 마감 직후 시세(15~20분 지연) 기준 · 전 거래일({d.prevDate}) 종가 대비 · 다음 날
+            아침 한국거래소 확정치로 자동으로 바뀝니다
+          </p>
+        ) : (
+          <p className="stock-asof">한국거래소 일별 시세 기준 · 전 거래일({d.prevDate}) 종가 대비</p>
+        )}
 
         <section className="panel stock-section">
           {lines.map((t, i) => (

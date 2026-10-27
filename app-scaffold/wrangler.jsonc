@@ -16,7 +16,8 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "sososo",
-  "main": ".open-next/worker.js",
+  // [2026-10-28] 입구 파일을 custom-worker.js로 — 예약 실행(장 마감 정리) 때문에. 안에서 기본 입구를 그대로 씀
+  "main": "custom-worker.js",
   "compatibility_date": "2026-01-15",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "keep_vars": true,
@@ -50,6 +51,11 @@
       "service": "sososo"
     }
   ],
+  // [2026-10-28] 예약 실행 — 평일 한국 시간 15:00~17:57 사이 3분마다(아래 시각은 세계 표준시라 9시간 빠름)
+  //   장 마감 직후 잠정 장 마감 정리를 모읍니다(custom-worker.js → /api/market-close).
+  "triggers": {
+    "crons": ["*/3 6-8 * * 1-5"]
+  },
   // 오류가 나면 대시보드 "Logs"에서 볼 수 있게
   "observability": {
     "enabled": true
