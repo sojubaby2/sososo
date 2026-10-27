@@ -21,6 +21,8 @@
 //  · 구글 서치콘솔 → Sitemaps → https://newsmeme.co.kr/sitemap.xml
 
 import { blogPosts } from "../lib/allBlogPosts";
+import { allStockCodes } from "../lib/stockDirectory";
+import { getMarketDates } from "../lib/marketDay";
 
 const SITE_URL = "https://newsmeme.co.kr";
 
@@ -32,7 +34,11 @@ function safeDate(value) {
   return parsed && !Number.isNaN(parsed.getTime()) ? parsed : new Date();
 }
 
-export default function sitemap() {
+// [2026-10-27] 장 마감 정리 날짜 목록(저장소 읽기)이 들어가서 요청 때 만듭니다.
+// 날짜 목록 자체는 lib/marketDay.js가 1시간 저장해 둔 것을 씁니다.
+export const dynamic = "force-dynamic";
+
+export default async function sitemap() {
   const now = new Date();
 
   // 고정 페이지들.
@@ -53,6 +59,8 @@ export default function sitemap() {
     { path: "/faq", changeFrequency: "monthly", priority: 0.6 },
     // [2026-10-26 추가] 공모주 일정 — DART에서 3시간마다 자동 갱신
     { path: "/ipo", changeFrequency: "daily", priority: 0.8 },
+    // [2026-10-27 추가] 날짜별 장 마감 정리 목록
+    { path: "/market", changeFrequency: "daily", priority: 0.8 },
     { path: "/disclaimer", changeFrequency: "yearly", priority: 0.4 },
     { path: "/about", changeFrequency: "yearly", priority: 0.4 },
     { path: "/contact", changeFrequency: "yearly", priority: 0.4 },
@@ -75,5 +83,29 @@ export default function sitemap() {
     priority: 0.7,
   }));
 
-  return [...staticPages, ...columnPages];
+  // [2026-10-27 추가] 종목별 페이지 — 테마 자료에 있는 종목(약 1,100개).
+  // 시세·속보가 계속 바뀌므로 daily. 검색엔진이 "○○ 주가" 검색으로 들어오는 입구입니다.
+  const stockPages = allStockCodes().map((code) => ({
+    url: `${SITE_URL}/stock/${code}`,
+    lastModified: now,
+    changeFrequency: "daily",
+    priority: 0.6,
+  }));
+
+  // [2026-10-27 추가] 날짜별 장 마감 정리 — 최근 60거래일. 한 번 지난 날짜는 내용이 안 바뀜.
+  // 날짜 목록은 1시간 저장본(lib/marketDay.js)을 쓰고, 못 읽으면 이 부분만 빠집니다.
+  let marketPages = [];
+  try {
+    const dates = (await getMarketDates()).slice(1).slice(-60);
+    marketPages = dates.map((d) => ({
+      url: `${SITE_URL}/market/${d}`,
+      lastModified: safeDate(`${d}T18:00:00+09:00`),
+      changeFrequency: "monthly",
+      priority: 0.6,
+    }));
+  } catch {
+    marketPages = [];
+  }
+
+  return [...staticPages, ...columnPages, ...marketPages, ...stockPages];
 }

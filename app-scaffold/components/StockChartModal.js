@@ -12,7 +12,8 @@
 //   · 그 아래 한 줄: 날짜 · 시가/고가/저가/종가 (등락률) · 거래량
 //     → 차트 위에 손가락/마우스를 올리면 그 날짜의 값으로 바뀝니다.
 //   · 차트: 최근 130거래일 일봉(오늘 포함) + 5일선(흰색) + 20일선(노란색) + 거래량 막대
-//   · 아래 단추: 코드 복사 / 관련 속보만 보기(홈에서 열었을 때) / 네이버 증권
+//   · 아래 단추: 관심종목 담기 / 코드 복사 / 관련 속보만 보기(홈에서 열었을 때) / 종목 페이지 / 네이버 증권
+//     ([2026-10-27] 관심종목 별표와 종목 페이지(/stock/코드) 단추 추가)
 //
 // 색: 국내 관례대로 오르면 빨강, 내리면 파랑.
 //
@@ -24,21 +25,22 @@
 // 데이터: /api/candles (lib/candles.js — 야후 무료 시세, 15~20분 지연, 비용 0)
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { X, Copy, Check, ExternalLink, Filter } from "lucide-react";
+import { X, Copy, Check, ExternalLink, Filter, FileText } from "lucide-react";
 import { OPEN_CHART_EVENT } from "../lib/openStockChart";
+import WatchStar from "./WatchStar";
 
 const SHOW_BARS = 130; // 화면에 보여줄 거래일 수
 const CLIENT_CACHE_MS = 120000; // 같은 종목을 2분 안에 다시 열면 다시 받지 않음
 const cache = new Map(); // code → { at, data }
 
 // ── 숫자 모양 ─────────────────────────────────────────────
-const won = (n) => (typeof n === "number" ? Math.round(n).toLocaleString("ko-KR") : "—");
-const pctText = (n) => (typeof n === "number" ? `${n > 0 ? "+" : ""}${n.toFixed(2)}%` : "");
-const toneOf = (n) => (typeof n === "number" ? (n > 0 ? "up" : n < 0 ? "down" : "flat") : "flat");
-const shortDate = (d) => `${d.slice(2, 4)}.${d.slice(5, 7)}.${d.slice(8, 10)}`;
+export const won = (n) => (typeof n === "number" ? Math.round(n).toLocaleString("ko-KR") : "—");
+export const pctText = (n) => (typeof n === "number" ? `${n > 0 ? "+" : ""}${n.toFixed(2)}%` : "");
+export const toneOf = (n) => (typeof n === "number" ? (n > 0 ? "up" : n < 0 ? "down" : "flat") : "flat");
+export const shortDate = (d) => `${d.slice(2, 4)}.${d.slice(5, 7)}.${d.slice(8, 10)}`;
 // 오늘 날짜(한국시간) "2026-10-26"
-const kstToday = () => new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
-function volText(v) {
+export const kstToday = () => new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+export function volText(v) {
   if (!v) return "0주";
   if (v >= 1e8) return `${(v / 1e8).toFixed(1)}억주`;
   if (v >= 1e4) return `${Math.round(v / 1e4).toLocaleString("ko-KR")}만주`;
@@ -69,7 +71,8 @@ function niceTicks(min, max, count = 4) {
 }
 
 // ── 차트 그림 ─────────────────────────────────────────────
-function CandleChart({ all, onHover }) {
+// [2026-10-27] 종목 페이지(components/StockInlineChart.js)에서도 같은 그림을 쓰려고 밖으로 내보냅니다.
+export function CandleChart({ all, onHover }) {
   const wrapRef = useRef(null);
   const [width, setWidth] = useState(0);
 
@@ -395,6 +398,7 @@ export default function StockChartModal() {
         </div>
 
         <div className="sc-actions">
+          <WatchStar stock={{ code: stock.code, name: stock.name, market: marketLabel }} />
           <button type="button" className="sc-btn" onClick={copyCode}>
             {copied ? <Check size={14} /> : <Copy size={14} />}
             {copied ? "복사됨" : "코드 복사"}
@@ -411,6 +415,12 @@ export default function StockChartModal() {
               <Filter size={14} />
               관련 속보만 보기
             </button>
+          )}
+          {!stock.hidePageLink && (
+            <a className="sc-btn" href={`/stock/${stock.code}`}>
+              <FileText size={14} />
+              종목 페이지
+            </a>
           )}
           <a
             className="sc-btn"

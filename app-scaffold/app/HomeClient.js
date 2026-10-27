@@ -12,12 +12,13 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Newspaper, Loader2, Flame, Bell, BellOff, Volume2, VolumeX, Smartphone, X, ArrowUp } from "lucide-react";
+import { Newspaper, Loader2, Flame, Bell, BellOff, Volume2, VolumeX, Smartphone, X, ArrowUp, Star } from "lucide-react";
 // [2026-10-21 추가] 뉴스 제목의 &#039; 같은 글자를 원래대로 되돌립니다.
 import { decodeEntities } from "../lib/decodeEntities";
 // [2026-10-21 추가] 속보를 채팅 말풍선으로 보여주는 컴포넌트.
 import NewsBoard from "../components/NewsBoard";
 import { openStockChart } from "../lib/openStockChart";
+import { useWatchlist } from "../lib/watchlist";
 import Header from "../components/Header";
 import DailyOutlookBanner from "../components/DailyOutlookBanner";
 import BriefingBand from "../components/BriefingBand";
@@ -316,9 +317,65 @@ function DailyMoversPanel() {
               </span>
             </div>
           ))}
+          {/* [2026-10-27] 날짜별 장 마감 정리 페이지로 */}
+          <Link href="/market" className="panel-more-link">
+            장 마감 정리 전체 보기 →
+          </Link>
         </>
       )}
     </aside>
+  );
+}
+
+// [2026-10-27 신설] 관심종목 칸 — 오른쪽 칸 맨 위.
+// 별표(☆)로 담은 종목의 오늘 등락률(quotes: 1분마다 받아오는 값)과 종목 페이지 링크.
+// 이름을 누르면 차트 창, "관심종목만 보기"를 누르면 아래 속보가 담은 종목 것만 남습니다.
+function WatchPanel({ list, quotes, active, onToggleFilter, onRemove }) {
+  return (
+    <section className="panel watch-panel" aria-label="관심종목">
+      <div className="watch-panel-head">
+        <span className="panel-label" style={{ margin: 0 }}>
+          <Star size={12} fill="currentColor" className="watch-star-ico" /> 관심종목
+        </span>
+        {list.length > 0 && (
+          <button type="button" className={`watch-filter-btn ${active ? "on" : ""}`} onClick={onToggleFilter} aria-pressed={active}>
+            {active ? "전체 속보 보기" : "관심종목 속보만"}
+          </button>
+        )}
+      </div>
+      {list.length === 0 ? (
+        <p className="watch-empty">종목을 눌러 차트 창의 ☆ 관심종목 담기를 누르면 여기 모입니다. 이 기기에만 저장돼요.</p>
+      ) : (
+        <ul className="watch-list">
+          {list.map((s) => {
+            const q = quotes?.[s.code];
+            const chg = typeof q?.changePct === "number" ? q.changePct : null;
+            return (
+              <li key={s.code} className="watch-row">
+                <button
+                  type="button"
+                  className="watch-name"
+                  onClick={() => openStockChart({ code: s.code, name: s.name, market: s.market })}
+                  title={`${s.name} 일봉 차트 보기`}
+                >
+                  {s.name}
+                  <span className="trending-row-code">{s.code}</span>
+                </button>
+                <span className={`mono watch-chg ${chg === null ? "flat" : chg > 0 ? "up" : chg < 0 ? "down" : "flat"}`}>
+                  {chg === null ? "—" : `${chg > 0 ? "+" : ""}${chg.toFixed(1)}%`}
+                </span>
+                <Link href={`/stock/${s.code}`} className="watch-page" aria-label={`${s.name} 종목 페이지`}>
+                  보기
+                </Link>
+                <button type="button" className="watch-remove" onClick={() => onRemove(s)} aria-label={`${s.name} 관심종목에서 빼기`}>
+                  <X size={12} />
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
   );
 }
 
@@ -742,9 +799,17 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
   //   → 최신 기사에 붙은 종목부터 순서대로, 50개씩 나눠서 빠짐없이 물어봅니다.
   //     (주소가 같으면 1분 동안 공용으로 저장되고, 야후 값은 서버에서 5분 저장 — 비용 0원)
   const QUOTE_CHUNK = 50;
+  // [2026-10-27] 관심종목(별표로 담은 종목)도 오늘 등락률을 받아옵니다 — 맨 앞에 넣어 항상 포함.
+  const watch = useWatchlist();
+  const watchKey = watch.list.map((s) => `${s.code}.${String(s.market || "").includes("닥") ? "KQ" : "KS"}`).join(",");
   const quoteKeys = useMemo(() => {
     const syms = [];
     const seen = new Set();
+    for (const sym of watchKey ? watchKey.split(",") : []) {
+      if (seen.has(sym)) continue;
+      seen.add(sym);
+      syms.push(sym);
+    }
     for (const it of rawItems.slice(0, 40)) {
       for (const m of it.matches || []) {
         if (!/^[0-9A-Z]{6}$/i.test(m.code || "")) continue;
@@ -757,7 +822,7 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
     const chunks = [];
     for (let i = 0; i < syms.length; i += QUOTE_CHUNK) chunks.push(syms.slice(i, i + QUOTE_CHUNK).join(","));
     return chunks;
-  }, [rawItems]);
+  }, [rawItems, watchKey]);
   const quoteKey = quoteKeys.join("|"); // 목록이 바뀌었는지 알아보는 용도
   useEffect(() => {
     if (!quoteKey) return;
@@ -784,7 +849,8 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
   const items = useMemo(() => rawItems.map((it) => toCardShape(it, quotesNow)), [rawItems, quotesNow]);
 
   // [2026-10-19 추가] 테마나 종목을 누르면 아래 속보를 그것만 남깁니다.
-  // filter: null | { kind: "theme" | "stock", value: "해운" }
+  // filter: null | { kind: "theme" | "stock" | "watch", value: "해운" }
+  //   [2026-10-27] kind "watch" = 관심종목에 담은 종목이 걸린 속보만
   const [filter, setFilter] = useState(null);
 
   function toggleFilter(kind, value) {
@@ -794,8 +860,12 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
   const visible = useMemo(() => {
     if (!filter) return items;
     if (filter.kind === "theme") return items.filter((n) => n.themes?.includes(filter.value));
+    if (filter.kind === "watch") {
+      const codes = new Set(watch.list.map((s) => s.code));
+      return items.filter((n) => n.stocks?.some((s) => codes.has(s.code)));
+    }
     return items.filter((n) => n.stocks?.some((s) => s.name === filter.value));
-  }, [items, filter]);
+  }, [items, filter, watch.list]);
 
   // ── [2026-10-26 변경] 채팅방 → "헤드라인 + 테이프" (components/NewsBoard.js) ──
   //
@@ -947,6 +1017,14 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
 
           {/* ── 오른쪽 칸 ── */}
           <aside className="home-col home-right" aria-label="대표 종목과 전일 급등주">
+            {/* [2026-10-27] 관심종목 칸 — WatchPanel 설명 참고 */}
+            <WatchPanel
+              list={watch.list}
+              quotes={quotesNow}
+              active={filter?.kind === "watch"}
+              onToggleFilter={() => toggleFilter("watch", "관심종목")}
+              onRemove={(s) => watch.toggle(s)}
+            />
             {/* 대표 종목(삼성전자·SK하이닉스) — 2026-10-26 추가, FlagshipStrip 설명 참고 */}
             <FlagshipStrip filter={filter} onPick={(name) => toggleFilter("stock", name)} />
             <DailyMoversPanel />
