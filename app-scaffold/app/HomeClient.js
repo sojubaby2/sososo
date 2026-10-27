@@ -17,6 +17,8 @@ import { Newspaper, Loader2, Flame, Bell, BellOff, Volume2, VolumeX, Smartphone,
 import { decodeEntities } from "../lib/decodeEntities";
 // [2026-10-21 추가] 속보를 채팅 말풍선으로 보여주는 컴포넌트.
 import NewsBoard from "../components/NewsBoard";
+// [2026-10-27 추가] 휴대폰 전용 속보 탭(큰 속보 카드 + 테마 지도 + 시간대별 목록) — components/MobileFeed.js
+import { MobileHero, MobilePulse, ThemeMap, HourTimeline } from "../components/MobileFeed";
 import { openStockChart } from "../lib/openStockChart";
 import { useWatchlist } from "../lib/watchlist";
 import Header from "../components/Header";
@@ -524,62 +526,25 @@ function FlagshipStrip({ filter, onPick }) {
   );
 }
 
-// [2026-10-27 신설] 휴대폰 "속보" 탭 맨 위 — 지수 한 줄 + 테마 칩 줄. (PC에서는 안 보임)
-//   · 지수 한 줄: 맨 위 브리핑 띠(시장 탭으로 옮김)의 세계 증시 숫자를 짧게. 옆으로 밀면 더 보임.
-//   · 테마 칩: 지금 속보에 많이 나온 테마 순서. 누르면 그 테마 속보만 남습니다(다시 누르면 해제).
-//     PC 화면의 "테마를 누르면 속보 거르기"와 같은 기능입니다.
-const M_THEME_CHIPS = 8;
-function MobileFeedTop({ worldIndices, items, filter, onTheme, onAll }) {
+// [2026-10-27 신설] 휴대폰 "속보" 탭 맨 위 — 지수 한 줄. (PC에서는 안 보임)
+//   맨 위 브리핑 띠(시장 탭으로 옮김)의 세계 증시 숫자를 짧게. 옆으로 밀면 더 보임.
+//   [2026-10-27 오후] 테마 칩 줄은 없앴습니다 — 아래 "테마 지도"(components/MobileFeed.js)가 같은 일을 더 크게 합니다.
+function MobileFeedTop({ worldIndices }) {
   const indices = Array.isArray(worldIndices?.items) ? worldIndices.items : [];
-  const themes = useMemo(() => {
-    const count = new Map();
-    for (const n of items.slice(0, 80)) {
-      for (const t of n.themes || []) {
-        if (!t || isPoliticalTheme(t)) continue;
-        count.set(t, (count.get(t) || 0) + 1);
-      }
-    }
-    return [...count.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, M_THEME_CHIPS)
-      .map(([t]) => t);
-  }, [items]);
-  const activeTheme = filter?.kind === "theme" ? filter.value : null;
-
+  if (!indices.length) return null;
   return (
     <div className="m-feedtop">
-      {indices.length > 0 && (
-        <div className="m-ticker" aria-label="주요 지수">
-          {indices.map((it) => (
-            <span key={it.key} className="m-tk">
-              <b>{String(it.label || "").split("-").pop()}</b>
-              <span className="mono">
-                {typeof it.close === "number" ? it.close.toLocaleString("ko-KR", { maximumFractionDigits: 2 }) : "—"}
-              </span>
-              <span className={`mono ${toneOf(it.changePct)}`}>{fmtPct(it.changePct)}</span>
+      <div className="m-ticker" aria-label="주요 지수">
+        {indices.map((it) => (
+          <span key={it.key} className="m-tk">
+            <b>{String(it.label || "").split("-").pop()}</b>
+            <span className="mono">
+              {typeof it.close === "number" ? it.close.toLocaleString("ko-KR", { maximumFractionDigits: 2 }) : "—"}
             </span>
-          ))}
-        </div>
-      )}
-      {themes.length > 0 && (
-        <div className="m-chips" role="group" aria-label="테마로 속보 거르기">
-          <button type="button" className={`m-chip ${!filter ? "on" : ""}`} aria-pressed={!filter} onClick={onAll}>
-            전체
-          </button>
-          {themes.map((t, i) => (
-            <button
-              type="button"
-              key={t}
-              className={`m-chip ${activeTheme === t ? "on" : ""}`}
-              aria-pressed={activeTheme === t}
-              onClick={() => onTheme(t)}
-            >
-              {i === 0 && <Flame size={12} aria-hidden="true" />}
-              {t}
-            </button>
-          ))}
-        </div>
-      )}
+            <span className={`mono ${toneOf(it.changePct)}`}>{fmtPct(it.changePct)}</span>
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
@@ -1063,14 +1028,23 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
           "홈 화면 — 어두운 터미널형 3칸 배치" 부분에 있습니다. */}
       <main className="container-wide home-main">
         {/* [2026-10-27] 휴대폰 "속보" 탭 맨 위 — 지수 한 줄 + 테마 칩 (PC에서는 안 보임) */}
-        <MobileFeedTop
-          worldIndices={worldIndices}
-          items={items}
-          filter={filter}
-          onTheme={(t) => toggleFilter("theme", t)}
-          onAll={() => setFilter(null)}
-        />
+        <MobileFeedTop worldIndices={worldIndices} />
         <InstallHintBanner />
+        {/* [2026-10-27 오후] 휴대폰 속보 탭: 큰 속보 카드 → 오늘 숫자 → 테마 지도 (PC에서는 안 보임) */}
+        <div className="mf-top">
+          <MobileHero items={items} />
+          <MobilePulse items={items} />
+          <ThemeMap
+            items={items}
+            activeTheme={filter?.kind === "theme" ? filter.value : null}
+            onPick={(t) => {
+              const picking = !(filter?.kind === "theme" && filter.value === t);
+              toggleFilter("theme", t);
+              // 고르면 그 테마 속보 목록이 보이도록 아래로 내려 줌(해제할 때는 그대로)
+              if (picking) requestAnimationFrame(() => goFeedTop());
+            }}
+          />
+        </div>
 
         <div className="home-grid">
           {/* ── 왼쪽 칸 ── */}
@@ -1157,7 +1131,11 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
               )}
 
               {/* [2026-10-26] 속보 본문 — 헤드라인 + 테이프 (components/NewsBoard.js) */}
-              <NewsBoard items={visible} newIds={newIds} />
+              {/* PC: 헤드라인 + 테이프 / 휴대폰: 시간대별 묶음 목록(components/MobileFeed.js) */}
+              <div className="desk-only">
+                <NewsBoard items={visible} newIds={newIds} />
+              </div>
+              <HourTimeline items={visible} newIds={newIds} filterKey={filter ? `${filter.kind}:${filter.value}` : ""} />
 
               {filter && visible.length === 0 && (
                 <p className="feed-empty" style={{ fontSize: 14, color: "var(--ink-muted)", padding: "24px 0" }}>

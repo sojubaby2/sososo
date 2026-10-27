@@ -1752,21 +1752,13 @@ img { -webkit-user-drag: none; }
     display: flex; gap: 18px; overflow-x: auto; padding: 9px 16px; white-space: nowrap; font-size: 12.5px;
     background: var(--surface); border-bottom: 1px solid var(--border); scrollbar-width: none;
   }
-  .m-ticker::-webkit-scrollbar, .m-chips::-webkit-scrollbar { display: none; }
+  .m-ticker::-webkit-scrollbar { display: none; }
   .m-tk { display: inline-flex; align-items: baseline; gap: 5px; }
   .m-tk b { font-weight: 600; color: var(--ink-soft); }
   .m-tk .mono { color: var(--ink); }
   .m-tk .mono.up { color: var(--up); }
   .m-tk .mono.down { color: var(--down); }
-  .m-chips { display: flex; gap: 7px; overflow-x: auto; padding: 12px 16px 0; scrollbar-width: none; }
-  .m-chip {
-    flex-shrink: 0; display: inline-flex; align-items: center; gap: 4px; height: 34px; padding: 0 14px; border-radius: 999px;
-    border: 1px solid var(--border); background: var(--surface); color: var(--ink-muted);
-    font: inherit; font-size: 13.5px; font-weight: 600; white-space: nowrap; cursor: pointer; -webkit-tap-highlight-color: transparent;
-  }
-  .m-chip svg { color: var(--up); }
-  .m-chip.on { background: var(--ink); border-color: var(--ink); color: var(--surface); }
-  .m-chip.on svg { color: inherit; }
+  /* (테마 칩 줄은 2026-10-27 오후 "테마 지도"로 바뀌어 없앰) */
 
   /* ── 홈 탭 나누기 ── */
   /* 속보 탭: 속보만 */
@@ -1807,4 +1799,166 @@ img { -webkit-user-drag: none; }
 }
 @media (max-width: 760px) and (prefers-reduced-motion: reduce) {
   .m-menu, .m-dim, .sc-modal { animation: none; }
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   [2026-10-27 오후 신설] 휴대폰 속보 탭 — 시안 A+B+C 합침 (components/MobileFeed.js)
+   재성님: "메인화면이 뭔가 아쉬운데 좀 혁신이 부족한 느낌" → "abc 다 합치면?"
+   A 큰 속보 카드(.mf-hero) · 오늘 숫자(.mf-pulse) · B 테마 지도(.mf-map) · C 시간대별 목록(.mf-tl)
+   PC(761px 이상)에서는 .m-only가 숨고 예전 화면(.desk-only)이 그대로 나옵니다.
+   ═══════════════════════════════════════════════════════════════════ */
+.m-only, .mf-top { display: none; }
+
+@media (max-width: 760px) {
+  .desk-only { display: none; }
+  .m-only { display: block; }
+  .mf-top { display: block; margin: 0 -16px 18px; }
+  .m-market .mf-top, .m-watch .mf-top { display: none; }
+  .m-feedtop { margin-bottom: 0; }
+  .install-hint { margin: 12px 0 0; }
+
+  /* ── A. 큰 속보 카드 ── */
+  .mf-hero { padding-top: 12px; }
+  .mf-hero-track {
+    display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding: 0 16px;
+    padding: 0 16px; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  }
+  .mf-hero-track::-webkit-scrollbar { display: none; }
+  .mf-card {
+    flex: 0 0 calc(100% - 26px); scroll-snap-align: start; position: relative; overflow: hidden;
+    border-radius: 22px; padding: 15px 15px 13px; color: #fff;
+    background: linear-gradient(155deg, #3a1114 0%, #1b1a1f 62%, #141416 100%);
+    border: 1px solid rgba(255, 255, 255, 0.08); box-shadow: 0 10px 28px rgba(20, 10, 12, 0.22);
+  }
+  .mf-card::after {
+    content: ""; position: absolute; right: -70px; top: -70px; width: 210px; height: 210px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(255, 77, 79, 0.32), transparent 70%); pointer-events: none;
+  }
+  .mf-card-meta { position: relative; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 7px; font-size: 12px; color: #c4c4cb; }
+  .mf-count { margin-left: auto; color: #8e8e96; }
+  .mf-brk { display: inline-block; background: #d62b2f; color: #fff; font-size: 11px; font-weight: 800; padding: 2px 7px; border-radius: 5px; line-height: 1.4; }
+  .mf-tag { display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 5px; border: 1px solid currentColor; line-height: 1.4; opacity: 0.85; }
+  .mf-tag.hot { color: #ff6b6e; opacity: 1; }
+  .mf-card .mf-tag { color: #d9d9de; }
+  .mf-card .mf-tag.hot { color: #ff7b7e; }
+  .mf-card-title {
+    position: relative; z-index: 1; margin: 10px 0 13px; font-size: 21px; line-height: 1.36; font-weight: 700; letter-spacing: -0.03em;
+    word-break: keep-all; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; min-height: 3.9em;
+  }
+  .mf-tiles { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+  .mf-tile {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 0; padding: 9px 9px 7px; border-radius: 13px;
+    background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.13); color: #fff; font: inherit; text-align: left; cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .mf-tile:active { background: rgba(255, 255, 255, 0.16); }
+  .mf-tile-nm { display: flex; align-items: center; gap: 3px; max-width: 100%; font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mf-tile-nm svg { color: #f9a8d4; flex-shrink: 0; }
+  .mf-tile-pct { font-size: 18px; font-weight: 700; letter-spacing: -0.02em; }
+  .mf-tile-pct.up { color: #ff6b74; }
+  .mf-tile-pct.down { color: #6aa6ff; }
+  .mf-tile-pct.flat { color: #c4c4cb; }
+  .mf-spark { display: block; width: 100%; height: 22px; margin-top: 3px; }
+  /* 가격 그림은 최근 20일 흐름이라 오늘 등락률(위 숫자)과 색이 엇갈리면 헷갈림 → 색 없이 흰 선 */
+  .mf-spark.up, .mf-spark.down { color: rgba(255, 255, 255, 0.72); }
+  .mf-spark-empty { border-bottom: 1px dashed rgba(255, 255, 255, 0.18); height: 12px; margin-bottom: 10px; }
+  .mf-card-link { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 3px; margin-top: 10px; font-size: 12px; color: #c4c4cb; text-decoration: none; }
+  .mf-dots { display: flex; justify-content: center; gap: 6px; padding: 10px 0 0; }
+  .mf-dots button { width: 7px; height: 7px; padding: 0; border: 0; border-radius: 4px; background: var(--border-strong); cursor: pointer; transition: width 0.2s ease; }
+  .mf-dots button.on { width: 22px; background: var(--ink); }
+
+  /* ── 오늘 숫자 한 줄 ── */
+  .mf-pulse { display: flex; gap: 8px; overflow-x: auto; padding: 12px 16px 0; scrollbar-width: none; }
+  .mf-pulse::-webkit-scrollbar { display: none; }
+  .mf-pc {
+    flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 9px 13px; border-radius: 14px;
+    background: var(--surface); border: 1px solid var(--border); font: inherit; font-size: 11.5px; color: var(--ink-soft); text-align: left;
+  }
+  button.mf-pc { cursor: pointer; }
+  .mf-pc b { display: inline-flex; align-items: center; gap: 4px; font-size: 15px; font-weight: 700; color: var(--ink); white-space: nowrap; }
+  .mf-pc b svg { color: var(--up); }
+  .mf-pc .up { color: var(--up); }
+  .mf-pc .down { color: var(--down); }
+
+  /* ── B. 테마 지도 ── */
+  .mf-map { padding: 0 16px; margin-top: 20px; }
+  .mf-sec-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 9px; }
+  .mf-sec-head h2 { margin: 0; font-size: 16.5px; font-weight: 700; color: var(--ink); letter-spacing: -0.02em; }
+  .mf-sec-head span { font-size: 12px; color: var(--ink-soft); white-space: nowrap; }
+  .mf-heat { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); grid-auto-rows: 56px; grid-auto-flow: dense; gap: 4px; }
+  .mf-ht {
+    display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start; min-width: 0; overflow: hidden;
+    padding: 8px 9px; border: 0; border-radius: 11px; color: #fff; font: inherit; text-align: left; cursor: pointer;
+    transition: opacity 0.15s ease, transform 0.12s ease; -webkit-tap-highlight-color: transparent;
+  }
+  .mf-ht:active { transform: scale(0.97); }
+  .mf-ht b { max-width: 100%; font-size: 15px; font-weight: 700; line-height: 1.2; letter-spacing: -0.02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mf-ht.big b { font-size: 21px; white-space: normal; word-break: keep-all; }
+  .mf-ht span { font-size: 11.5px; opacity: 0.92; white-space: nowrap; }
+  .mf-ht.sm { padding: 7px 6px; }
+  .mf-ht.sm b { font-size: 12.5px; }
+  .mf-ht.sm span { font-size: 10.5px; }
+  .mf-heat.has-pick .mf-ht:not(.on) { opacity: 0.38; }
+  .mf-ht.on { box-shadow: inset 0 0 0 3px var(--ink); }
+  .hu3 { background: #b81f30; }
+  .hu2 { background: #d6475a; }
+  .hu1 { background: #cf6675; }
+  .hd1 { background: #6f93d9; }
+  .hd2 { background: #4b7ad6; }
+  .hd3 { background: #2b55b0; }
+  .h0 { background: #8b8b94; }
+  .mf-map-note { margin: 8px 0 0; font-size: 11.5px; color: var(--ink-soft); line-height: 1.5; word-break: keep-all; }
+
+  /* ── C. 시간대별 묶음 목록 ── */
+  .mf-tl { padding: 4px 0 6px; }
+  .mf-hour { border-top: 1px solid var(--border); }
+  .mf-hour:first-child { border-top: 0; }
+  .mf-hour-head {
+    display: grid; grid-template-columns: auto auto 1fr; align-items: center; gap: 2px 8px; width: 100%; padding: 13px 14px 11px;
+    background: none; border: 0; font: inherit; text-align: left; color: var(--ink); cursor: pointer; -webkit-tap-highlight-color: transparent;
+  }
+  .mf-hour-lb { font-size: 16px; font-weight: 700; letter-spacing: -0.02em; }
+  .mf-hour-n { font-size: 12px; color: var(--ink-soft); }
+  .mf-hour-chev { justify-self: end; color: var(--ink-soft); transition: transform 0.18s ease; }
+  .mf-hour.open .mf-hour-chev { transform: rotate(180deg); }
+  .mf-hour-sum { grid-column: 1 / -1; font-size: 13px; color: var(--ink-muted); line-height: 1.45; word-break: keep-all; }
+  .mf-hour-sum b { font-weight: 700; }
+  .mf-hour-sum .up { color: var(--up); }
+  .mf-hour-sum .down { color: var(--down); }
+  .mf-hour-sum .flat { color: var(--ink); }
+  .mf-rows { list-style: none; margin: 0; padding: 0 14px 6px; }
+  .mf-row { display: grid; grid-template-columns: 16px 40px minmax(0, 1fr); gap: 0 6px; align-items: start; padding: 10px 0; border-top: 1px dashed var(--border); }
+  .mf-row.mf-new { animation: mf-flash 2.4s ease-out; }
+  @keyframes mf-flash { 0%, 30% { background: var(--breaking-tint); } 100% { background: transparent; } }
+  .mf-dot { width: 9px; height: 9px; margin: 6px 0 0 3px; border-radius: 50%; background: var(--ink-soft); }
+  .mf-dot.up { background: var(--up); }
+  .mf-dot.down { background: var(--down); }
+  .mf-dot.big { width: 15px; height: 15px; margin: 3px 0 0 0; box-shadow: 0 0 0 3px color-mix(in oklab, currentColor 0%, transparent); }
+  .mf-dot.big.up { box-shadow: 0 0 0 3px color-mix(in oklab, var(--up) 22%, transparent); }
+  .mf-dot.big.down { box-shadow: 0 0 0 3px color-mix(in oklab, var(--down) 22%, transparent); }
+  .mf-time { font-size: 12.5px; color: var(--ink-soft); padding-top: 2px; }
+  .mf-time.fresh { color: var(--breaking-bright); font-weight: 700; }
+  .mf-body { min-width: 0; }
+  .mf-title {
+    display: block; width: 100%; padding: 0; background: none; border: 0; font: inherit; text-align: left; cursor: pointer;
+    font-size: 15px; font-weight: 600; line-height: 1.42; letter-spacing: -0.02em; color: var(--ink); word-break: keep-all; overflow-wrap: anywhere;
+  }
+  .mf-title .mf-brk, .mf-title .mf-tag { margin-right: 5px; vertical-align: 1px; }
+  .mf-tag.bad { color: var(--bad); }
+  .mf-stocks { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 5px; }
+  .mf-stocks button { padding: 0; background: none; border: 0; font: inherit; font-size: 12.5px; color: var(--ink-muted); cursor: pointer; }
+  .mf-stocks b { font-weight: 700; }
+  .mf-stocks .up { color: var(--up); }
+  .mf-stocks .down { color: var(--down); }
+  .mf-stocks .flat { color: var(--ink-soft); }
+  .mf-more { font-size: 12px; color: var(--ink-soft); }
+  .mf-detail { margin-top: 9px; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); font-size: 13.5px; line-height: 1.6; color: var(--ink-muted); }
+  .mf-detail p { margin: 0 0 6px; word-break: keep-all; }
+  .mf-why { margin: 0 0 6px; padding-left: 16px; font-size: 12.5px; }
+  .mf-detail-foot { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--ink-soft); }
+  .mf-detail-foot a { display: inline-flex; align-items: center; gap: 4px; color: var(--ink); font-weight: 600; text-decoration: none; }
+}
+@media (max-width: 760px) and (prefers-reduced-motion: reduce) {
+  .mf-row.mf-new { animation: none; }
 }
