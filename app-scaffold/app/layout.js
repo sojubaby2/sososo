@@ -2,6 +2,7 @@ import "./globals.css";
 import SiteFooterNav from "../components/SiteFooterNav";
 // [2026-10-26 추가] 종목을 누르면 뜨는 일봉 차트 창 — 모든 페이지에서 쓰도록 여기 한 번만 달아 둠
 import StockChartModal from "../components/StockChartModal";
+import NoDrag from "../components/NoDrag";
 
 const SITE_URL = "https://newsmeme.co.kr";
 const TITLE = "뉴스매매 — 실시간 뉴스 속보와 관련주 매칭";
@@ -105,6 +106,8 @@ export default function RootLayout({ children }) {
         {children}
         <SiteFooterNav />
         <StockChartModal />
+        {/* [2026-10-27] 드래그 방지 (components/NoDrag.js) */}
+        <NoDrag />
       </body>
     </html>
   );
