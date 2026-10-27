@@ -6,6 +6,7 @@
 //
 // 이 파일이 정하는 것:
 //   · name            — Cloudflare 안에서 이 사이트(Worker)의 이름. 대시보드에서 이 이름으로 보입니다.
+//                       [2026-10-27] 9월에 만들어 둔 "sososo" Worker(API 키가 이미 들어 있음)를 그대로 씁니다.
 //   · assets          — 그림·글꼴·화면 코드 같은 고정 파일(요청 수에 안 잡히고 무료)
 //   · r2_buckets      — 페이지·자료를 잠시 저장해 두는 창고(R2). 대시보드에서 아래 이름으로 미리 만들어야 함
 //   · durable_objects — "N분마다 새로 만들기" 페이지를 뒤에서 차례로 다시 만드는 일꾼
@@ -14,7 +15,7 @@
 // ★ 이름을 바꾸면 대시보드의 Worker 이름, R2 창고 이름도 똑같이 맞춰야 합니다.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "newsmeme",
+  "name": "sososo",
   "main": ".open-next/worker.js",
   "compatibility_date": "2026-01-15",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
@@ -46,7 +47,7 @@
   "services": [
     {
       "binding": "WORKER_SELF_REFERENCE",
-      "service": "newsmeme"
+      "service": "sososo"
     }
   ],
   // 오류가 나면 대시보드 "Logs"에서 볼 수 있게
