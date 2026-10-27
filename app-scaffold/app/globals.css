@@ -1572,3 +1572,44 @@ input, textarea, select, [contenteditable="true"] {
   -webkit-touch-callout: default;
 }
 img { -webkit-user-drag: none; }
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   [2026-10-27 추가] 공시 일정(/disclosure) — 달력은 공모주 달력(ipo-cal-*) 모양을 같이 씀
+   ═══════════════════════════════════════════════════════════════════ */
+.dc-ev { font-weight: 600; border-left: 3px solid var(--border); }
+.dc-ev b { font-weight: 500; color: var(--ink-soft); }
+.dc-free { background: color-mix(in oklab, var(--up) 10%, transparent); border-left-color: var(--up); color: var(--ink); }
+.dc-cut { background: color-mix(in oklab, var(--down) 10%, transparent); border-left-color: var(--down); color: var(--ink); }
+.dc-buyback { background: var(--amber-tint); border-left-color: var(--amber); color: var(--amber-tint-ink); }
+.dc-more { font-size: 11px; color: var(--ink-soft); padding-left: 4px; }
+.ipo-cal-key.dc-key-free { background: color-mix(in oklab, var(--up) 10%, transparent); border-left: 3px solid var(--up); }
+.ipo-cal-key.dc-key-cut { background: color-mix(in oklab, var(--down) 10%, transparent); border-left: 3px solid var(--down); margin-left: 6px; }
+.ipo-cal-key.dc-key-buyback { background: var(--amber-tint); border-left: 3px solid var(--amber); margin-left: 6px; }
+.dc-filters { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.dc-filter { font-size: 13px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-2); color: var(--ink-muted); cursor: pointer; font-weight: 500; }
+.dc-filter .mono { font-size: 11.5px; color: var(--ink-soft); margin-left: 2px; }
+.dc-filter:hover { border-color: var(--amber); color: var(--ink); }
+.dc-filter.on { border-color: var(--amber); background: var(--amber-tint); color: var(--amber-tint-ink); }
+.dc-day { margin-top: 14px; }
+.dc-list { list-style: none; margin: 0; padding: 0; }
+.dc-row { display: grid; grid-template-columns: 88px 170px 1fr; gap: 10px; align-items: baseline; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+.dc-row .dc-tag { justify-self: start; }
+.dc-row:last-child { border-bottom: none; }
+.dc-corp { color: var(--ink); font-weight: 600; text-decoration: none; word-break: keep-all; }
+.dc-corp:hover { color: var(--amber); }
+.dc-title { color: var(--ink-muted); text-decoration: none; word-break: keep-all; overflow-wrap: anywhere; }
+.dc-title:hover { color: var(--ink); text-decoration: underline; }
+.dc-tag { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 5px; background: var(--surface-2); color: var(--ink-muted); white-space: nowrap; }
+.dc-tag-warn { background: var(--bad-tint); color: var(--bad-tint-ink); }
+.dc-tag-earn { background: var(--green-tint); color: var(--green-tint-ink); }
+.dc-tag-deal { background: var(--amber-tint); color: var(--amber-tint-ink); }
+.dc-tag-free, .dc-tag-buyback, .dc-tag-div { background: color-mix(in oklab, var(--up) 12%, transparent); color: var(--up); }
+.dc-tag-paid, .dc-tag-cut, .dc-tag-bond { background: color-mix(in oklab, var(--down) 12%, transparent); color: var(--down); }
+.dc-tag-sched { background: var(--amber); color: var(--on-fill); }
+.dc-more-btn { margin-top: 12px; }
+.market-page .muted { color: var(--ink-soft); }
+@media (max-width: 640px) {
+  .dc-row { grid-template-columns: 88px 1fr; }
+  .dc-title { grid-column: 1 / -1; }
+}

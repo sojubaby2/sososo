@@ -50,6 +50,8 @@ const MENU = [
   { href: "/themes", label: "테마별 종목정리" },
   // [2026-10-26 변경] 바깥 DART 링크 → 우리 사이트 공모주 페이지(app/ipo, 3시간마다 자동 갱신)
   { href: "/ipo", label: "공모주 정보" },
+  // [2026-10-27 추가] DART 공시 일정·주요 공시(app/disclosure)
+  { href: "/disclosure", label: "공시 일정" },
   { href: "/market", label: "장 마감 정리" },
   { href: "/guide", label: "차트 가이드" },
   { href: "/blog", label: "칼럼" },

@@ -61,6 +61,8 @@ export default async function sitemap() {
     { path: "/ipo", changeFrequency: "daily", priority: 0.8 },
     // [2026-10-27 추가] 날짜별 장 마감 정리 목록
     { path: "/market", changeFrequency: "daily", priority: 0.8 },
+    // [2026-10-27 추가] 공시 일정·주요 공시(30분마다 갱신)
+    { path: "/disclosure", changeFrequency: "hourly", priority: 0.8 },
     { path: "/disclaimer", changeFrequency: "yearly", priority: 0.4 },
     { path: "/about", changeFrequency: "yearly", priority: 0.4 },
     { path: "/contact", changeFrequency: "yearly", priority: 0.4 },

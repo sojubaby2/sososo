@@ -12,6 +12,7 @@
 //   3. 한눈에 보기 — 1주/1개월/3개월 등락률, 기간 고점·저점, 평균선 위치를 문장으로
 //   4. 이 종목이 걸린 최근 속보(이 사이트가 자동 매칭한 이유와 함께)
 //   5. 속한 테마 → 테마별 종목정리로 이동 / 같은 테마 종목 → 그 종목 페이지로 이동
+//   6. [2026-10-27 추가] 최근 공시와 공시 일정(DART — lib/disclosures.js의 30분 저장본을 같이 씀)
 //
 // 데이터와 비용(전부 0원)
 //   · 일봉: 야후 무료 시세(lib/candles.js) — 2분 저장
@@ -32,6 +33,7 @@ import { fetchDailyCandles } from "../../../lib/candles";
 import { getRecentFeed, newsForStock, kstDateTimeText } from "../../../lib/recentFeed";
 import { summarizeCandles, describeSummary } from "../../../lib/stockSummary";
 import { decodeEntities } from "../../../lib/decodeEntities";
+import { disclosuresForStock, categoryLabel, dartViewerUrl, kstTodayIso } from "../../../lib/disclosures";
 
 export const revalidate = 600; // 10분
 export const dynamicParams = true;
@@ -50,9 +52,10 @@ function normCode(raw) {
 
 async function loadStock(code) {
   const dir = getStock(code);
-  const [chart, feed] = await Promise.all([
+  const [chart, feed, disc] = await Promise.all([
     fetchDailyCandles(code, dir?.market || "").catch(() => null),
     getRecentFeed(),
+    disclosuresForStock(code).catch(() => ({ recent: [], events: [] })),
   ]);
   const news = newsForStock(feed, code, 20);
   // 이름: 테마 자료 → 속보에 붙은 이름 → 코드
@@ -67,7 +70,7 @@ async function loadStock(code) {
     }
   }
   const market = chart?.market || dir?.market || "";
-  return { dir, chart, news, name, market };
+  return { dir, chart, news, name, market, disc };
 }
 
 export async function generateMetadata({ params }) {
@@ -96,8 +99,10 @@ const tone = (v) => (typeof v === "number" ? (v > 0 ? "up" : v < 0 ? "down" : "f
 export default async function StockPage({ params }) {
   const code = normCode(params.code);
   if (!code) notFound();
-  const { dir, chart, news, name, market } = await loadStock(code);
+  const { dir, chart, news, name, market, disc } = await loadStock(code);
   if (!name && !chart) notFound();
+  const today = kstTodayIso();
+  const upcomingEvents = (disc?.events || []).filter((e) => e.date >= today);
 
   const label = name || code;
   const candles = chart?.candles || [];
@@ -195,6 +200,41 @@ export default async function StockPage({ params }) {
             </ul>
           )}
         </section>
+
+        {(disc?.recent?.length > 0 || upcomingEvents.length > 0) && (
+          <section className="panel stock-section">
+            <h2 className="stock-h2">최근 공시</h2>
+            {upcomingEvents.length > 0 && (
+              <ul className="stock-news">
+                {upcomingEvents.map((e, i) => (
+                  <li key={`${e.rceptNo}-${e.type}-${i}`}>
+                    <span className="dc-tag dc-tag-sched">일정</span>{" "}
+                    <b className="mono">{e.date}</b> {e.label}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {disc.recent.length > 0 && (
+              <ul className="stock-news">
+                {disc.recent.map((d) => (
+                  <li key={d.rceptNo}>
+                    <span className={`dc-tag dc-tag-${d.cat}`}>{categoryLabel(d.cat)}</span>{" "}
+                    <a href={dartViewerUrl(d.rceptNo)} target="_blank" rel="noopener noreferrer" className="stock-news-title">
+                      {d.title}
+                    </a>
+                    <div className="stock-news-meta">
+                      <span className="mono">{d.date}</span>
+                      <span>DART 원문</span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="stock-text muted" style={{ fontSize: 13, marginTop: 8 }}>
+              최근 7일 주요 공시만 보여 줍니다. 전체 공시 일정은 <Link href="/disclosure">공시 일정</Link>에서 볼 수 있어요.
+            </p>
+          </section>
+        )}
 
         {dir && (
           <section className="panel stock-section">
