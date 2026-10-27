@@ -1657,3 +1657,154 @@ img { -webkit-user-drag: none; }
   .stock-page { padding: 18px 14px 56px; }
   .stock-section { padding: 16px 14px; }
 }
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   [2026-10-27 신설] 휴대폰 앱형 화면 — 760px 이하에서만. PC 화면은 전혀 바뀌지 않습니다.
+   재성님: "pc 배치를 아예 벗어나서 새롭고 혁신적이게 모바일 전용 ui배치를 해보는건 어때?"
+   → 시안 A(증권 앱처럼 아래 탭 + 밑에서 올라오는 종목 창) + 시안 C(촘촘한 속보 목록)
+
+   구성
+     · 맨 아래 탭 줄 5개(components/MobileTabBar.js): 속보 · 시장 · 관심 · 일정 · 전체
+     · 위쪽 메뉴 줄은 숨김 → "전체"를 누르면 모든 메뉴가 바둑판으로
+     · 홈은 탭 세 개로 나뉨(app/HomeClient.js, lib/mobileTab.js)
+         속보: 지수 한 줄 + 테마 칩 + 실시간 속보
+         시장: 오늘 요약·지수 띠 + 대표 종목 + 전일 급등주 + 오늘의 예측 + HOT 테마
+         관심: 관심종목 + 그 종목이 걸린 속보만
+     · 종목 창은 아래에서 올라오고, 손잡이를 잡아 내리면 닫힘(components/StockChartModal.js)
+   ═══════════════════════════════════════════════════════════════════ */
+.m-tabbar, .m-menu, .m-dim, .m-feedtop, .m-sched, .sc-grab { display: none; }
+
+@media (max-width: 760px) {
+  /* 탭 줄에 내용이 가리지 않게 맨 아래 여백 */
+  body { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
+
+  /* ── 머리띠: 한 줄(로고 · 화면 전환 단추), 메뉴 줄은 탭 줄이 대신 ── */
+  .site-header-inner { height: 52px; padding: 0; flex-wrap: nowrap; gap: 10px; }
+  .site-header .nav { display: none; }
+  .theme-toggle { margin-left: auto; }
+
+  /* ── 맨 아래 탭 줄 ── */
+  .m-tabbar {
+    display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 70;
+    height: calc(60px + env(safe-area-inset-bottom)); padding: 0 4px env(safe-area-inset-bottom);
+    background: color-mix(in oklab, var(--surface) 94%, transparent);
+    -webkit-backdrop-filter: saturate(1.4) blur(14px); backdrop-filter: saturate(1.4) blur(14px);
+    border-top: 1px solid var(--border);
+  }
+  .m-tab {
+    flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    padding: 0; border: 0; background: none; font: inherit; font-size: 11px; font-weight: 600; letter-spacing: -0.01em;
+    color: var(--ink-soft); text-decoration: none; cursor: pointer; -webkit-tap-highlight-color: transparent;
+  }
+  .m-tab.on { color: var(--amber); font-weight: 700; }
+  .m-tab-ico { position: relative; display: flex; transition: transform 0.12s ease; }
+  .m-tab:active .m-tab-ico { transform: scale(0.88); }
+  .m-badge {
+    position: absolute; top: -6px; left: 12px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px;
+    background: var(--breaking); color: #fff; font-size: 10.5px; font-weight: 800; line-height: 18px; text-align: center;
+    box-shadow: 0 0 0 2px var(--surface);
+  }
+  .m-count {
+    position: absolute; top: -5px; left: 14px; min-width: 16px; padding: 0 4px; border-radius: 8px; line-height: 15px;
+    font-size: 10px; font-weight: 800; text-align: center; color: var(--ink-muted); background: var(--surface-2); border: 1px solid var(--border);
+  }
+  .m-tab.on .m-count { color: var(--amber); border-color: var(--amber); }
+
+  /* ── "전체" 메뉴 창 ── */
+  .m-dim { display: block; position: fixed; inset: 0; z-index: 68; background: var(--backdrop); animation: sc-fade 0.14s ease-out; }
+  .m-menu {
+    display: block; position: fixed; left: 10px; right: 10px; bottom: calc(70px + env(safe-area-inset-bottom)); z-index: 69;
+    max-height: calc(100dvh - 150px); overflow-y: auto;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 22px; padding: 14px 14px 12px;
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.32); animation: m-pop 0.18s ease-out;
+  }
+  @keyframes m-pop { from { opacity: 0; transform: translateY(12px) scale(0.98); } to { opacity: 1; transform: none; } }
+  .m-menu-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; font-size: 15px; font-weight: 700; color: var(--ink); padding-left: 4px; }
+  .m-menu-close {
+    width: 34px; height: 34px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center;
+    background: var(--surface-2); border: 1px solid var(--border); color: var(--ink-muted); cursor: pointer;
+  }
+  .m-menu-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px 4px; }
+  .m-menu-item {
+    display: flex; flex-direction: column; align-items: center; gap: 7px; text-decoration: none; text-align: center;
+    font-size: 12px; line-height: 1.3; color: var(--ink-muted); word-break: keep-all; -webkit-tap-highlight-color: transparent;
+  }
+  .m-menu-ico {
+    width: 54px; height: 54px; border-radius: 17px; display: flex; align-items: center; justify-content: center;
+    background: var(--surface-2); border: 1px solid var(--border); color: var(--ink); transition: transform 0.12s ease;
+  }
+  .m-menu-item:active .m-menu-ico { transform: scale(0.92); }
+  .m-menu-item.on { color: var(--ink); font-weight: 700; }
+  .m-menu-item.on .m-menu-ico { background: var(--amber-tint); border-color: var(--amber); color: var(--amber); }
+  .m-menu-foot { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 18px; padding: 12px 4px 2px; border-top: 1px solid var(--border); font-size: 12px; }
+  .m-menu-foot a { color: var(--ink-soft); text-decoration: none; }
+
+  /* 탭 줄과 겹치지 않게: 새 소식 알림은 탭 줄 위로, "새 속보 N건" 단추는 낮아진 머리띠 바로 아래 */
+  .toast-container { left: 12px; right: 12px; bottom: calc(74px + env(safe-area-inset-bottom)); }
+  .new-toast { max-width: none; }
+  .nb-newpill { top: 62px; }
+
+  /* ── 홈: 속보 탭 맨 위(지수 한 줄 + 테마 칩) ── */
+  .home-main { padding-top: 0; }
+  .m-feedtop { display: block; margin: 0 -16px 14px; }
+  .m-ticker {
+    display: flex; gap: 18px; overflow-x: auto; padding: 9px 16px; white-space: nowrap; font-size: 12.5px;
+    background: var(--surface); border-bottom: 1px solid var(--border); scrollbar-width: none;
+  }
+  .m-ticker::-webkit-scrollbar, .m-chips::-webkit-scrollbar { display: none; }
+  .m-tk { display: inline-flex; align-items: baseline; gap: 5px; }
+  .m-tk b { font-weight: 600; color: var(--ink-soft); }
+  .m-tk .mono { color: var(--ink); }
+  .m-tk .mono.up { color: var(--up); }
+  .m-tk .mono.down { color: var(--down); }
+  .m-chips { display: flex; gap: 7px; overflow-x: auto; padding: 12px 16px 0; scrollbar-width: none; }
+  .m-chip {
+    flex-shrink: 0; display: inline-flex; align-items: center; gap: 4px; height: 34px; padding: 0 14px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--surface); color: var(--ink-muted);
+    font: inherit; font-size: 13.5px; font-weight: 600; white-space: nowrap; cursor: pointer; -webkit-tap-highlight-color: transparent;
+  }
+  .m-chip svg { color: var(--up); }
+  .m-chip.on { background: var(--ink); border-color: var(--ink); color: var(--surface); }
+  .m-chip.on svg { color: inherit; }
+
+  /* ── 홈 탭 나누기 ── */
+  /* 속보 탭: 속보만 */
+  .m-feed .brief-band, .m-feed .home-left, .m-feed .home-right, .m-feed .about-site { display: none; }
+  /* 시장 탭: 브리핑 띠 → 대표 종목·급등주 → 예측·HOT 테마 → 사이트 설명 */
+  .m-market .home-center, .m-market .m-feedtop, .m-market .install-hint, .m-market .home-right .watch-panel { display: none; }
+  .m-market .home-main { padding-top: 16px; }
+  .m-market .home-right { grid-row: 1; }
+  .m-market .home-left { grid-row: 2; flex-direction: column; align-items: stretch; }
+  .m-market .about-site { margin-top: 32px; }
+  /* 관심 탭: 관심종목 칸 → 그 종목 속보 */
+  .m-watch .brief-band, .m-watch .home-left, .m-watch .m-feedtop, .m-watch .install-hint, .m-watch .about-site { display: none; }
+  .m-watch .home-main { padding-top: 16px; }
+  .m-watch .home-right > :not(.watch-panel) { display: none; }
+  .m-watch .home-right { grid-row: 1; }
+  .m-watch .home-center { grid-row: 2; }
+  .m-watch .watch-filter-btn, .m-watch .clear-filter { display: none; }
+  .feed-empty { padding-left: 16px !important; padding-right: 16px !important; }
+
+  /* ── 일정 탭: 공시 일정 | 공모주 청약 전환 ── */
+  .m-sched { display: flex; gap: 4px; padding: 4px; margin: 0 0 16px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px; }
+  .m-sched a { flex: 1; padding: 9px 0; border-radius: 9px; text-align: center; font-size: 14px; font-weight: 600; color: var(--ink-muted); text-decoration: none; }
+  .m-sched a.on { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); }
+  .ipo-page { padding-top: 16px; }
+
+  /* ── 종목 창: 아래에서 올라오는 창(손잡이를 잡고 내리면 닫힘) ── */
+  .sc-backdrop { align-items: flex-end; padding: 0; }
+  .sc-modal {
+    width: 100%; max-height: 90dvh; border-radius: 22px 22px 0 0; border-bottom: 0;
+    padding: 0 16px calc(18px + env(safe-area-inset-bottom));
+    animation: sc-sheet 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  @keyframes sc-sheet { from { transform: translateY(100%); } to { transform: none; } }
+  .sc-grab { display: flex; justify-content: center; position: sticky; top: 0; z-index: 2; padding: 10px 0 10px; background: var(--surface); touch-action: none; }
+  .sc-grab span { width: 42px; height: 5px; border-radius: 3px; background: var(--border-strong, #4a4950); }
+  .sc-head { touch-action: none; }
+  .sc-close { width: 34px; height: 34px; }
+}
+@media (max-width: 760px) and (prefers-reduced-motion: reduce) {
+  .m-menu, .m-dim, .sc-modal { animation: none; }
+}

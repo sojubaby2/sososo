@@ -17,6 +17,8 @@
 // 비용: 0원 (DART 무료, AI·Redis 안 씀)
 
 import Header from "../../components/Header";
+// [2026-10-27 추가] 휴대폰 전용 "공시 일정 | 공모주 청약" 전환 단추
+import ScheduleSwitch from "../../components/ScheduleSwitch";
 // [2026-10-26 추가] 맨 위 청약 달력(평일 5칸, 이번 달/다음 달)
 import IpoCalendar from "../../components/IpoCalendar";
 import { fetchIpoSchedule, statusOf, kstTodayIso } from "../../lib/ipo";
@@ -179,6 +181,7 @@ export default async function IpoPage() {
     <div>
       <Header />
       <main className="container-wide ipo-page">
+        <ScheduleSwitch current="ipo" />
         <header className="ipo-head">
           <h1 className="ipo-h1">공모주 청약 일정</h1>
           <p className="ipo-lead">

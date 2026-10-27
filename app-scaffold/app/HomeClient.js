@@ -24,6 +24,15 @@ import DailyOutlookBanner from "../components/DailyOutlookBanner";
 import BriefingBand from "../components/BriefingBand";
 import { extractThemes } from "../lib/todayBrief";
 import { isPoliticalTheme } from "../lib/themeData";
+// [2026-10-27 추가] 휴대폰 전용 홈 탭(속보·시장·관심) — lib/mobileTab.js 설명 참고
+import {
+  HOME_TAB_REQUEST,
+  tabFromHash,
+  hrefForTab,
+  takePendingHomeTab,
+  announceHomeTab,
+  announceFeedNew,
+} from "../lib/mobileTab";
 
 const HOT_THEME_COUNT = 8;
 // [2026-10-26 변경 — 속보 지연 줄이기, 비용 그대로]
@@ -515,6 +524,66 @@ function FlagshipStrip({ filter, onPick }) {
   );
 }
 
+// [2026-10-27 신설] 휴대폰 "속보" 탭 맨 위 — 지수 한 줄 + 테마 칩 줄. (PC에서는 안 보임)
+//   · 지수 한 줄: 맨 위 브리핑 띠(시장 탭으로 옮김)의 세계 증시 숫자를 짧게. 옆으로 밀면 더 보임.
+//   · 테마 칩: 지금 속보에 많이 나온 테마 순서. 누르면 그 테마 속보만 남습니다(다시 누르면 해제).
+//     PC 화면의 "테마를 누르면 속보 거르기"와 같은 기능입니다.
+const M_THEME_CHIPS = 8;
+function MobileFeedTop({ worldIndices, items, filter, onTheme, onAll }) {
+  const indices = Array.isArray(worldIndices?.items) ? worldIndices.items : [];
+  const themes = useMemo(() => {
+    const count = new Map();
+    for (const n of items.slice(0, 80)) {
+      for (const t of n.themes || []) {
+        if (!t || isPoliticalTheme(t)) continue;
+        count.set(t, (count.get(t) || 0) + 1);
+      }
+    }
+    return [...count.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, M_THEME_CHIPS)
+      .map(([t]) => t);
+  }, [items]);
+  const activeTheme = filter?.kind === "theme" ? filter.value : null;
+
+  return (
+    <div className="m-feedtop">
+      {indices.length > 0 && (
+        <div className="m-ticker" aria-label="주요 지수">
+          {indices.map((it) => (
+            <span key={it.key} className="m-tk">
+              <b>{String(it.label || "").split("-").pop()}</b>
+              <span className="mono">
+                {typeof it.close === "number" ? it.close.toLocaleString("ko-KR", { maximumFractionDigits: 2 }) : "—"}
+              </span>
+              <span className={`mono ${toneOf(it.changePct)}`}>{fmtPct(it.changePct)}</span>
+            </span>
+          ))}
+        </div>
+      )}
+      {themes.length > 0 && (
+        <div className="m-chips" role="group" aria-label="테마로 속보 거르기">
+          <button type="button" className={`m-chip ${!filter ? "on" : ""}`} aria-pressed={!filter} onClick={onAll}>
+            전체
+          </button>
+          {themes.map((t, i) => (
+            <button
+              type="button"
+              key={t}
+              className={`m-chip ${activeTheme === t ? "on" : ""}`}
+              aria-pressed={activeTheme === t}
+              onClick={() => onTheme(t)}
+            >
+              {i === 0 && <Flame size={12} aria-hidden="true" />}
+              {t}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function InstallHintBanner() {
   const [dismissed, setDismissed] = useState(true); // hidden until localStorage check to avoid a flash
   useEffect(() => {
@@ -858,6 +927,65 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
     setFilter((cur) => (cur && cur.kind === kind && cur.value === value ? null : { kind, value }));
   }
 
+  // ── [2026-10-27 신설] 휴대폰 전용 홈 탭: "feed"(속보) | "market"(시장) | "watch"(관심) ──
+  // 재성님: "pc 배치를 아예 벗어나서 새롭고 혁신적이게 모바일 전용 ui배치를 해보는건 어때?"
+  // 탭을 바꾸면 겉의 class(m-feed / m-market / m-watch)만 바뀌고, 어느 칸을 보일지는
+  // globals.css의 "휴대폰 앱형 화면" 부분이 정합니다. 그래서 PC 화면(761px 이상)은 전혀 영향이 없습니다.
+  // 모든 칸이 늘 화면 코드 안에 들어 있어서(숨김만) 검색엔진이 읽는 내용도 그대로입니다.
+  const [mTab, setMTab] = useState("feed");
+  const mTabRef = useRef("feed");
+
+  function switchTab(tab, { scrollTop = true } = {}) {
+    if (mTabRef.current === tab) {
+      // 같은 탭을 다시 누르면 맨 위로(증권 앱과 같은 동작)
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    mTabRef.current = tab;
+    setMTab(tab);
+    try {
+      window.history.replaceState(window.history.state, "", hrefForTab(tab));
+    } catch {
+      // 주소 바꾸기가 막힌 환경 — 화면만 바꿈
+    }
+    if (scrollTop) window.scrollTo(0, 0);
+  }
+
+  // 처음 열 때(주소 끝 #market 등) + 아래 탭 줄에서 오는 신호 + 뒤로 가기
+  useEffect(() => {
+    const first = takePendingHomeTab() || tabFromHash(window.location.hash);
+    if (first !== "feed") {
+      mTabRef.current = first;
+      setMTab(first);
+    }
+    const onRequest = (e) => switchTab(e.detail || "feed");
+    const onHash = () => {
+      const t = tabFromHash(window.location.hash);
+      mTabRef.current = t;
+      setMTab(t);
+    };
+    window.addEventListener(HOME_TAB_REQUEST, onRequest);
+    window.addEventListener("hashchange", onHash);
+    return () => {
+      window.removeEventListener(HOME_TAB_REQUEST, onRequest);
+      window.removeEventListener("hashchange", onHash);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 탭이 바뀌면: 아래 탭 줄에 알리고, 관심 탭이면 관심종목 속보만 남기기
+  useEffect(() => {
+    announceHomeTab(mTab);
+    if (mTab === "watch") setFilter({ kind: "watch", value: "관심종목" });
+    else setFilter((cur) => (cur?.kind === "watch" ? null : cur));
+  }, [mTab]);
+
+  // 시장 탭에서 대표 종목 "관련 속보만 보기"를 누르면 → 속보 탭으로 넘어가서 보여 줌
+  function filterAndShow(kind, value) {
+    toggleFilter(kind, value);
+    if (mTabRef.current === "market") switchTab("feed");
+  }
+
   const visible = useMemo(() => {
     if (!filter) return items;
     if (filter.kind === "theme") return items.filter((n) => n.themes?.includes(filter.value));
@@ -889,6 +1017,11 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
   // 새 속보가 들어온 순간(newIds가 채워짐) 화면이 아래쪽이면 숫자를 올립니다.
   useEffect(() => {
     if (newIds.size === 0) return;
+    // [2026-10-27] 휴대폰에서 시장·관심 탭을 보는 중이면 아래 탭 줄 "속보"에 숫자를 띄웁니다.
+    if (mTabRef.current !== "feed") {
+      announceFeedNew(newIds.size);
+      return;
+    }
     if (!feedTopVisible()) setUnseen((c) => c + newIds.size);
   }, [newIds]);
 
@@ -911,7 +1044,7 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
   // 재성님 요청으로 그 자리에 대표 종목(삼성전자·SK하이닉스) 칸이 들어갔습니다.
 
   return (
-    <div>
+    <div className={`home-app m-${mTab}`}>
       <Header />
 
       {/* [2026-10-19 신설] 남색 브리핑 밴드 — 오늘을 한 문장으로 요약하고,
@@ -929,6 +1062,14 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
           오른쪽(대표 종목·전일 급등주). 스타일 설명은 app/globals.css의
           "홈 화면 — 어두운 터미널형 3칸 배치" 부분에 있습니다. */}
       <main className="container-wide home-main">
+        {/* [2026-10-27] 휴대폰 "속보" 탭 맨 위 — 지수 한 줄 + 테마 칩 (PC에서는 안 보임) */}
+        <MobileFeedTop
+          worldIndices={worldIndices}
+          items={items}
+          filter={filter}
+          onTheme={(t) => toggleFilter("theme", t)}
+          onAll={() => setFilter(null)}
+        />
         <InstallHintBanner />
 
         <div className="home-grid">
@@ -946,7 +1087,8 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
                     실시간 속보"라고 알아보게 합니다. 예전엔 페이지에 h1이 없었습니다. */}
                 <h1>
                   <span className="live-dot" />
-                  실시간 속보
+                  {/* [2026-10-27] 휴대폰 "관심" 탭에서는 제목을 "관심종목 속보"로 */}
+                  {mTab === "watch" ? "관심종목 속보" : "실시간 속보"}
                 </h1>
                 <span className="stories-count">
                   {filter ? `${visible.length}건 / 전체 ${items.length}건` : `${items.length}건`}
@@ -1018,7 +1160,7 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
               <NewsBoard items={visible} newIds={newIds} />
 
               {filter && visible.length === 0 && (
-                <p style={{ fontSize: 14, color: "var(--ink-muted)", padding: "24px 0" }}>
+                <p className="feed-empty" style={{ fontSize: 14, color: "var(--ink-muted)", padding: "24px 0" }}>
                   {filter.value}에 해당하는 속보가 아직 없습니다.{" "}
                   <button type="button" className="clear-filter" onClick={() => setFilter(null)}>
                     필터 해제 ✕
@@ -1040,7 +1182,7 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
               onRemove={(s) => watch.toggle(s)}
             />
             {/* 대표 종목(삼성전자·SK하이닉스) — 2026-10-26 추가, FlagshipStrip 설명 참고 */}
-            <FlagshipStrip filter={filter} onPick={(name) => toggleFilter("stock", name)} />
+            <FlagshipStrip filter={filter} onPick={(name) => filterAndShow("stock", name)} />
             <DailyMoversPanel />
           </aside>
         </div>

@@ -255,6 +255,9 @@ export default function StockChartModal() {
   const [copied, setCopied] = useState(false);
   const closeRef = useRef(null);
   const lastFocus = useRef(null);
+  // [2026-10-27 추가] 휴대폰: 아래에서 올라오는 창 — 위쪽 손잡이(또는 이름 줄)를 잡고 아래로 내리면 닫힘
+  const sheetRef = useRef(null);
+  const dragRef = useRef(null); // { y0, dy } 끄는 중일 때만
 
   // 어디서든 openStockChart(...)를 부르면 여기서 받아서 엽니다.
   useEffect(() => {
@@ -322,6 +325,35 @@ export default function StockChartModal() {
 
   if (!stock) return null;
 
+  // ── [2026-10-27] 휴대폰에서 창을 아래로 끌어 내려 닫기 ──
+  //   손가락을 90px 넘게 내리면 닫히고, 덜 내리면 제자리로 돌아갑니다. PC(마우스)에서는 동작하지 않습니다.
+  function dragStart(e) {
+    if (window.innerWidth > 760 || !sheetRef.current) return;
+    if (sheetRef.current.scrollTop > 0) return; // 창 안을 아래로 읽어 내린 상태면 끌기 대신 스크롤
+    dragRef.current = { y0: e.touches[0].clientY, dy: 0 };
+    sheetRef.current.style.transition = "none";
+  }
+  function dragMove(e) {
+    const d = dragRef.current;
+    if (!d || !sheetRef.current) return;
+    d.dy = Math.max(0, e.touches[0].clientY - d.y0);
+    sheetRef.current.style.transform = d.dy ? `translateY(${d.dy}px)` : "";
+  }
+  function dragEnd() {
+    const d = dragRef.current;
+    dragRef.current = null;
+    const el = sheetRef.current;
+    if (!d || !el) return;
+    el.style.transition = "transform 0.18s ease-out";
+    if (d.dy > 90) {
+      el.style.transform = "translateY(100%)";
+      setTimeout(close, 170);
+    } else {
+      el.style.transform = "";
+    }
+  }
+  const dragProps = { onTouchStart: dragStart, onTouchMove: dragMove, onTouchEnd: dragEnd, onTouchCancel: dragEnd };
+
   const candles = data?.candles || [];
   const lastI = candles.length - 1;
   const showI = hoverIdx ?? lastI;
@@ -344,8 +376,12 @@ export default function StockChartModal() {
 
   return (
     <div className="sc-backdrop" onMouseDown={(e) => e.target === e.currentTarget && close()}>
-      <div className="sc-modal" role="dialog" aria-modal="true" aria-labelledby="sc-title">
-        <header className="sc-head">
+      <div className="sc-modal" role="dialog" aria-modal="true" aria-labelledby="sc-title" ref={sheetRef}>
+        {/* [2026-10-27] 휴대폰에서만 보이는 손잡이 — 잡고 아래로 내리면 닫힘 */}
+        <div className="sc-grab" aria-hidden="true" {...dragProps}>
+          <span />
+        </div>
+        <header className="sc-head" {...dragProps}>
           <div className="sc-titlebox">
             <h2 id="sc-title" className="sc-title">
               {stock.name || stock.code}

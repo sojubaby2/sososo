@@ -13,6 +13,8 @@
 
 import Link from "next/link";
 import Header from "../../components/Header";
+// [2026-10-27 추가] 휴대폰 전용 "공시 일정 | 공모주 청약" 전환 단추
+import ScheduleSwitch from "../../components/ScheduleSwitch";
 import DisclosureCalendar from "../../components/DisclosureCalendar";
 import DisclosureList from "../../components/DisclosureList";
 import { getDisclosureData, CATEGORIES, kstTodayIso } from "../../lib/disclosures";
@@ -86,6 +88,7 @@ export default async function DisclosurePage() {
     <div>
       <Header />
       <main className="stock-page market-page">
+        <ScheduleSwitch current="disclosure" />
         <h1 className="mk-title">공시 일정 · 주요 공시</h1>
         <p className="stock-asof">
           금융감독원 DART 공시 기준 · 30분마다 갱신

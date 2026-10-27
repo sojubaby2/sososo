@@ -40,24 +40,13 @@ import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import ThemeToggle from "./ThemeToggle";
+import { MENU, isMenuActive } from "../lib/siteMenu";
 
 // 로고 글씨에서 강조할 글자의 색입니다.
 const BRAND_ACCENT = "#ff5b4e";
 
-// 메뉴는 여기만 고치면 됩니다.
-// external: true 면 새 창으로 열리는 바깥 링크입니다.
-const MENU = [
-  { href: "/", label: "홈 · 뉴스", match: (p) => p === "/" },
-  { href: "/patterns", label: "패턴검색" },
-  { href: "/themes", label: "테마별 종목정리" },
-  // [2026-10-26 변경] 바깥 DART 링크 → 우리 사이트 공모주 페이지(app/ipo, 3시간마다 자동 갱신)
-  { href: "/ipo", label: "공모주 정보" },
-  // [2026-10-27 추가] DART 공시 일정·주요 공시(app/disclosure)
-  { href: "/disclosure", label: "공시 일정" },
-  { href: "/market", label: "장 마감 정리" },
-  { href: "/guide", label: "차트 가이드" },
-  { href: "/blog", label: "칼럼" },
-];
+// [2026-10-27 변경] 메뉴 목록은 lib/siteMenu.js로 옮겼습니다(휴대폰 "전체" 창과 같이 씀).
+//   메뉴를 고치려면 lib/siteMenu.js의 MENU를 고치세요.
 
 export default function Header() {
   const pathname = usePathname();
@@ -72,6 +61,7 @@ export default function Header() {
     nav.scrollTo({ left: Math.max(0, left), behavior: "auto" });
   }, [pathname]);
 
+  // [2026-10-27] 휴대폰(760px 이하)에서는 이 메뉴 줄을 숨기고, 맨 아래 탭 줄(components/MobileTabBar.js)이 대신합니다.
   return (
     <header className="site-header">
       <div className="container-wide site-header-inner">
@@ -92,7 +82,7 @@ export default function Header() {
                 </a>
               );
             }
-            const active = m.match ? m.match(pathname) : pathname?.startsWith(m.href);
+            const active = isMenuActive(m, pathname);
             return (
               <Link key={m.href} href={m.href} className={`nav-btn ${active ? "active" : ""}`}>
                 {m.label}

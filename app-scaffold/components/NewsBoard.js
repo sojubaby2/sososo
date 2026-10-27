@@ -199,7 +199,8 @@ function OriginalLink({ n }) {
 }
 
 // [2026-10-27] 휴대폰에서 처음에 보여 줄 한 줄 속보 수(맨 위 큰 속보 3건은 별도)
-const MOBILE_TAPE = 12;
+//   [2026-10-27 오후 12 → 30] 휴대폰 화면이 탭으로 나뉘면서 "속보" 탭에는 속보만 있으니 더 많이 보여 줍니다.
+const MOBILE_TAPE = 30;
 
 export default function NewsBoard({ items, newIds }) {
   // "몇 분 전"을 1분마다 다시 계산하기 위한 시계
