@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useRef } from "react";
+
 // components/Header.js
 //
 // [2026-10-19 디자인 개편] 흰 바탕 + 주황 강조였던 헤더를 짙은 남색 띠로
@@ -59,6 +61,16 @@ const MENU = [
 
 export default function Header() {
   const pathname = usePathname();
+  // [2026-10-27 추가] 휴대폰에서 메뉴 줄은 옆으로 밀어야 다 보이는데, 지금 보고 있는 메뉴(예: 공시 일정)가
+  // 화면 밖에 숨어 있었습니다. 페이지에 들어오면 그 메뉴를 보이는 곳으로 살짝 밀어 줍니다(PC에서는 변화 없음).
+  const navRef = useRef(null);
+  useEffect(() => {
+    const nav = navRef.current;
+    const el = nav?.querySelector(".nav-btn.active");
+    if (!nav || !el || nav.scrollWidth <= nav.clientWidth) return;
+    const left = el.offsetLeft - (nav.clientWidth - el.offsetWidth) / 2;
+    nav.scrollTo({ left: Math.max(0, left), behavior: "auto" });
+  }, [pathname]);
 
   return (
     <header className="site-header">
@@ -71,7 +83,7 @@ export default function Header() {
           <span className="brand-tag">실시간 속보 · 관련주</span>
         </Link>
 
-        <nav className="nav">
+        <nav className="nav" ref={navRef}>
           {MENU.map((m) => {
             if (m.external) {
               return (

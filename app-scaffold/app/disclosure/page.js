@@ -109,7 +109,7 @@ export default async function DisclosurePage() {
               {upcoming.length === 0 ? (
                 <p className="stock-text muted">앞으로 30일 안에 잡힌 일정이 없습니다.</p>
               ) : (
-                <table className="mk-table">
+                <table className="mk-table dc-upcoming">
                   <thead>
                     <tr>
                       <th>날짜</th>

@@ -198,6 +198,9 @@ function OriginalLink({ n }) {
   );
 }
 
+// [2026-10-27] 휴대폰에서 처음에 보여 줄 한 줄 속보 수(맨 위 큰 속보 3건은 별도)
+const MOBILE_TAPE = 12;
+
 export default function NewsBoard({ items, newIds }) {
   // "몇 분 전"을 1분마다 다시 계산하기 위한 시계
   const [now, setNow] = useState(() => Date.now());
@@ -208,6 +211,10 @@ export default function NewsBoard({ items, newIds }) {
 
   // 한 줄 목록에서 펼쳐 둔 속보들(id 묶음)
   const [open, setOpen] = useState(() => new Set());
+  // [2026-10-27 추가] 휴대폰에서는 한 줄 목록을 처음 MOBILE_TAPE건만 보여 줍니다.
+  //   속보 60건이 화면 7개 길이를 차지해서 그 아래(대표 종목·급등주·HOT 테마)가 사실상 안 보였기 때문.
+  //   숨기는 건 CSS(globals.css의 .nb-mhide, 860px 이하에서만)라 PC 화면은 그대로입니다.
+  const [showAll, setShowAll] = useState(false);
   function toggle(id) {
     setOpen((cur) => {
       const next = new Set(cur);
@@ -302,13 +309,14 @@ export default function NewsBoard({ items, newIds }) {
       {/* ── 나머지: 한 줄에 한 건, 누르면 펼침 ── */}
       {rest.length > 0 && (
         <ul className="nb-tape">
-          {rest.map((n) => {
+          {rest.map((n, idx) => {
             const m = minutesAgo(n.ts, now);
             const lead0 = n.stocks?.[0];
             const isOpen = open.has(n.id);
             const tt = splitTags(n.headline);
+            const mHide = !showAll && idx >= MOBILE_TAPE;
             return (
-              <li key={n.id} className={`${isOpen ? "open" : ""} ${isNew(n) ? "nb-arrive" : ""}`}>
+              <li key={n.id} className={`${isOpen ? "open" : ""} ${isNew(n) ? "nb-arrive" : ""} ${mHide ? "nb-mhide" : ""}`}>
                 <button type="button" className="nb-row" aria-expanded={isOpen} onClick={() => toggle(n.id)}>
                   <span className={`nb-time mono ${isFresh(m) ? "fresh" : ""}`} title={agoText(m)}>
                     {clockText(n.time, m)}
@@ -346,6 +354,11 @@ export default function NewsBoard({ items, newIds }) {
             );
           })}
         </ul>
+      )}
+      {!showAll && rest.length > MOBILE_TAPE && (
+        <button type="button" className="nb-mmore" onClick={() => setShowAll(true)}>
+          지난 속보 더 보기 ({rest.length - MOBILE_TAPE}건)
+        </button>
       )}
     </div>
   );

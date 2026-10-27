@@ -530,7 +530,8 @@ function InstallHintBanner() {
   return (
     <div className="install-hint">
       <Smartphone size={15} style={{ flexShrink: 0 }} />
-      <span>모바일에서는 "홈 화면에 추가"를 하면 앱처럼 빠르게 열어볼 수 있어요. PC에서는 Ctrl+D로 즐겨찾기 해두세요.</span>
+      {/* [2026-10-27] 휴대폰에서만 보이는 안내라 PC 문구를 빼고 한 줄로 */}
+      <span>"홈 화면에 추가"하면 앱처럼 바로 열려요.</span>
       <button type="button" className="install-hint-close" onClick={dismiss}><X size={14} /></button>
     </div>
   );
@@ -956,13 +957,26 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
                   새 속보 받는 중
                 </span>
                 <div className="watch-toggles">
-                  <button type="button" className={`sound-toggle ${soundEnabled ? "on" : ""}`} onClick={toggleSound}>
+                  {/* [2026-10-27] 휴대폰에서는 글자를 숨기고 아이콘만(.toggle-label) — 첫 화면 공간 확보 */}
+                  <button
+                    type="button"
+                    className={`sound-toggle ${soundEnabled ? "on" : ""}`}
+                    onClick={toggleSound}
+                    aria-label={`알림음 ${soundEnabled ? "켜짐" : "꺼짐"}`}
+                    title={`알림음 ${soundEnabled ? "켜짐" : "꺼짐"}`}
+                  >
                     {soundEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
-                    알림음 {soundEnabled ? "켜짐" : "꺼짐"}
+                    <span className="toggle-label">알림음 {soundEnabled ? "켜짐" : "꺼짐"}</span>
                   </button>
-                  <button type="button" className={`sound-toggle ${notifyEnabled ? "on" : ""}`} onClick={toggleNotify}>
+                  <button
+                    type="button"
+                    className={`sound-toggle ${notifyEnabled ? "on" : ""}`}
+                    onClick={toggleNotify}
+                    aria-label={`데스크톱 알림 ${notifyEnabled ? "켜짐" : "꺼짐"}`}
+                    title={`데스크톱 알림 ${notifyEnabled ? "켜짐" : "꺼짐"}`}
+                  >
                     {notifyEnabled ? <Bell size={14} /> : <BellOff size={14} />}
-                    데스크톱 알림 {notifyEnabled ? "켜짐" : "꺼짐"}
+                    <span className="toggle-label">데스크톱 알림 {notifyEnabled ? "켜짐" : "꺼짐"}</span>
                   </button>
                   {filter && (
                     <button type="button" className="clear-filter" onClick={() => setFilter(null)}>
