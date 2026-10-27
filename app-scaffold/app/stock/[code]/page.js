@@ -26,6 +26,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import Header from "../../../components/Header";
+// [2026-10-27 추가] 애드센스 광고 칸(번호는 lib/ads.js)
+import AdSlot from "../../../components/AdSlot";
 import StockInlineChart from "../../../components/StockInlineChart";
 import WatchStar from "../../../components/WatchStar";
 import { getStock, peersOf } from "../../../lib/stockDirectory";
@@ -148,6 +150,9 @@ export default async function StockPage({ params }) {
         <section className="panel stock-section">
           <StockInlineChart candles={candles.slice(-Math.max(SHOW_BARS + 30, 160))} />
         </section>
+
+        {/* [2026-10-27] 광고 — 차트 아래 */}
+        <AdSlot />
 
         {summary && (
           <section className="panel stock-section">

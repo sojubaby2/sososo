@@ -1,5 +1,7 @@
 import Link from "next/link";
 import Header from "../../components/Header";
+// [2026-10-27 추가] 애드센스 광고 칸(번호는 lib/ads.js)
+import AdSlot from "../../components/AdSlot";
 import BlogThumbnail from "../../components/BlogThumbnail";
 // [2026-09-14 변경] 칼럼 글을 lib/blogPosts.js 한 파일에만 쌓지 않고
 // lib/blogPostsModern.js로 나눴기 때문에, 둘을 합쳐주는 lib/allBlogPosts.js를
@@ -39,6 +41,9 @@ export default function BlogListPage() {
             </Link>
           ))}
         </div>
+
+        {/* [2026-10-27] 광고 — 칼럼 목록 아래 */}
+        <AdSlot />
       </main>
     </div>
   );

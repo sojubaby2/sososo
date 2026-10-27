@@ -9,6 +9,8 @@ import { blogPosts } from "../../../lib/allBlogPosts";
 // [2026-10-26 추가] 본문 사이 사진(위키미디어 공용, 칼럼당 최대 3장) — lib/blogImages.js 참고
 import { blogImages } from "../../../lib/blogImages";
 import BlogFigure from "../../../components/BlogFigure";
+// [2026-10-27 추가] 애드센스 광고 칸(번호는 lib/ads.js)
+import AdSlot from "../../../components/AdSlot";
 
 // 사진을 본문 어디에 넣을지 정합니다. 사진에 after(몇 번째 덩어리 뒤)가 적혀 있으면 그대로,
 // 없으면 글 길이를 사진 수+1로 나눈 지점들에 고르게 — 단, 소제목(h2) 바로 뒤가 아니라
@@ -25,6 +27,20 @@ function placeImages(body, imgs) {
     at.set(i, img);
   });
   return at;
+}
+
+// [2026-10-27 추가] 본문 사이 광고 자리 — 글의 1/3, 2/3 지점 문단 뒤(소제목 바로 뒤·사진과 같은 자리는 피함).
+// 문단이 12개 미만인 짧은 글은 사이 광고 1개(가운데)만.
+function placeAds(body, taken) {
+  const n = body.length;
+  const marks = n >= 12 ? [1 / 3, 2 / 3] : n >= 6 ? [1 / 2] : [];
+  const out = new Set();
+  for (const f of marks) {
+    let i = Math.round(n * f) - 1;
+    while (i < n - 2 && (body[i]?.type === "h2" || taken.has(i) || out.has(i))) i += 1;
+    if (i < n - 2) out.add(i);
+  }
+  return out;
 }
 
 // 빌드 시점에 이 페이지들을 미리 정적으로 만들어둠(force-dynamic 아님) —
@@ -72,13 +88,18 @@ export default function BlogPostPage({ params }) {
 
         {(() => {
           const at = placeImages(post.body, blogImages[post.slug]);
+          const ads = placeAds(post.body, at);
           return post.body.map((block, i) => (
             <Fragment key={i}>
               {block.type === "h2" ? <h2>{block.text}</h2> : <p>{block.text}</p>}
               {at.has(i) && <BlogFigure img={at.get(i)} />}
+              {ads.has(i) && <AdSlot kind="inArticle" />}
             </Fragment>
           ));
         })()}
+
+        {/* [2026-10-27] 광고 — 글 끝 */}
+        <AdSlot />
       </main>
     </div>
   );

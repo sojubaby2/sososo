@@ -202,7 +202,8 @@ function OriginalLink({ n }) {
 //   [2026-10-27 오후 12 → 30] 휴대폰 화면이 탭으로 나뉘면서 "속보" 탭에는 속보만 있으니 더 많이 보여 줍니다.
 const MOBILE_TAPE = 30;
 
-export default function NewsBoard({ items, newIds }) {
+// [2026-10-27 추가] ad: 큰 기사 3건 바로 아래에 끼울 광고 칸(app/HomeClient.js가 <AdSlot />을 넘김)
+export default function NewsBoard({ items, newIds, ad = null }) {
   // "몇 분 전"을 1분마다 다시 계산하기 위한 시계
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -306,6 +307,8 @@ export default function NewsBoard({ items, newIds }) {
           })}
         </div>
       )}
+
+      {ad}
 
       {/* ── 나머지: 한 줄에 한 건, 누르면 펼침 ── */}
       {rest.length > 0 && (

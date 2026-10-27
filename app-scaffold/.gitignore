@@ -1,0 +1,6 @@
+# [2026-10-27] 컴퓨터에서 만들어지는 임시 폴더 — 깃허브에 올리지 않음
+node_modules/
+.next/
+.open-next/
+.wrangler/
+.dev.vars

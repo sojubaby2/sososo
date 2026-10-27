@@ -17,6 +17,8 @@
 // 비용: 0원 (DART 무료, AI·Redis 안 씀)
 
 import Header from "../../components/Header";
+// [2026-10-27 추가] 애드센스 광고 칸(번호는 lib/ads.js)
+import AdSlot from "../../components/AdSlot";
 // [2026-10-27 추가] 휴대폰 전용 "공시 일정 | 공모주 청약" 전환 단추
 import ScheduleSwitch from "../../components/ScheduleSwitch";
 // [2026-10-26 추가] 맨 위 청약 달력(평일 5칸, 이번 달/다음 달)
@@ -209,6 +211,8 @@ export default async function IpoPage() {
             <IpoCalendar items={data.items || []} todayIso={todayIso} />
             <Section title="지금 청약 중" rows={live} todayIso={todayIso} empty="오늘 청약 중인 공모주가 없습니다." />
             <Section title="청약 예정" rows={upcoming} todayIso={todayIso} empty="예정된 청약이 아직 없습니다." />
+            {/* [2026-10-27] 광고 — 청약 예정 아래 */}
+            <AdSlot />
             <Section title="최근 청약 마감" note="최근 30일" rows={done} todayIso={todayIso} empty="최근 30일 동안 마감된 청약이 없습니다." />
             {unknown.length > 0 && (
               <Section title="일정 미정" note="신고서에 청약일이 아직 정해지지 않은 회사" rows={unknown} todayIso={todayIso} empty="" />

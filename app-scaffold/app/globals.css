@@ -1962,3 +1962,42 @@ img { -webkit-user-drag: none; }
 @media (max-width: 760px) and (prefers-reduced-motion: reduce) {
   .mf-row.mf-new { animation: none; }
 }
+
+/* ── [2026-10-27] 새 속보가 큰 카드에 들어올 때 (components/MobileFeed.js MobileHero) ──
+   새 카드는 몇 초 동안 빨간 테두리가 번쩍이고 "NEW" 딱지. 다른 카드를 읽던 중이면 끌고 가지 않고
+   왼쪽 위에 "← 새 속보" 단추만 띄웁니다. */
+@media (max-width: 760px) {
+  .mf-hero { position: relative; }
+  .mf-hero .mf-dots { min-height: 38px; align-items: center; padding: 6px 0 0; }
+  .mf-card.is-new { animation: mf-newglow 1.1s ease-out 3; }
+  @keyframes mf-newglow {
+    0% { box-shadow: 0 0 0 0 rgba(255, 77, 79, 0.9), 0 10px 28px rgba(20, 10, 12, 0.22); }
+    100% { box-shadow: 0 0 0 10px rgba(255, 77, 79, 0), 0 10px 28px rgba(20, 10, 12, 0.22); }
+  }
+  .mf-newtag { display: inline-block; background: #fff; color: #d62b2f; font-size: 10.5px; font-weight: 800; padding: 2px 6px; border-radius: 5px; line-height: 1.4; letter-spacing: 0.04em; }
+  .mf-newpill {
+    position: absolute; left: 16px; bottom: 1px; z-index: 3; display: inline-flex; align-items: center; gap: 4px;
+    height: 30px; padding: 0 12px; border: 0; border-radius: 999px; background: #d62b2f; color: #fff;
+    font: inherit; font-size: 13px; font-weight: 700; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3); cursor: pointer;
+    animation: mf-pillin 0.25s ease-out;
+  }
+  @keyframes mf-pillin { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+}
+@media (max-width: 760px) and (prefers-reduced-motion: reduce) {
+  .mf-card.is-new, .mf-newpill { animation: none; }
+  .mf-card.is-new { box-shadow: 0 0 0 3px rgba(255, 77, 79, 0.8); }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   [2026-10-27 신설] 애드센스 광고 칸 (components/AdSlot.js, 번호는 lib/ads.js)
+   광고가 실제로 채워진 뒤에만 자리·"광고" 표시가 생깁니다. 채울 광고가 없거나 광고 차단기로
+   막히면 아무 자리도 차지하지 않습니다(빈 네모가 남지 않게).
+   ═══════════════════════════════════════════════════════════════════ */
+.ad-wrap { display: block; margin: 0; overflow: hidden; }
+.ad-label { display: none; margin: 0 0 4px; font-size: 10.5px; color: var(--ink-soft); letter-spacing: 0.06em; }
+.ad-wrap:has(ins[data-ad-status="filled"]) { margin: 22px 0; }
+.ad-wrap:has(ins[data-ad-status="filled"]) .ad-label { display: block; }
+.ad-wrap:has(ins[data-ad-status="unfilled"]) { display: none; }
+/* 속보 목록 안에 끼는 광고: 목록과 같은 안쪽 여백 + 위아래 줄 */
+.ad-in-feed:has(ins[data-ad-status="filled"]) { margin: 0; padding: 14px 16px; border-top: 1px solid var(--border); }
+.m-market-ad .ad-wrap:has(ins[data-ad-status="filled"]) { margin: 4px 0; }

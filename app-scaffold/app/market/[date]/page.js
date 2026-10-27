@@ -12,6 +12,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import Header from "../../../components/Header";
+// [2026-10-27 추가] 애드센스 광고 칸(번호는 lib/ads.js)
+import AdSlot from "../../../components/AdSlot";
 import { getMarketDay, describeMarketDay, koreanDate } from "../../../lib/marketDay";
 import { getRecentFeed, kstDateOf, kstDateTimeText } from "../../../lib/recentFeed";
 import { decodeEntities } from "../../../lib/decodeEntities";
@@ -139,6 +141,9 @@ export default async function MarketDayPage({ params }) {
             ))}
           </div>
         </section>
+
+        {/* [2026-10-27] 광고 — 요약 아래 */}
+        <AdSlot />
 
         <section className="panel stock-section mk-grid">
           <ThemeList title="강했던 테마" list={d.themesUp} />

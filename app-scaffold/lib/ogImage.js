@@ -8,18 +8,33 @@
 //
 // 그림은 처음 공유될 때 한 번 만들어 저장해 두고 재사용합니다(비용 0 — 바깥 서비스 안 씀).
 // 한글 글꼴: lib/fonts/og-font-subset.ttf (Pretendard Bold를 한글 2,350자·영문만 남겨 줄인 것,
-// SIL OFL 라이선스 — 같은 폴더의 og-font-LICENSE.txt)
+// SIL OFL 라이선스 — 같은 폴더의 og-font-LICENSE.txt). Cloudflare용 복사본: public/fonts/ (아래 readFont 참고)
 
 export const OG_SIZE = { width: 1200, height: 630 };
 
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-// 글꼴 파일은 서버에서 직접 읽습니다(Next.js 공식 안내 방식 — 배포 때 파일이 같이 실려 갑니다).
+// 글꼴 파일 읽기
+//   ① 일반 서버(빌드할 때, 내 컴퓨터, 예전 Vercel): lib/fonts 폴더에서 직접 읽습니다.
+//   ② Cloudflare(2026-10-27 이전): 서버 안에 프로젝트 파일이 없어서 ①이 실패합니다.
+//      그래서 같은 글꼴을 public/fonts에도 넣어 두고, Cloudflare의 "정적 파일 창고"(ASSETS)에서 꺼내 씁니다.
+//      (바깥 인터넷을 거치지 않는 내부 읽기라 비용·속도 부담 없음)
 let fontPromise = null;
+async function readFont() {
+  try {
+    return await readFile(join(process.cwd(), "lib/fonts/og-font-subset.ttf"));
+  } catch (e) {
+    const cf = globalThis[Symbol.for("__cloudflare-context__")];
+    if (!cf?.env?.ASSETS) throw e;
+    const res = await cf.env.ASSETS.fetch(new Request("https://assets.local/fonts/og-font-subset.ttf"));
+    if (!res.ok) throw new Error(`글꼴 파일을 못 읽음(${res.status})`);
+    return res.arrayBuffer();
+  }
+}
 export function loadOgFont() {
   if (!fontPromise) {
-    fontPromise = readFile(join(process.cwd(), "lib/fonts/og-font-subset.ttf")).catch((e) => {
+    fontPromise = readFont().catch((e) => {
       fontPromise = null;
       throw e;
     });

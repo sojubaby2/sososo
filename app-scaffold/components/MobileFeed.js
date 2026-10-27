@@ -19,7 +19,7 @@
 // ★ 비용: 가격 그림은 종목 차트 창과 같은 자료(/api/candles, 2분 공용 저장)를 지금 보이는 카드의 종목만 받아 옵니다.
 //   나머지는 이미 화면에 있는 속보 자료로 계산합니다(추가 비용 0).
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ExternalLink, Flame, AlertTriangle } from "lucide-react";
 import { openStockChart } from "../lib/openStockChart";
 import { isPoliticalTheme } from "../lib/themeData";
@@ -159,20 +159,54 @@ export function MobileHero({ items }) {
   const now = useNow();
   const list = useMemo(() => items.filter((n) => n.stocks?.length).slice(0, HERO_COUNT), [items]);
   const [idx, setIdx] = useState(0);
+  const idxRef = useRef(0);
+  const viewedRef = useRef(null); // 지금 보고 있는 카드의 속보 id
   const trackRef = useRef(null);
   const leadId = list[0]?.id;
+  const prevLead = useRef(leadId);
+  // [2026-10-27 추가] 새 속보가 들어왔을 때 — 재성님: "속보가 뜨면 카드뉴스는 어떻게 변해?" → 개선
+  //   arrived: 방금 맨 앞에 들어온 카드 id(몇 초 동안 빨갛게 번쩍 + "NEW")
+  //   pending: 다른 카드를 읽던 중이라 첫 장으로 끌고 가지 않고 "← 새 속보" 단추만 띄운 상태
+  const [arrived, setArrived] = useState(null);
+  const [pending, setPending] = useState(false);
+  const step = () => {
+    const card = trackRef.current?.firstElementChild;
+    return card ? card.offsetWidth + 10 : 0;
+  };
 
-  // 새 속보가 맨 앞에 오면 첫 장으로
-  useEffect(() => {
-    trackRef.current?.scrollTo({ left: 0, behavior: "smooth" });
-    setIdx(0);
+  // 화면이 그려지기 직전에 처리해야 카드가 한 칸 밀려 보이는 깜빡임이 없습니다.
+  useLayoutEffect(() => {
+    if (prevLead.current === leadId) return;
+    const hadLead = prevLead.current !== undefined;
+    prevLead.current = leadId;
+    if (!hadLead || !leadId) return;
+    setArrived(leadId);
+    const el = trackRef.current;
+    if (el && idxRef.current > 0) {
+      // 읽던 카드 그대로: 그 카드가 새 순서에서 몇 번째인지 찾아 그 자리로(앞에 한 장이 끼어들었으니 보통 한 칸 뒤)
+      //   (휴대폰 브라우저에 따라 스스로 자리를 지켜 주기도 해서, "몇 칸 더"가 아니라 "그 카드 자리"로 맞춥니다)
+      const j = list.findIndex((n) => n.id === viewedRef.current);
+      const target = j >= 0 ? j : list.length - 1;
+      el.scrollLeft = target * step();
+      idxRef.current = target;
+      setIdx(target);
+      setPending(true);
+    } else if (el) {
+      el.scrollLeft = 0;
+    }
+    const t = setTimeout(() => setArrived((cur) => (cur === leadId ? null : cur)), 6000);
+    return () => clearTimeout(t);
   }, [leadId]);
 
   function onScroll() {
     const el = trackRef.current;
-    const card = el?.firstElementChild;
-    if (!el || !card) return;
-    setIdx(Math.round(el.scrollLeft / (card.offsetWidth + 10)));
+    const w = step();
+    if (!el || !w) return;
+    const i = Math.round(el.scrollLeft / w);
+    idxRef.current = i;
+    viewedRef.current = list[i]?.id ?? null;
+    setIdx(i);
+    if (i === 0) setPending(false);
   }
   function go(i) {
     const el = trackRef.current;
@@ -187,10 +221,12 @@ export function MobileHero({ items }) {
         {list.map((n, i) => {
           const m = minutesAgo(n.ts, now);
           const fresh = m !== null && m < FRESH_MINUTES;
-          const { tags, text } = splitTags(n.headline);
+          const { tags: rawTags, text } = splitTags(n.headline);
+          const tags = fresh ? rawTags.filter((t) => t !== "속보") : rawTags; // 빨간 "속보" 딱지와 겹치지 않게
           return (
-            <article key={n.id} className="mf-card">
+            <article key={n.id} className={`mf-card ${arrived === n.id ? "is-new" : ""}`}>
               <div className="mf-card-meta">
+                {arrived === n.id && <span className="mf-newtag">NEW</span>}
                 {fresh && <span className="mf-brk">속보</span>}
                 {tags.map((t) => (
                   <span key={t} className={`mf-tag ${HOT_TAGS.has(t) ? "hot" : ""}`}>
@@ -232,6 +268,11 @@ export function MobileHero({ items }) {
           );
         })}
       </div>
+      {pending && (
+        <button type="button" className="mf-newpill" onClick={() => go(0)}>
+          ← 새 속보
+        </button>
+      )}
       {list.length > 1 && (
         <div className="mf-dots" role="tablist" aria-label="속보 카드 넘기기">
           {list.map((n, i) => (
@@ -359,10 +400,11 @@ function groupSummary(list) {
   const avgs = stats.map((t) => t.avg).filter(isNum);
   const avg = avgs.length ? avgs.reduce((a, b) => a + b, 0) / avgs.length : null;
   const word = !isNum(avg) ? "" : avg >= 0.5 ? "강세" : avg <= -0.5 ? "약세" : "보합";
-  return { themes: stats.map((t) => t.theme), word, wordTone: tone(avg), mover };
+  return { themes: stats.map((t) => t.theme), word, wordTone: word === "보합" ? "flat" : tone(avg), mover };
 }
 
-export function HourTimeline({ items, newIds, filterKey }) {
+// ad: 첫 시간대 묶음 바로 아래에 끼울 광고 칸(app/HomeClient.js가 <AdSlot />을 넘김)
+export function HourTimeline({ items, newIds, filterKey, ad = null }) {
   const now = useNow();
   const todayKey = dayKey(kstParts(new Date().toISOString()));
   const groups = useMemo(() => {
@@ -402,7 +444,9 @@ export function HourTimeline({ items, newIds, filterKey }) {
         const open = isOpen(g, gi);
         const { themes, word, wordTone, mover } = g.sum;
         return (
-          <section key={g.key} className={`mf-hour ${open ? "open" : ""}`}>
+          <Fragment key={g.key}>
+          {gi === 1 && ad}
+          <section className={`mf-hour ${open ? "open" : ""}`}>
             <button type="button" className="mf-hour-head" aria-expanded={open} onClick={() => flip(g.key)}>
               <span className="mf-hour-lb">{g.label}</span>
               <span className="mf-hour-n mono">속보 {g.list.length}건</span>
@@ -429,7 +473,8 @@ export function HourTimeline({ items, newIds, filterKey }) {
                   const fresh = m !== null && m < FRESH_MINUTES;
                   const lead = n.stocks?.[0];
                   const big = lead && isNum(lead.change) && Math.abs(lead.change) >= 3;
-                  const { tags, text } = splitTags(n.headline);
+                  const { tags: rawTags, text } = splitTags(n.headline);
+                  const tags = fresh ? rawTags.filter((t) => t !== "속보") : rawTags;
                   const rowOpen = openRow === n.id;
                   return (
                     <li key={n.id} className={`mf-row ${newIds?.has(n.id) ? "mf-new" : ""} ${rowOpen ? "open" : ""}`}>
@@ -492,8 +537,10 @@ export function HourTimeline({ items, newIds, filterKey }) {
               </ul>
             )}
           </section>
+          </Fragment>
         );
       })}
+      {groups.length === 1 && ad}
     </div>
   );
 }

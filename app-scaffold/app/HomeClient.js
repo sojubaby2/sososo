@@ -19,6 +19,8 @@ import { decodeEntities } from "../lib/decodeEntities";
 import NewsBoard from "../components/NewsBoard";
 // [2026-10-27 추가] 휴대폰 전용 속보 탭(큰 속보 카드 + 테마 지도 + 시간대별 목록) — components/MobileFeed.js
 import { MobileHero, MobilePulse, ThemeMap, HourTimeline } from "../components/MobileFeed";
+// [2026-10-27 추가] 애드센스 광고 칸(번호는 lib/ads.js)
+import AdSlot from "../components/AdSlot";
 import { openStockChart } from "../lib/openStockChart";
 import { useWatchlist } from "../lib/watchlist";
 import Header from "../components/Header";
@@ -1133,9 +1135,14 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
               {/* [2026-10-26] 속보 본문 — 헤드라인 + 테이프 (components/NewsBoard.js) */}
               {/* PC: 헤드라인 + 테이프 / 휴대폰: 시간대별 묶음 목록(components/MobileFeed.js) */}
               <div className="desk-only">
-                <NewsBoard items={visible} newIds={newIds} />
+                <NewsBoard items={visible} newIds={newIds} ad={<AdSlot className="ad-in-feed" />} />
               </div>
-              <HourTimeline items={visible} newIds={newIds} filterKey={filter ? `${filter.kind}:${filter.value}` : ""} />
+              <HourTimeline
+                items={visible}
+                newIds={newIds}
+                filterKey={filter ? `${filter.kind}:${filter.value}` : ""}
+                ad={<AdSlot className="ad-in-feed" />}
+              />
 
               {filter && visible.length === 0 && (
                 <p className="feed-empty" style={{ fontSize: 14, color: "var(--ink-muted)", padding: "24px 0" }}>
@@ -1161,6 +1168,10 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
             />
             {/* 대표 종목(삼성전자·SK하이닉스) — 2026-10-26 추가, FlagshipStrip 설명 참고 */}
             <FlagshipStrip filter={filter} onPick={(name) => filterAndShow("stock", name)} />
+            {/* [2026-10-27] 광고 — 휴대폰 시장 탭에서만(PC 오른쪽 칸은 화면을 따라다니는 칸이라 광고를 넣지 않음) */}
+            <div className="m-only m-market-ad">
+              <AdSlot />
+            </div>
             <DailyMoversPanel />
           </aside>
         </div>

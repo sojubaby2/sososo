@@ -1,17 +1,56 @@
+// wrangler.jsonc — Cloudflare Workers 배포 설정
+//
+// [2026-10-27 다시 작성] Vercel → Cloudflare Workers(유료 월 5달러) 이전.
+//   재성님: "vercel이라서 이건 유료잖아 … cloudflare로 갈아타야돼" → 유료($5)로 결정.
+//   (Vercel 무료 요금제는 애드센스 광고가 붙으면 규정 위반이라 옮김)
+//
+// 이 파일이 정하는 것:
+//   · name            — Cloudflare 안에서 이 사이트(Worker)의 이름. 대시보드에서 이 이름으로 보입니다.
+//   · assets          — 그림·글꼴·화면 코드 같은 고정 파일(요청 수에 안 잡히고 무료)
+//   · r2_buckets      — 페이지·자료를 잠시 저장해 두는 창고(R2). 대시보드에서 아래 이름으로 미리 만들어야 함
+//   · durable_objects — "N분마다 새로 만들기" 페이지를 뒤에서 차례로 다시 만드는 일꾼
+//   · keep_vars       — 대시보드에 넣은 환경변수(API 키 등)를 배포할 때 지우지 않고 그대로 둠
+//
+// ★ 이름을 바꾸면 대시보드의 Worker 이름, R2 창고 이름도 똑같이 맞춰야 합니다.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "sososo",
+  "name": "newsmeme",
   "main": ".open-next/worker.js",
-  "compatibility_date": "2026-08-01",
-  "compatibility_flags": ["nodejs_compat"],
+  "compatibility_date": "2026-01-15",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "keep_vars": true,
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
   },
+  "r2_buckets": [
+    {
+      "binding": "NEXT_INC_CACHE_R2_BUCKET",
+      "bucket_name": "newsmeme-cache"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "NEXT_CACHE_DO_QUEUE",
+        "class_name": "DOQueueHandler"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["DOQueueHandler"]
+    }
+  ],
   "services": [
     {
       "binding": "WORKER_SELF_REFERENCE",
-      "service": "sososo"
+      "service": "newsmeme"
     }
-  ]
+  ],
+  // 오류가 나면 대시보드 "Logs"에서 볼 수 있게
+  "observability": {
+    "enabled": true
+  }
 }

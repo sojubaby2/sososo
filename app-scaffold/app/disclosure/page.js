@@ -13,6 +13,8 @@
 
 import Link from "next/link";
 import Header from "../../components/Header";
+// [2026-10-27 추가] 애드센스 광고 칸(번호는 lib/ads.js)
+import AdSlot from "../../components/AdSlot";
 // [2026-10-27 추가] 휴대폰 전용 "공시 일정 | 공모주 청약" 전환 단추
 import ScheduleSwitch from "../../components/ScheduleSwitch";
 import DisclosureCalendar from "../../components/DisclosureCalendar";
@@ -106,6 +108,9 @@ export default async function DisclosurePage() {
             <section className="panel stock-section">
               <DisclosureCalendar events={events} todayIso={today} />
             </section>
+
+            {/* [2026-10-27] 광고 — 달력 아래 */}
+            <AdSlot />
 
             <section className="panel stock-section">
               <h2 className="stock-h2">다가오는 일정 (30일)</h2>
