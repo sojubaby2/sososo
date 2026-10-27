@@ -19,6 +19,9 @@ const nextConfig = {
       "/blog/[slug]/opengraph-image": OG_FONT,
       "/stock/[code]/opengraph-image": OG_FONT,
       "/market/[date]/opengraph-image": OG_FONT,
+      "/disclosure/opengraph-image": OG_FONT,
+      "/ipo/opengraph-image": OG_FONT,
+      "/og/home": OG_FONT,
     },
   },
 };

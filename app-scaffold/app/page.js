@@ -45,6 +45,26 @@ import { buildTodayBrief, todaysItems } from "../lib/todayBrief";
 // 이 페이지의 HTML을 60초 동안 재사용합니다(그 사이 방문자는 저장된 걸 받음).
 export const revalidate = 60;
 
+// [2026-10-27 추가] 메인 홈 링크를 카카오톡 등에 공유할 때 — 재성님: "메인홈페이지 링크공유시도 좀 바꿔줘"
+// 그림: 방금 들어온 속보 3개가 보이는 /og/home(app/og/home/route.js). 다른 페이지는 기존 공용 그림 그대로.
+export const metadata = {
+  openGraph: {
+    title: "속보 뜨는 순간, 관련주까지 한 번에 — 뉴스매매",
+    description: "실시간 주식 속보마다 움직일 관련주를 자동으로 찾아 붙여 줍니다. 오늘 강한 테마·종목 차트·공시 일정까지 무료로.",
+    url: "/",
+    siteName: "뉴스매매",
+    locale: "ko_KR",
+    type: "website",
+    images: [{ url: "/og/home", width: 1200, height: 630, alt: "뉴스매매 — 방금 들어온 속보와 관련주" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "속보 뜨는 순간, 관련주까지 한 번에 — 뉴스매매",
+    description: "실시간 주식 속보마다 움직일 관련주를 자동으로 찾아 붙여 줍니다.",
+    images: ["/og/home"],
+  },
+};
+
 const SITE_URL = "https://newsmeme.co.kr";
 
 // 서버가 HTML을 만들 때 미리 가져올 기사 개수.

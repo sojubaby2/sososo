@@ -23,11 +23,39 @@ import { fetchIpoSchedule, statusOf, kstTodayIso } from "../../lib/ipo";
 
 export const revalidate = 10800; // 3시간마다 새로 만듦
 
-export const metadata = {
-  title: "공모주 청약 일정 — 청약일·공모가·주관사 | 뉴스매매",
-  description:
-    "금융감독원 DART 증권신고서를 바탕으로 공모주 청약 일정, 공모가, 공모 규모, 주관 증권사를 3시간마다 자동으로 정리합니다.",
-};
+// [2026-10-27 변경] 카카오톡 공유 때 누르고 싶게 — 제목·설명에 "지금 청약 중인 곳"을 숫자와 이름으로 넣습니다.
+// (미리보기 그림은 app/ipo/opengraph-image.js)
+export async function generateMetadata() {
+  const title = "공모주 청약 일정 — 청약일·공모가·주관사 | 뉴스매매";
+  const base =
+    "금융감독원 DART 증권신고서를 바탕으로 공모주 청약 일정, 공모가, 공모 규모, 주관 증권사를 3시간마다 자동으로 정리합니다.";
+  let ogTitle = "공모주 청약 일정 한눈에 — 청약일·공모가·주관사";
+  let ogDesc = "이번 주 어떤 공모주가 청약하는지, 공모가와 주관사까지 DART 신고서로 자동 정리합니다.";
+  try {
+    const today = kstTodayIso();
+    const data = await fetchIpoSchedule();
+    const rows = (data.items || []).map((it) => ({ it, st: statusOf(it, today) }));
+    const live = rows.filter((r) => r.st === "진행").map((r) => r.it.corpName);
+    const next = rows.filter((r) => r.st === "예정").sort((a, b) => (a.it.subStart < b.it.subStart ? -1 : 1)).map((r) => r.it.corpName);
+    if (live.length) {
+      ogTitle = `지금 청약 중인 공모주 ${live.length}개 — ${live.slice(0, 2).join(", ")}${live.length > 2 ? " 외" : ""}`;
+    } else if (next.length) {
+      ogTitle = `다가오는 공모주 청약 ${next.length}개 — ${next.slice(0, 2).join(", ")}${next.length > 2 ? " 외" : ""}`;
+    }
+    if (live.length || next.length) {
+      ogDesc = `청약일·공모가·주관사를 한 화면에.${next.length ? ` 다음 청약: ${next.slice(0, 3).join(", ")}.` : ""} 3시간마다 자동 갱신.`;
+    }
+  } catch {
+    // 못 받아와도 기본 문구로
+  }
+  return {
+    title,
+    description: base,
+    alternates: { canonical: "/ipo" },
+    openGraph: { title: ogTitle, description: ogDesc, type: "website", siteName: "뉴스매매", locale: "ko_KR" },
+    twitter: { card: "summary_large_image", title: ogTitle, description: ogDesc },
+  };
+}
 
 const WEEK = ["일", "월", "화", "수", "목", "금", "토"];
 

@@ -19,12 +19,43 @@ import { getDisclosureData, CATEGORIES, kstTodayIso } from "../../lib/disclosure
 
 export const revalidate = 1800;
 
-export const metadata = {
-  title: "공시 일정 — 무상증자 권리락·감자·자사주 매입·주요 공시 | 뉴스매매",
-  description:
-    "금융감독원 DART 공시를 바탕으로 무상증자 권리락·신주 상장일, 감자 거래정지, 자사주 매입 기간, 정기보고서 마감일과 최근 실적·수주·증자 공시를 자동으로 정리합니다.",
-  alternates: { canonical: "/disclosure" },
-};
+// [2026-10-27 변경] 카카오톡 공유 때 누르고 싶게 — 이번 주 일정 수와 오늘 공시 수를 제목·설명에 넣습니다.
+// (미리보기 그림은 app/disclosure/opengraph-image.js)
+export async function generateMetadata() {
+  const title = "공시 일정 — 무상증자 권리락·감자·자사주 매입·주요 공시 | 뉴스매매";
+  const description =
+    "금융감독원 DART 공시를 바탕으로 무상증자 권리락·신주 상장일, 감자 거래정지, 자사주 매입 기간, 정기보고서 마감일과 최근 실적·수주·증자 공시를 자동으로 정리합니다.";
+  let ogTitle = "이번 주 놓치면 안 되는 공시 일정 — 권리락·감자·자사주 매입";
+  let ogDesc = "무상증자 권리락일, 감자 거래정지, 자사주 매입 기간과 오늘 나온 실적·수주 공시를 한눈에.";
+  try {
+    const data = await getDisclosureData();
+    if (data) {
+      const today = data.today;
+      const week = data.events.filter((e) => e.code && e.date >= today && e.date <= addDays(today, 7));
+      const ex = week.filter((e) => e.type === "free-ex").map((e) => e.name);
+      if (week.length)
+        ogTitle = `이번 주 놓치면 안 되는 공시 일정 ${week.length}건 — ${
+          ex.length ? `무상증자 권리락 ${ex.slice(0, 2).join(", ")}` : "권리락·감자·자사주 매입"
+        }`;
+      const lastDay = data.recent[0]?.date;
+      const todays = data.recent.filter((r) => r.date === lastDay);
+      const earn = todays.filter((r) => r.cat === "earn").length;
+      const deal = todays.filter((r) => r.cat === "deal").length;
+      if (todays.length) {
+        ogDesc = `${lastDay === today ? "오늘" : "최근"} 주요 공시 ${todays.length}건(실적 ${earn}·수주 ${deal}). 권리락·감자·자사주 매입 일정까지 30분마다 자동 정리.`;
+      }
+    }
+  } catch {
+    // 못 받아와도 기본 문구로
+  }
+  return {
+    title,
+    description,
+    alternates: { canonical: "/disclosure" },
+    openGraph: { title: ogTitle, description: ogDesc, type: "website", siteName: "뉴스매매", locale: "ko_KR" },
+    twitter: { card: "summary_large_image", title: ogTitle, description: ogDesc },
+  };
+}
 
 const DAY = ["일", "월", "화", "수", "목", "금", "토"];
 const dayText = (iso) => `${Number(iso.slice(5, 7))}.${iso.slice(8, 10)}(${DAY[new Date(`${iso}T00:00:00Z`).getUTCDay()]})`;
