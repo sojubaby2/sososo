@@ -735,27 +735,43 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
   // 이제 화면을 보고 있는 동안 1분마다, 그리고 새 속보가 들어올 때 위쪽 속보 40건에
   // 붙은 종목들의 오늘 등락률을 다시 받아 덮어씁니다. 서버가 처음 넣어준 값(liveQuotes)에서 시작.
   const [quotesNow, setQuotesNow] = useState(liveQuotes);
-  const quoteKey = useMemo(() => {
-    const syms = new Set();
+  // [2026-10-27 수정] 재성님 질문: "지앤비에스 에코 칩 -1.8%인데 눌러 보면 +3.31%"
+  //   원인: 속보 40건에 붙은 종목이 88개였는데 한 번에 60개까지만 물어봤고, 그 60개를
+  //   "종목코드 번호 순"으로 골랐습니다. 번호가 뒤쪽인 종목(382800 등)은 아예 안 물어봐서
+  //   기사 들어올 때 찍힌 어제 등락률이 그대로 남아 있었습니다.
+  //   → 최신 기사에 붙은 종목부터 순서대로, 50개씩 나눠서 빠짐없이 물어봅니다.
+  //     (주소가 같으면 1분 동안 공용으로 저장되고, 야후 값은 서버에서 5분 저장 — 비용 0원)
+  const QUOTE_CHUNK = 50;
+  const quoteKeys = useMemo(() => {
+    const syms = [];
+    const seen = new Set();
     for (const it of rawItems.slice(0, 40)) {
       for (const m of it.matches || []) {
         if (!/^[0-9A-Z]{6}$/i.test(m.code || "")) continue;
-        syms.add(`${m.code.toUpperCase()}.${String(m.market || "").includes("닥") ? "KQ" : "KS"}`);
+        const sym = `${m.code.toUpperCase()}.${String(m.market || "").includes("닥") ? "KQ" : "KS"}`;
+        if (seen.has(sym)) continue;
+        seen.add(sym);
+        syms.push(sym);
       }
     }
-    return [...syms].sort().slice(0, 60).join(",");
+    const chunks = [];
+    for (let i = 0; i < syms.length; i += QUOTE_CHUNK) chunks.push(syms.slice(i, i + QUOTE_CHUNK).join(","));
+    return chunks;
   }, [rawItems]);
+  const quoteKey = quoteKeys.join("|"); // 목록이 바뀌었는지 알아보는 용도
   useEffect(() => {
     if (!quoteKey) return;
     let alive = true;
     const load = () => {
       if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
-      fetch(`/api/live-quotes?s=${encodeURIComponent(quoteKey)}`)
-        .then((r) => r.json())
-        .then((d) => {
-          if (alive && d?.quotes && Object.keys(d.quotes).length) setQuotesNow((cur) => ({ ...cur, ...d.quotes }));
-        })
-        .catch(() => {});
+      for (const key of quoteKeys) {
+        fetch(`/api/live-quotes?s=${encodeURIComponent(key)}`)
+          .then((r) => r.json())
+          .then((d) => {
+            if (alive && d?.quotes && Object.keys(d.quotes).length) setQuotesNow((cur) => ({ ...cur, ...d.quotes }));
+          })
+          .catch(() => {});
+      }
     };
     load(); // 종목 목록이 바뀌면(새 속보) 바로 한 번
     const t = setInterval(load, 60000);
