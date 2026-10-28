@@ -20,6 +20,8 @@ import NewsBoard from "../components/NewsBoard";
 // [2026-10-27 추가] 휴대폰 전용 속보 탭(큰 속보 카드 + 테마 지도 + 시간대별 목록) — components/MobileFeed.js
 import { HourTimeline } from "../components/MobileFeed";
 import MobileShorts from "../components/MobileShorts";
+import MobileChat from "../components/MobileChat";
+import { MOBILE_FEED } from "../lib/mobileLayout";
 import ThemeRadar from "../components/ThemeRadar";
 // [2026-10-27 추가] 애드센스 광고 칸(번호는 lib/ads.js)
 import AdSlot from "../components/AdSlot";
@@ -1052,20 +1054,34 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
         {/* [2026-10-27] 휴대폰 지수 한 줄 (PC에서는 안 보임) — [2026-10-28] 속보 탭에서 테마 탭 맨 위로 옮김 */}
         <MobileFeedTop worldIndices={worldIndices} />
         <InstallHintBanner />
-        {/* [2026-10-28] 휴대폰 속보 탭: 숏폼 속보 — 속보 한 건이 화면 하나, 위로 밀면 다음 (components/MobileShorts.js)
-            재성님: "모바일 화면 맘에안드는데 다시 바꾸자 — 훨씬 혁신적인 모바일 화면" → 시안 A+B.
-            PC에서는 아예 그려지지 않습니다. */}
-        <MobileShorts
-          items={items}
-          newIds={newIds}
-          filter={shortsFilter}
-          onFilter={setShortsFilter}
-          focusId={shortsFocus}
-          onFocused={() => setShortsFocus(null)}
-        />
+        {/* [2026-10-28] 휴대폰 속보 탭 — 모양은 lib/mobileLayout.js의 MOBILE_FEED로 고름
+              "chat"   = C. 속보 채널(채팅방처럼 아래로 쌓임, components/MobileChat.js)
+              "shorts" = A. 숏폼 속보(속보 한 건이 화면 하나, components/MobileShorts.js)
+            재성님: "c형으로 한번적용 해봐도돼? 맘에안들면 다시 a+b로 올게". PC에서는 둘 다 그려지지 않습니다. */}
+        {MOBILE_FEED === "chat" ? (
+          <MobileChat
+            items={items}
+            newIds={newIds}
+            filter={shortsFilter}
+            onFilter={setShortsFilter}
+            focusId={shortsFocus}
+            onFocused={() => setShortsFocus(null)}
+            soundEnabled={soundEnabled}
+            onToggleSound={toggleSound}
+          />
+        ) : (
+          <MobileShorts
+            items={items}
+            newIds={newIds}
+            filter={shortsFilter}
+            onFilter={setShortsFilter}
+            focusId={shortsFocus}
+            onFocused={() => setShortsFocus(null)}
+          />
+        )}
         {/* [2026-10-28] 휴대폰 테마 탭 맨 위: 테마 레이더 (components/ThemeRadar.js) */}
         <div className="m-radar-wrap">
-          <ThemeRadar items={items} onOpen={openThemeShorts} />
+          <ThemeRadar items={items} onOpen={openThemeShorts} goText={MOBILE_FEED === "chat" ? "모아보기" : "넘겨보기"} />
         </div>
 
         <div className="home-grid">

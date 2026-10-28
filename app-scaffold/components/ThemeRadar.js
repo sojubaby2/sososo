@@ -8,7 +8,7 @@
 // 무엇을 보여 주나:
 //   · 오늘 속보에 많이 나온 테마일수록 큰 동그라미. 관련 종목이 평균적으로 올랐으면 빨강, 내렸으면 파랑(진할수록 많이).
 //   · 동그라미를 누르면 아래 칸이 그 테마로 바뀝니다: 관련주(누르면 차트) + 최근 속보.
-//   · "이 테마 속보 넘겨보기"를 누르면 속보 탭(숏폼)으로 가서 그 테마 속보만 넘겨 봅니다.
+//   · "이 테마 속보 넘겨보기(모아보기)"를 누르면 속보 탭으로 가서 그 테마 속보만 봅니다.
 //
 // 자료: 홈 화면이 이미 받아 둔 속보 목록만으로 계산합니다(서버 요청 추가 0, 비용 0).
 // ★ PC 화면에서는 보이지 않습니다(globals.css .m-radar-wrap).
@@ -59,7 +59,7 @@ function packBubbles(stats, W, H) {
   return [];
 }
 
-export default function ThemeRadar({ items, onOpen }) {
+export default function ThemeRadar({ items, onOpen, goText = "넘겨보기" }) {
   const today = useMemo(() => todaysOf(items), [items]);
   const stats = useMemo(() => themeStats(today).slice(0, MAX_BUBBLES), [today]);
   const fieldRef = useRef(null);
@@ -172,7 +172,7 @@ export default function ThemeRadar({ items, onOpen }) {
             ))}
           </ul>
           <button type="button" className="tr-go" onClick={() => onOpen?.(selected.theme, null)}>
-            {selected.theme} 속보 {selected.count}건 넘겨보기
+            {selected.theme} 속보 {selected.count}건 {goText}
             <ChevronRight size={16} />
           </button>
         </div>

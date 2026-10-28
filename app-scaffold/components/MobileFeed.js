@@ -11,6 +11,7 @@
 // 이 파일에 남은 것:
 //   · 여러 화면이 같이 쓰는 작은 도우미들(시간 계산, 등락률 글자, 테마별 집계, 가격 그림 Spark)
 //   · HourTimeline — 속보를 1시간씩 묶은 목록. 지금은 휴대폰 "관심" 탭(관심종목 속보)에서 씁니다.
+//   · [2026-10-28 오전] 속보 탭을 채팅형(C, components/MobileChat.js)으로도 바꿀 수 있게 됨 — lib/mobileLayout.js
 //
 // ★ PC 화면(761px 이상)에서는 이 부품들이 보이지 않고 예전 화면(components/NewsBoard.js)이 그대로 나옵니다.
 //   (globals.css의 .m-only / .desk-only)
@@ -35,7 +36,7 @@ export function kstParts(ts) {
 }
 export const dayKey = (p) => (p ? `${p.y}-${p.mo}-${p.d}` : "");
 export const hhmm = (p) => (p ? `${String(p.h).padStart(2, "0")}:${String(p.mi).padStart(2, "0")}` : "");
-function hourLabel(h) {
+export function hourLabel(h) {
   if (h === 0) return "밤 12시";
   if (h < 6) return `새벽 ${h}시`;
   if (h < 12) return `오전 ${h}시`;
@@ -163,7 +164,7 @@ export function heatClass(avg) {
 }
 
 // ── C. 시간대별 묶음 목록 ───────────────────────────────────────
-function groupSummary(list) {
+export function groupSummary(list) {
   const stats = themeStats(list).slice(0, 2);
   let mover = null;
   for (const n of list) {
