@@ -16,6 +16,8 @@ import Header from "../../../components/Header";
 import AdSlot from "../../../components/AdSlot";
 import { getMarketDay, describeMarketDay, koreanDate } from "../../../lib/marketDay";
 import { getRecentFeed, kstDateOf, kstDateTimeText } from "../../../lib/recentFeed";
+// [2026-10-28 추가] 지수 마감 + 투자자별(개인·외국인·기관) 순매수 — 재성님: "외국인, 기관 등 매수, 매도 이런내용도"
+import { getMarketFlow, describeFlow } from "../../../lib/investorFlow";
 import { decodeEntities } from "../../../lib/decodeEntities";
 
 // [2026-10-27] 저장소(Redis) 읽기는 "매번 새로" 방식이라 미리 만들어 두는 페이지와 함께 쓰면 오류가 납니다.
@@ -45,6 +47,52 @@ function eok(v) {
   if (typeof v !== "number") return "—";
   const e = v / 1e8;
   return e >= 10000 ? `${(e / 10000).toFixed(1)}조` : `${Math.round(e).toLocaleString("ko-KR")}억`;
+}
+
+// [2026-10-28 추가] 투자자별 순매수 표(억 원). 오른쪽(+)이 산 쪽, 왼쪽(-)이 판 쪽
+function FlowTable({ flow }) {
+  const cell = (v) =>
+    typeof v === "number" ? (
+      <td className={`num mono ${tone(v)}`}>
+        {v > 0 ? "+" : ""}
+        {Math.round(v).toLocaleString("ko-KR")}
+      </td>
+    ) : (
+      <td className="num mono">—</td>
+    );
+  const markets = ["코스피", "코스닥"].filter((mk) => flow?.[mk]?.flow);
+  if (!markets.length) return null;
+  return (
+    <div className="mk-table-wrap">
+      <h3 className="mk-h3">투자자별 순매수 (억 원)</h3>
+      <table className="mk-table">
+        <thead>
+          <tr>
+            <th>시장</th>
+            <th className="num">개인</th>
+            <th className="num">외국인</th>
+            <th className="num">기관</th>
+            <th className="num">연기금</th>
+          </tr>
+        </thead>
+        <tbody>
+          {markets.map((mk) => {
+            const f = flow[mk].flow;
+            return (
+              <tr key={mk}>
+                <td>{mk}</td>
+                {cell(f.individual)}
+                {cell(f.foreign)}
+                {cell(f.institution)}
+                {cell(f.pension)}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      <p className="mk-note">+ 는 산 금액이 더 많음(순매수), − 는 판 금액이 더 많음(순매도) · 기관에 연기금이 포함됩니다 · 자료: 네이버 금융</p>
+    </div>
+  );
 }
 
 function StockTable({ title, rows, showValue }) {
@@ -105,7 +153,9 @@ function ThemeList({ title, list }) {
 export default async function MarketDayPage({ params }) {
   const d = await getMarketDay(params.date);
   if (!d) notFound();
-  const lines = describeMarketDay(d);
+  // [2026-10-28] 지수 마감·투자자별 순매수(못 받으면 그 부분만 빠짐)
+  const flow = await getMarketFlow(d.date, { latest: !d.nextDate });
+  const lines = [...describeFlow(flow), ...describeMarketDay(d)];
 
   // 그날 올라온 속보 중 상승·하락 상위 종목이 걸린 것(피드가 최근 300건만 보관하므로 최근 날짜만 나옴)
   const movers = new Set([...d.gainers, ...d.losers, ...d.byValue].map((x) => x.code));
@@ -148,6 +198,7 @@ export default async function MarketDayPage({ params }) {
               </div>
             ))}
           </div>
+          <FlowTable flow={flow} />
         </section>
 
         {/* [2026-10-27] 광고 — 요약 아래 */}

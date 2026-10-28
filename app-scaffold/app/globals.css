@@ -2462,3 +2462,8 @@ img { -webkit-user-drag: none; }
 .nb-lead-side .nb-stk-why { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .nb-lead-side .nb-stk-nm { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .nb-lead-side .nb-stk-nm svg { vertical-align: -1px; margin-right: 3px; }
+
+/* [2026-10-28 추가] 장 마감 정리 — 투자자별 순매수 표 아래 설명 */
+.market-page .stock-section .mk-table-wrap + .mk-table-wrap,
+.market-page .stock-stats + .mk-table-wrap { margin-top: 16px; }
+.mk-note { margin: 6px 0 0; font-size: 12px; color: var(--ink-soft); line-height: 1.5; }
