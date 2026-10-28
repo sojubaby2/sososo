@@ -2064,3 +2064,12 @@ img { -webkit-user-drag: none; }
 @media (min-width: 1700px) {
   .home-grid { grid-template-columns: 320px minmax(0, 1fr) 340px; gap: 28px; }
 }
+
+/* [2026-10-28] PC 화면 양옆 빈자리 광고(components/SideAds.js) — 위치는 부품이 계산, 여기선 모양만.
+   따라다니지 않음(position: absolute → 스크롤하면 같이 올라감). 노트북 이하 화면에선 아예 안 나옴. */
+.side-ad { position: absolute; z-index: 1; }
+.side-ad .ad-wrap.ad-box { margin: 0; }
+.side-ad .ad-label { display: block; text-align: center; }
+.side-ad-300 .ad-box ins { width: 300px; height: 600px; }
+.side-ad-160 .ad-box ins { width: 160px; height: 600px; }
+@media (max-width: 1180px) { .side-ad { display: none; } }
