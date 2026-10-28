@@ -21,6 +21,10 @@
   "compatibility_date": "2026-01-15",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "keep_vars": true,
+  // [2026-10-28] 예비 주소(sososo.sojubaby2.workers.dev)는 끔 — 같은 사이트가 두 주소로 열리면 검색엔진이 중복으로 봄.
+  //   대시보드에서 꺼도 배포할 때마다 다시 켜지기 때문에 여기서 끕니다. 사이트 주소는 newsmeme.co.kr / www.newsmeme.co.kr
+  "workers_dev": false,
+  "preview_urls": false,
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
