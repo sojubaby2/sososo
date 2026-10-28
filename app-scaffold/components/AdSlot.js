@@ -6,6 +6,7 @@
 // [2026-10-28 개편] 광고 종류 4가지 + 화면 가까이 왔을 때만 불러오기(지연 불러오기).
 //
 // 쓰는 법: <AdSlot kind="display" />  /  "inFeed"  /  "inArticle"  /  "multiplex"
+//   eager: 화면 가까이 왔는지 따지지 않고 보이는 즉시 요청(휴대폰 숏폼 광고 카드처럼, 부르는 쪽이 이미 "곧 볼 자리"일 때만 켜서 씀)
 //   box: 정해진 크기 칸에 꼭 맞는 광고(예: 휴대폰 속보 카드 사이 광고). 칸 크기는 CSS(.ad-box ins)가 정합니다.
 //        [2026-10-28 추가] 구글 안내: 반응형 광고에서 data-ad-format을 빼고 칸 너비·높이를 정해 주면 그 크기에 맞춰 나옴
 //   광고 단위 번호는 lib/ads.js의 AD_SLOTS에서 가져옵니다.
@@ -38,13 +39,13 @@ function resolveKind(kind) {
   return "display";
 }
 
-function AdBox({ slot, kind, box }) {
+function AdBox({ slot, kind, box, eager }) {
   const insRef = useRef(null);
   useEffect(() => {
     const ins = insRef.current;
     if (!ins) return;
     let done = false;
-    let near = false;
+    let near = Boolean(eager);
     // 광고 요청 조건: ① 화면에 실제로 보이는 칸(폭이 있음) ② 화면 가까이 내려왔음 ③ 아직 요청 안 함
     //   홈은 PC용·휴대폰용 화면이 둘 다 들어 있고 하나는 숨겨져 있어서, 숨은 칸에 요청하면 오류가 납니다.
     //   휴대폰 "시장" 탭처럼 처음엔 숨어 있다가 나중에 보이는 칸은, 보이는 순간 요청합니다.
@@ -97,7 +98,7 @@ function AdBox({ slot, kind, box }) {
   );
 }
 
-export default function AdSlot({ kind = "display", className = "", box = false }) {
+export default function AdSlot({ kind = "display", className = "", box = false, eager = false }) {
   const pathname = usePathname();
   const real = box ? "display" : resolveKind(kind);
   const slot = AD_SLOTS[real];
@@ -106,7 +107,7 @@ export default function AdSlot({ kind = "display", className = "", box = false }
     <aside className={`ad-wrap ad-${real} ${box ? "ad-box" : ""} ${className}`} aria-label="광고">
       <span className="ad-label">광고</span>
       {/* key: 페이지가 바뀌면 칸을 새로 만들어 새 광고를 받음 */}
-      <AdBox key={`${pathname}-${real}-${slot}-${box ? "b" : ""}`} slot={slot} kind={real} box={box} />
+      <AdBox key={`${pathname}-${real}-${slot}-${box ? "b" : ""}`} slot={slot} kind={real} box={box} eager={eager} />
     </aside>
   );
 }

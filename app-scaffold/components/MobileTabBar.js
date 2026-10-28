@@ -8,7 +8,7 @@
 //
 // 탭 다섯 개:
 //   속보 — 홈의 실시간 속보 (다른 탭을 보는 사이 새 속보가 오면 빨간 숫자)
-//   시장 — 홈의 오늘 요약·지수·대표 종목·HOT 테마·전일 급등주
+//   테마 — [2026-10-28 "시장"에서 바뀜] 테마 레이더(components/ThemeRadar.js) + 지수·대표 종목·HOT 테마·전일 급등주
 //   관심 — 별표로 담은 종목 + 그 종목 속보만 (담은 개수 표시)
 //   일정 — 공시 일정(위쪽 단추로 공모주 일정과 오갈 수 있음)
 //   전체 — 모든 메뉴가 바둑판으로 펼쳐지는 창
@@ -23,6 +23,7 @@ import { useEffect, useState } from "react";
 import {
   Zap,
   BarChart3,
+  Radar,
   Star,
   CalendarDays,
   LayoutGrid,
@@ -122,7 +123,8 @@ export default function MobileTabBar() {
 
   const homeTabs = [
     { key: "feed", label: "속보", Icon: Zap },
-    { key: "market", label: "시장", Icon: BarChart3 },
+    // [2026-10-28] "시장" → "테마": 이 탭 맨 위가 테마 레이더로 바뀜(주소는 예전처럼 #market)
+    { key: "market", label: "테마", Icon: Radar },
     { key: "watch", label: "관심", Icon: Star },
   ];
 

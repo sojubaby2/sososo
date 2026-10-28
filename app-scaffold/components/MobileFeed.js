@@ -2,47 +2,39 @@
 
 // components/MobileFeed.js
 //
-// [2026-10-27 신설] 휴대폰 전용 "속보" 탭 — 시안 A + B + C를 합친 것.
-// 재성님: "메인화면이 뭔가 아쉬운데 좀 혁신이 부족한 느낌" → 시안 3개 → "abc 다 합치면?"
+// [2026-10-27 신설] 휴대폰 화면 부품 모음.
+// [2026-10-28 개편] 재성님: "모바일 화면 맘에안드는데 다시 바꾸자 — 훨씬 혁신적인 모바일 화면" → 시안 A+B 선택.
+//   · 속보 탭  → components/MobileShorts.js (A. 숏폼 속보 — 속보 한 건이 화면 하나, 위로 밀면 다음)
+//   · 테마 탭  → components/ThemeRadar.js  (B. 테마 레이더 — 속보 많이 나온 테마일수록 큰 동그라미)
+//   예전 큰 카드(MobileHero)·오늘 숫자(MobilePulse)·테마 지도(ThemeMap)는 위 두 화면으로 바뀌어 지웠습니다.
 //
-// 위에서부터:
-//   A. MobileHero   — "방금 터진 속보" 큰 카드 5장(옆으로 넘김). 관련 종목이 큰 숫자 + 최근 20일 가격 그림으로.
-//                     새 속보가 오면 저절로 첫 장으로 돌아갑니다.
-//      MobilePulse  — 오늘 숫자 한 줄: 오늘 속보 수 · 가장 뜨거운 테마 · 가장 많이 오른 종목
-//   B. ThemeMap     — 테마 지도. 오늘 속보에 많이 나온 테마일수록 큰 네모, 관련 종목이 많이 올랐을수록 빨강
-//                     (내렸으면 파랑). 누르면 아래 목록이 그 테마 속보만 남습니다.
-//   C. HourTimeline — 속보를 1시간씩 묶고, 묶음마다 "이 시간엔 무슨 일이" 한 줄 요약. 최근 두 묶음만 펼쳐 두고
-//                     나머지는 접어 둡니다(누르면 펼침). 속보 한 줄을 누르면 요약·근거·원문이 펼쳐집니다.
+// 이 파일에 남은 것:
+//   · 여러 화면이 같이 쓰는 작은 도우미들(시간 계산, 등락률 글자, 테마별 집계, 가격 그림 Spark)
+//   · HourTimeline — 속보를 1시간씩 묶은 목록. 지금은 휴대폰 "관심" 탭(관심종목 속보)에서 씁니다.
 //
 // ★ PC 화면(761px 이상)에서는 이 부품들이 보이지 않고 예전 화면(components/NewsBoard.js)이 그대로 나옵니다.
 //   (globals.css의 .m-only / .desk-only)
 // ★ 비용: 가격 그림은 종목 차트 창과 같은 자료(/api/candles, 2분 공용 저장)를 지금 보이는 카드의 종목만 받아 옵니다.
 //   나머지는 이미 화면에 있는 속보 자료로 계산합니다(추가 비용 0).
 
-import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, ExternalLink, Flame, AlertTriangle } from "lucide-react";
+import { Fragment, useEffect, useMemo, useState } from "react";
+import { ChevronDown, ExternalLink, AlertTriangle } from "lucide-react";
 import { openStockChart } from "../lib/openStockChart";
 import { isPoliticalTheme } from "../lib/themeData";
-import { AD_SLOTS } from "../lib/ads";
-import AdSlot from "./AdSlot";
 
-const FRESH_MINUTES = 15; // 이 시간 안의 속보에 빨간 "속보" 딱지
-const HERO_COUNT = 5;
-const HERO_AD_AT = 2; // [2026-10-28] 속보 카드 사이 광고 자리(0부터 셈 → 2 = 세 번째 자리). 끄려면 HERO_AD를 false로
-const HERO_AD = Boolean(AD_SLOTS.display);
-const MAP_COUNT = 8;
+export const FRESH_MINUTES = 15; // 이 시간 안의 속보에 빨간 "속보" 딱지
 const OPEN_GROUPS = 2; // 처음에 펼쳐 둘 시간 묶음 수
 
 // ── 작은 도우미들 ──────────────────────────────────────────────
 const KST = 9 * 3600 * 1000;
-function kstParts(ts) {
+export function kstParts(ts) {
   const ms = Date.parse(ts || "");
   if (!Number.isFinite(ms)) return null;
   const d = new Date(ms + KST);
   return { y: d.getUTCFullYear(), mo: d.getUTCMonth() + 1, d: d.getUTCDate(), h: d.getUTCHours(), mi: d.getUTCMinutes() };
 }
-const dayKey = (p) => (p ? `${p.y}-${p.mo}-${p.d}` : "");
-const hhmm = (p) => (p ? `${String(p.h).padStart(2, "0")}:${String(p.mi).padStart(2, "0")}` : "");
+export const dayKey = (p) => (p ? `${p.y}-${p.mo}-${p.d}` : "");
+export const hhmm = (p) => (p ? `${String(p.h).padStart(2, "0")}:${String(p.mi).padStart(2, "0")}` : "");
 function hourLabel(h) {
   if (h === 0) return "밤 12시";
   if (h < 6) return `새벽 ${h}시`;
@@ -50,22 +42,22 @@ function hourLabel(h) {
   if (h === 12) return "낮 12시";
   return `오후 ${h - 12}시`;
 }
-function minutesAgo(ts, now) {
+export function minutesAgo(ts, now) {
   const t = Date.parse(ts || "");
   return Number.isFinite(t) ? Math.max(0, Math.floor((now - t) / 60000)) : null;
 }
-function agoText(m) {
+export function agoText(m) {
   if (m === null) return "";
   if (m < 1) return "방금";
   if (m < 60) return `${m}분 전`;
   if (m < 1440) return `${Math.floor(m / 60)}시간 전`;
   return `${Math.floor(m / 1440)}일 전`;
 }
-const isNum = (v) => typeof v === "number" && Number.isFinite(v);
-const pct = (v) => (isNum(v) ? `${v > 0 ? "+" : ""}${v.toFixed(1)}%` : "—");
-const tone = (v) => (isNum(v) ? (v > 0 ? "up" : v < 0 ? "down" : "flat") : "flat");
+export const isNum = (v) => typeof v === "number" && Number.isFinite(v);
+export const pct = (v) => (isNum(v) ? `${v > 0 ? "+" : ""}${v.toFixed(1)}%` : "—");
+export const tone = (v) => (isNum(v) ? (v > 0 ? "up" : v < 0 ? "down" : "flat") : "flat");
 // 제목 앞 말머리("[단독]")는 떼어서 딱지로
-function splitTags(headline) {
+export function splitTags(headline) {
   let text = String(headline || "");
   const tags = [];
   for (;;) {
@@ -76,10 +68,10 @@ function splitTags(headline) {
   }
   return { tags, text };
 }
-const HOT_TAGS = new Set(["단독", "속보", "긴급", "1보", "2보"]);
+export const HOT_TAGS = new Set(["단독", "속보", "긴급", "1보", "2보"]);
 
 // 1분마다 다시 그리기("3분 전" 갱신용)
-function useNow() {
+export function useNow() {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 30000);
@@ -89,7 +81,7 @@ function useNow() {
 }
 
 // "오늘" 속보: 가장 최근 속보와 같은 날(한국 시간). 너무 적으면(장 시작 전 등) 최근 60건.
-function todaysOf(items) {
+export function todaysOf(items) {
   const k = dayKey(kstParts(items[0]?.ts));
   const today = items.filter((n) => dayKey(kstParts(n.ts)) === k);
   return today.length >= 8 ? today : items.slice(0, 60);
@@ -118,7 +110,7 @@ export function themeStats(items) {
 // ── 가격 그림(최근 20거래일 종가) ───────────────────────────────
 const sparkCache = new Map(); // code → { at, closes }
 const SPARK_MS = 5 * 60 * 1000;
-function Spark({ code, market, active }) {
+export function Spark({ code, market, active }) {
   const [closes, setCloses] = useState(() => sparkCache.get(code)?.closes || null);
   useEffect(() => {
     if (!active || !code) return;
@@ -158,262 +150,8 @@ function Spark({ code, market, active }) {
   );
 }
 
-// ── A. 방금 터진 속보 큰 카드 ───────────────────────────────────
-export function MobileHero({ items }) {
-  const now = useNow();
-  const list = useMemo(() => items.filter((n) => n.stocks?.length).slice(0, HERO_COUNT), [items]);
-  // [2026-10-28 추가] 카드 사이 광고 한 장 — 재성님: "모바일버전은 최신 속보카드 사이에 광고 들어가게 해줘"
-  //   2장째 속보 카드 다음(3번째 자리)에 광고 카드 1장. 맨 앞 카드엔 넣지 않습니다(첫 화면은 속보가 먼저).
-  //   · 넘겨서 그 자리에 왔을 때 광고를 불러옵니다(안 넘기는 사람에겐 광고 요청 자체를 안 함 → 가시성↑)
-  //   · 채울 광고가 없거나 광고 차단기로 막히면 그 카드를 통째로 빼서 빈 카드가 남지 않게 합니다
-  //   · 카드 번호(1/5)는 속보 카드만 셉니다
-  const [adGone, setAdGone] = useState(false);
-  const showAd = HERO_AD && !adGone && list.length > HERO_AD_AT;
-  const slides = useMemo(() => {
-    const s = list.map((n, k) => ({ key: n.id, n, num: k + 1 }));
-    if (showAd) s.splice(HERO_AD_AT, 0, { key: "ad", ad: true });
-    return s;
-  }, [list, showAd]);
-  const [idx, setIdx] = useState(0);
-  const idxRef = useRef(0);
-  const viewedRef = useRef(null); // 지금 보고 있는 카드(속보 id 또는 "ad")
-  const trackRef = useRef(null);
-  const adCardRef = useRef(null);
-  const leadId = list[0]?.id;
-  const prevLead = useRef(leadId);
-  // [2026-10-27 추가] 새 속보가 들어왔을 때 — 재성님: "속보가 뜨면 카드뉴스는 어떻게 변해?" → 개선
-  //   arrived: 방금 맨 앞에 들어온 카드 id(몇 초 동안 빨갛게 번쩍 + "NEW")
-  //   pending: 다른 카드를 읽던 중이라 첫 장으로 끌고 가지 않고 "← 새 속보" 단추만 띄운 상태
-  const [arrived, setArrived] = useState(null);
-  const [pending, setPending] = useState(false);
-  const step = () => {
-    const card = trackRef.current?.firstElementChild;
-    return card ? card.offsetWidth + 10 : 0;
-  };
-
-  // 화면이 그려지기 직전에 처리해야 카드가 한 칸 밀려 보이는 깜빡임이 없습니다.
-  useLayoutEffect(() => {
-    if (prevLead.current === leadId) return;
-    const hadLead = prevLead.current !== undefined;
-    prevLead.current = leadId;
-    if (!hadLead || !leadId) return;
-    setArrived(leadId);
-    const el = trackRef.current;
-    if (el && idxRef.current > 0) {
-      // 읽던 카드 그대로: 그 카드가 새 순서에서 몇 번째인지 찾아 그 자리로(앞에 한 장이 끼어들었으니 보통 한 칸 뒤)
-      //   (휴대폰 브라우저에 따라 스스로 자리를 지켜 주기도 해서, "몇 칸 더"가 아니라 "그 카드 자리"로 맞춥니다)
-      const j = slides.findIndex((x) => x.key === viewedRef.current);
-      const target = j >= 0 ? j : slides.length - 1;
-      el.scrollLeft = target * step();
-      idxRef.current = target;
-      setIdx(target);
-      setPending(true);
-    } else if (el) {
-      el.scrollLeft = 0;
-    }
-    const t = setTimeout(() => setArrived((cur) => (cur === leadId ? null : cur)), 6000);
-    return () => clearTimeout(t);
-  }, [leadId]);
-
-  // 광고 카드가 빠질 때 — 광고 뒤 카드를 보던 중이면 같은 카드가 계속 보이게 한 칸 당겨 줍니다.
-  useLayoutEffect(() => {
-    if (!adGone) return;
-    const el = trackRef.current;
-    if (!el) return;
-    const i = idxRef.current;
-    const target = i > HERO_AD_AT ? i - 1 : i;
-    if (target !== i) el.scrollLeft = target * step();
-    idxRef.current = target;
-    viewedRef.current = list[target]?.id ?? null;
-    setIdx(target);
-  }, [adGone]);
-
-  // 광고 카드 지켜보기: 채울 광고가 없다고 나오거나(unfilled), 요청하고 8초가 지나도 안 채워지면(광고 차단 등) 카드를 뺌
-  useEffect(() => {
-    if (!showAd) return;
-    const card = adCardRef.current;
-    if (!card) return;
-    let timer = null;
-    const check = () => {
-      const ins = card.querySelector("ins");
-      if (!ins) return;
-      const st = ins.getAttribute("data-ad-status");
-      if (st === "unfilled") return setAdGone(true);
-      if (st === "filled") {
-        clearTimeout(timer);
-        timer = null;
-        return;
-      }
-      if (!timer && ins.classList.contains("adsbygoogle")) {
-        timer = setTimeout(() => {
-          if (ins.getAttribute("data-ad-status") !== "filled") setAdGone(true);
-        }, 8000);
-      }
-    };
-    const mo = new MutationObserver(check);
-    mo.observe(card, { subtree: true, attributes: true, attributeFilter: ["class", "data-ad-status"] });
-    check();
-    return () => {
-      mo.disconnect();
-      clearTimeout(timer);
-    };
-  }, [showAd]);
-
-  function onScroll() {
-    const el = trackRef.current;
-    const w = step();
-    if (!el || !w) return;
-    const i = Math.round(el.scrollLeft / w);
-    idxRef.current = i;
-    viewedRef.current = slides[i]?.key ?? null;
-    setIdx(i);
-    if (i === 0) setPending(false);
-  }
-  function go(i) {
-    const el = trackRef.current;
-    const card = el?.firstElementChild;
-    if (el && card) el.scrollTo({ left: i * (card.offsetWidth + 10), behavior: "smooth" });
-  }
-
-  if (!list.length) return null;
-  return (
-    <section className="mf-hero m-only" aria-label="방금 들어온 속보">
-      <div className="mf-hero-track" ref={trackRef} onScroll={onScroll}>
-        {slides.map((sl, i) => {
-          if (sl.ad) {
-            return (
-              <div key="ad" ref={adCardRef} className="mf-card mf-adcard">
-                <AdSlot box className="mf-adslot" />
-              </div>
-            );
-          }
-          const n = sl.n;
-          const m = minutesAgo(n.ts, now);
-          const fresh = m !== null && m < FRESH_MINUTES;
-          const { tags: rawTags, text } = splitTags(n.headline);
-          const tags = fresh ? rawTags.filter((t) => t !== "속보") : rawTags; // 빨간 "속보" 딱지와 겹치지 않게
-          return (
-            <article key={n.id} className={`mf-card ${arrived === n.id ? "is-new" : ""}`}>
-              <div className="mf-card-meta">
-                {arrived === n.id && <span className="mf-newtag">NEW</span>}
-                {fresh && <span className="mf-brk">속보</span>}
-                {tags.map((t) => (
-                  <span key={t} className={`mf-tag ${HOT_TAGS.has(t) ? "hot" : ""}`}>
-                    {t}
-                  </span>
-                ))}
-                <span>{agoText(m)}</span>
-                <span className="mono">{hhmm(kstParts(n.ts))}</span>
-                {n.theme && <span>· {n.theme}</span>}
-                <span className="mf-count mono">
-                  {sl.num}/{list.length}
-                </span>
-              </div>
-              <h2 className="mf-card-title">{text}</h2>
-              <div className="mf-tiles">
-                {n.stocks.slice(0, 3).map((s) => (
-                  <button
-                    type="button"
-                    key={s.code}
-                    className="mf-tile"
-                    onClick={() => openStockChart({ code: s.code, name: s.name, market: s.market })}
-                    title={`${s.name} 차트 보기`}
-                  >
-                    <span className="mf-tile-nm">
-                      {s.catalyst && <AlertTriangle size={11} aria-label="악재" />}
-                      {s.name}
-                    </span>
-                    <span className={`mf-tile-pct mono ${tone(s.change)}`}>{pct(s.change)}</span>
-                    <Spark code={s.code} market={s.market} active={i === idx} />
-                  </button>
-                ))}
-              </div>
-              {n.link && (
-                <a className="mf-card-link" href={n.link} target="_blank" rel="noopener noreferrer">
-                  원문 <ExternalLink size={11} />
-                </a>
-              )}
-            </article>
-          );
-        })}
-      </div>
-      {pending && (
-        <button type="button" className="mf-newpill" onClick={() => go(0)}>
-          ← 새 속보
-        </button>
-      )}
-      {slides.length > 1 && (
-        <div className="mf-dots" role="tablist" aria-label="속보 카드 넘기기">
-          {slides.map((sl, i) => (
-            <button
-              type="button"
-              key={sl.key}
-              role="tab"
-              aria-selected={i === idx}
-              aria-label={sl.ad ? "광고" : `${sl.num}번째 속보`}
-              className={`${i === idx ? "on" : ""} ${sl.ad ? "ad" : ""}`}
-              onClick={() => go(i)}
-            />
-          ))}
-        </div>
-      )}
-    </section>
-  );
-}
-
-// ── 오늘 숫자 한 줄 ─────────────────────────────────────────────
-export function MobilePulse({ items }) {
-  const data = useMemo(() => {
-    const today = todaysOf(items);
-    const hot = themeStats(today)[0];
-    let top = null;
-    for (const n of today) for (const s of n.stocks || []) if (isNum(s.change) && (!top || s.change > top.change)) top = s;
-    return { count: today.length, hot, top };
-  }, [items]);
-  if (!items.length) return null;
-  return (
-    <div className="mf-pulse m-only">
-      <div className="mf-pc">
-        오늘 속보<b className="mono">{data.count}건</b>
-      </div>
-      {data.hot && (
-        <div className="mf-pc">
-          가장 많이 나온 테마
-          <b>
-            <Flame size={13} aria-hidden="true" /> {data.hot.theme}
-          </b>
-        </div>
-      )}
-      {data.top && (
-        <button
-          type="button"
-          className="mf-pc"
-          onClick={() => openStockChart({ code: data.top.code, name: data.top.name, market: data.top.market })}
-        >
-          가장 많이 오른
-          <b>
-            {data.top.name} <span className={`mono ${tone(data.top.change)}`}>{pct(data.top.change)}</span>
-          </b>
-        </button>
-      )}
-    </div>
-  );
-}
-
-// ── B. 테마 지도 ────────────────────────────────────────────────
-// 네모 크기는 순위로 정합니다(1등 가장 크게). 6칸 바둑판에 8개가 빈틈없이 들어가는 모양:
-//   1등 3칸×2줄, 2등 3칸, 3등 2칸, 4등 1칸, 5·6등 2칸, 7·8등 1칸
-const SPANS = [
-  [3, 2],
-  [3, 1],
-  [2, 1],
-  [1, 1],
-  [2, 1],
-  [2, 1],
-  [1, 1],
-  [1, 1],
-];
-function heatClass(avg) {
+// 테마 평균 등락률 → 색 단계(빨강 3단계·파랑 3단계·회색). ThemeRadar.js·MobileShorts.js가 씀
+export function heatClass(avg) {
   if (!isNum(avg)) return "h0";
   if (avg >= 3) return "hu3";
   if (avg >= 1) return "hu2";
@@ -422,40 +160,6 @@ function heatClass(avg) {
   if (avg <= -1) return "hd2";
   if (avg < -0.2) return "hd1";
   return "h0";
-}
-export function ThemeMap({ items, activeTheme, onPick }) {
-  const stats = useMemo(() => themeStats(todaysOf(items)).slice(0, MAP_COUNT), [items]);
-  if (stats.length < 3) return null;
-  return (
-    <section className="mf-map m-only" aria-label="오늘 속보가 몰린 테마">
-      <div className="mf-sec-head">
-        <h2>지금 뉴스가 몰리는 테마</h2>
-        <span>누르면 그 테마 속보만</span>
-      </div>
-      <div className={`mf-heat ${activeTheme ? "has-pick" : ""}`}>
-        {stats.map((t, i) => {
-          const [c, r] = SPANS[i] || [1, 1];
-          const on = activeTheme === t.theme;
-          return (
-            <button
-              type="button"
-              key={t.theme}
-              className={`mf-ht ${heatClass(t.avg)} ${c === 1 ? "sm" : ""} ${i === 0 ? "big" : ""} ${on ? "on" : ""}`}
-              style={{ gridColumn: `span ${c}`, gridRow: `span ${r}` }}
-              aria-pressed={on}
-              onClick={() => onPick(t.theme)}
-            >
-              <b>{t.theme}</b>
-              <span className="mono">
-                {t.count}건{c > 1 && isNum(t.avg) ? ` · ${pct(t.avg)}` : ""}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-      <p className="mf-map-note">네모가 클수록 속보가 많이 나온 테마, 빨갈수록 관련 종목이 많이 올랐어요(파랑은 내림).</p>
-    </section>
-  );
 }
 
 // ── C. 시간대별 묶음 목록 ───────────────────────────────────────

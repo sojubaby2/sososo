@@ -18,7 +18,9 @@ import { decodeEntities } from "../lib/decodeEntities";
 // [2026-10-21 추가] 속보를 채팅 말풍선으로 보여주는 컴포넌트.
 import NewsBoard from "../components/NewsBoard";
 // [2026-10-27 추가] 휴대폰 전용 속보 탭(큰 속보 카드 + 테마 지도 + 시간대별 목록) — components/MobileFeed.js
-import { MobileHero, MobilePulse, ThemeMap, HourTimeline } from "../components/MobileFeed";
+import { HourTimeline } from "../components/MobileFeed";
+import MobileShorts from "../components/MobileShorts";
+import ThemeRadar from "../components/ThemeRadar";
 // [2026-10-27 추가] 애드센스 광고 칸(번호는 lib/ads.js)
 import AdSlot from "../components/AdSlot";
 import { openStockChart } from "../lib/openStockChart";
@@ -172,6 +174,8 @@ function toCardShape(item, liveQuotes) {
         code: m.code,
         market: m.market,
         catalyst: m.catalyst || null,
+        // [2026-10-28] 휴대폰 숏폼 카드에 "왜 관련주인지" 한 줄(예: 수송선 개발 주체)
+        reason: m.reason || "",
         change: typeof live?.changePct === "number" ? live.changePct : m.change,
       };
     }),
@@ -904,7 +908,8 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
 
   function switchTab(tab, { scrollTop = true } = {}) {
     if (mTabRef.current === tab) {
-      // 같은 탭을 다시 누르면 맨 위로(증권 앱과 같은 동작)
+      // 같은 탭을 다시 누르면 맨 위로(증권 앱과 같은 동작). 속보 탭(숏폼)은 첫 카드로.
+      if (tab === "feed") window.dispatchEvent(new Event("nm-shorts-top"));
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
@@ -947,10 +952,25 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
     else setFilter((cur) => (cur?.kind === "watch" ? null : cur));
   }, [mTab]);
 
-  // 시장 탭에서 대표 종목 "관련 속보만 보기"를 누르면 → 속보 탭으로 넘어가서 보여 줌
+  // [2026-10-28] 휴대폰 속보 탭(숏폼, components/MobileShorts.js)이 걸러 볼 테마·종목과 바로 넘어갈 카드
+  //   shortsFilter: null | { kind: "theme" | "stock", value }
+  const [shortsFilter, setShortsFilter] = useState(null);
+  const [shortsFocus, setShortsFocus] = useState(null);
+
+  // 테마 탭에서 대표 종목 "관련 속보만 보기"를 누르면 → 속보 탭으로 넘어가서 보여 줌
   function filterAndShow(kind, value) {
     toggleFilter(kind, value);
-    if (mTabRef.current === "market") switchTab("feed");
+    if (mTabRef.current === "market") {
+      setShortsFilter({ kind, value });
+      switchTab("feed");
+    }
+  }
+
+  // 테마 탭(레이더)에서 테마의 속보를 보러 갈 때 — id가 있으면 그 카드로 바로
+  function openThemeShorts(theme, id) {
+    setShortsFilter({ kind: "theme", value: theme });
+    setShortsFocus(id || null);
+    switchTab("feed");
   }
 
   const visible = useMemo(() => {
@@ -1029,23 +1049,23 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
           오른쪽(대표 종목·전일 급등주). 스타일 설명은 app/globals.css의
           "홈 화면 — 어두운 터미널형 3칸 배치" 부분에 있습니다. */}
       <main className="container-wide home-main">
-        {/* [2026-10-27] 휴대폰 "속보" 탭 맨 위 — 지수 한 줄 + 테마 칩 (PC에서는 안 보임) */}
+        {/* [2026-10-27] 휴대폰 지수 한 줄 (PC에서는 안 보임) — [2026-10-28] 속보 탭에서 테마 탭 맨 위로 옮김 */}
         <MobileFeedTop worldIndices={worldIndices} />
         <InstallHintBanner />
-        {/* [2026-10-27 오후] 휴대폰 속보 탭: 큰 속보 카드 → 오늘 숫자 → 테마 지도 (PC에서는 안 보임) */}
-        <div className="mf-top">
-          <MobileHero items={items} />
-          <MobilePulse items={items} />
-          <ThemeMap
-            items={items}
-            activeTheme={filter?.kind === "theme" ? filter.value : null}
-            onPick={(t) => {
-              const picking = !(filter?.kind === "theme" && filter.value === t);
-              toggleFilter("theme", t);
-              // 고르면 그 테마 속보 목록이 보이도록 아래로 내려 줌(해제할 때는 그대로)
-              if (picking) requestAnimationFrame(() => goFeedTop());
-            }}
-          />
+        {/* [2026-10-28] 휴대폰 속보 탭: 숏폼 속보 — 속보 한 건이 화면 하나, 위로 밀면 다음 (components/MobileShorts.js)
+            재성님: "모바일 화면 맘에안드는데 다시 바꾸자 — 훨씬 혁신적인 모바일 화면" → 시안 A+B.
+            PC에서는 아예 그려지지 않습니다. */}
+        <MobileShorts
+          items={items}
+          newIds={newIds}
+          filter={shortsFilter}
+          onFilter={setShortsFilter}
+          focusId={shortsFocus}
+          onFocused={() => setShortsFocus(null)}
+        />
+        {/* [2026-10-28] 휴대폰 테마 탭 맨 위: 테마 레이더 (components/ThemeRadar.js) */}
+        <div className="m-radar-wrap">
+          <ThemeRadar items={items} onOpen={openThemeShorts} />
         </div>
 
         <div className="home-grid">
