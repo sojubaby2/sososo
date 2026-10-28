@@ -85,6 +85,9 @@ async function computeDay(iso) {
   for (const r of today) {
     const pc = prevClose.get(r.code);
     if (!pc || !r.c) continue;
+    // [2026-10-28] 하루 가격제한폭(±30%)을 넘는 등락은 실제 등락이 아님 — 액면병합·감자·거래재개처럼
+    //   그날 기준가가 새로 정해진 종목이라 전날 종가와 비교하면 숫자가 튐(예: 에스에너지 +807%). 정리에서 뺌.
+    if (Math.abs(((r.c - pc) / pc) * 100) > 30.5) continue;
     rows.push({
       code: r.code,
       name: r.name,
@@ -154,10 +157,10 @@ async function computeDay(iso) {
   };
 }
 
-const cachedRecent = unstable_cache(computeDay, ["market-day-recent-v1"], { revalidate: 3600 });
+const cachedRecent = unstable_cache(computeDay, ["market-day-recent-v2"], { revalidate: 3600 });
 // [2026-10-28] 가장 최근 날짜가 잠정 자료일 때 — 짧게 저장하고 이름표를 따로 둬서, 확정 자료가 오면 새로 계산됨
-const cachedProvisional = unstable_cache(computeDay, ["market-day-provisional-v1"], { revalidate: 600 });
-const cachedPast = unstable_cache(computeDay, ["market-day-past-v1"], { revalidate: 7 * 86400 });
+const cachedProvisional = unstable_cache(computeDay, ["market-day-provisional-v2"], { revalidate: 600 });
+const cachedPast = unstable_cache(computeDay, ["market-day-past-v2"], { revalidate: 7 * 86400 });
 
 // 날짜 "2026-10-27" → 정리 결과(없으면 null)
 export async function getMarketDay(iso) {
