@@ -2428,3 +2428,21 @@ img { -webkit-user-drag: none; }
 @media (max-width: 760px) and (prefers-reduced-motion: reduce) {
   .mc-msg.is-new, .mc-head-t span.on i { animation: none; }
 }
+
+/* [2026-10-28 11:44] 휴대폰 테마 탭 순서 바꿈 — 재성님: "테마에 삼성, 하이닉스 위치를 바꾸는 방법 적용해서"
+   → 대표 종목(삼성전자·SK하이닉스)을 맨 위로, 테마 레이더는 그 아래로.
+   순서: 지수 한 줄 → 대표 종목 → 테마 레이더 → 광고 → HOT 테마 → 전일 급등주 → 오늘의 예측 → 사이트 설명
+   방법: 테마 탭(휴대폰)에서만 칸 묶음(home-grid, 오른쪽 칸)을 풀어서 안의 칸들을 한 줄로 세우고 순서(order)를 정함.
+   PC와 다른 탭은 영향 없음. */
+@media (max-width: 760px) {
+  .m-market .home-main { display: flex; flex-direction: column; gap: 16px; }
+  .m-market .home-grid, .m-market .home-right { display: contents; }
+  .m-market .home-right > * { order: 4; }
+  .m-market .home-right > .flagship { order: 1; }
+  .m-market .m-radar-wrap { order: 2; }
+  .m-market .home-right > .m-market-ad { order: 3; }
+  .m-market .home-left { order: 5; }
+  .m-market .about-site { order: 6; }
+  .m-market .m-radar-wrap .tr { margin: 6px 0 0; }
+  .m-market .m-feedtop { margin-bottom: -4px; }
+}

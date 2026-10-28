@@ -7,6 +7,8 @@
 //   "chat"   — C. 속보 채널(텔레그램 채팅방처럼 아래로 쌓임)   components/MobileChat.js
 //   "shorts" — A. 숏폼 속보(속보 한 건이 화면 하나, 위로 밀기)  components/MobileShorts.js
 //
+// [2026-10-28 11:44] 재성님: "이거 전꺼가 낫다" → 다시 숏폼(A)으로. 채팅형 코드는 지우지 않고 남겨 둠.
+//
 //   어느 쪽이든 "테마" 탭(테마 레이더, components/ThemeRadar.js)과 "관심" 탭, PC 화면은 그대로입니다.
 
-export const MOBILE_FEED = "chat";
+export const MOBILE_FEED = "shorts";
