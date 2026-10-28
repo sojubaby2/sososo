@@ -509,13 +509,19 @@ function FlagshipStrip({ filter, onPick }) {
                   <>
                     <span className="flag-venue">
                       {a.venue} <b className="mono">{a.ticker}</b> <span className="mono">{fmtForeign(a.price, a.currency)}</span>
+                      {/* [2026-10-28 추가] 해외 자체 등락률 — 밤사이 해외 투자자 반응 */}
+                      {typeof a.changePct === "number" && <span className={`mono ${toneOf(a.changePct)}`}> {fmtPct(a.changePct)}</span>}
                       <span className="flag-when-abroad"> · {kstClock(a.asOf)}</span>
                     </span>
                     {a.krwPerShare ? (
                       <span className="flag-gap">
                         1주 환산 <span className="mono">{fmtWon(a.krwPerShare)}원</span>
                         {typeof a.gapPct === "number" && (
-                          <span className={`flag-gap-pct ${toneOf(a.gapPct)}`}>{a.gapBase} 대비 <span className="mono">{fmtPct(a.gapPct)}</span></span>
+                          // [2026-10-28 변경] "국내 전일 종가 대비 +45%" → "국내가보다 31% 비싸게 거래 중"
+                          //   (하이닉스 ADR은 원래 국내보다 30~50% 비쌈 — lib/flagships.js 설명)
+                          <span className="flag-gap-pct" title="해외 가격을 국내 1주 값으로 바꿔서 국내 가격과 비교한 차이(해외 프리미엄)">
+                            국내가보다 <span className="mono">{Math.abs(a.gapPct).toFixed(1)}%</span> {a.gapPct >= 0 ? "비싸게" : "싸게"} 거래 중
+                          </span>
                         )}
                       </span>
                     ) : (

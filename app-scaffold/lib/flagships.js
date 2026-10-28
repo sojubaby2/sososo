@@ -18,8 +18,14 @@
 //   1. 국내 현재가와 등락률 (야후, 15~20분 지연)
 //   2. 해외 가격을 "국내 1주 값"으로 바꾼 원화 금액
 //      = 해외 가격 ÷ (해외 1주가 국내 몇 주인지) × 원/달러 환율
-//   3. 그 원화 금액이 국내 종가보다 몇 % 높은지/낮은지
-//      → 밤사이 해외 투자자들이 어떻게 반응했는지 = 다음 날 아침 참고값
+//   3. 해외 자체 등락률(해외 전날 종가 대비) → 밤사이 해외 투자자들이 어떻게 반응했는지
+//   4. 그 원화 금액이 국내 가격보다 몇 % 비싼지/싼지(= 해외 프리미엄)
+//
+//   [2026-10-28 변경] 재성님: "하이닉스 전일 종가대비%가 왜저래"(+44.99%로 나옴)
+//     SK하이닉스 ADR은 상장 직후부터 국내 주식보다 30~50% 비싸게 거래됩니다(ADR↔국내주 전환이
+//     자유롭지 않아 차익거래가 안 됨 — 7월 기사들). 그래서 "국내 전일 종가 대비"로 보여 주면
+//     원래 있던 프리미엄(약 30~40%)에 밤사이 움직임이 섞여 +45% 같은 이상한 숫자가 됩니다.
+//     → 밤사이 반응은 해외 자체 등락률로, 비싸고 싼 정도는 "국내가 대비"로 따로 보여 줍니다.
 //
 // ── 비교 기준을 고르는 법 (중요) ─────────────────────────────────────────
 //   해외 시세와 국내 시세 중 "어느 쪽이 더 최근 것인지"로 정합니다.
@@ -29,7 +35,7 @@
 //
 // ── 안전장치 ─────────────────────────────────────────────────────────────
 //   · 비율(25주, 0.1주)이 혹시 바뀌면 환산값이 터무니없어집니다. 그래서
-//     환산값이 국내 가격과 40% 넘게 차이 나면 "비율이 틀렸다"고 보고
+//     환산값이 국내 가격과 크게(삼성 40%, 하이닉스 100%) 차이 나면 "비율이 틀렸다"고 보고
 //     환산·비교를 아예 하지 않고 해외 가격만 보여줍니다(틀린 숫자를
 //     보여주는 것보다 안 보여주는 게 낫습니다).
 //   · 야후가 응답을 안 주면 그 칸만 "—"로 비웁니다. 화면 전체가 멈추지 않습니다.
@@ -63,7 +69,8 @@ export const FLAGSHIPS = [
     code: "000660",
     name: "SK하이닉스",
     domesticSymbol: "000660.KS",
-    abroad: { symbols: ["SKHY"], venue: "나스닥", ticker: "SKHY", sharesPerUnit: 0.1 },
+    // [2026-10-28] 하이닉스 ADR은 원래 30~50% 비싸게 거래돼서 안전장치 기준을 100%로(40%면 환산이 자꾸 숨겨짐)
+    abroad: { symbols: ["SKHY"], venue: "나스닥", ticker: "SKHY", sharesPerUnit: 0.1, maxGap: 1.0 },
   },
 ];
 
@@ -166,18 +173,15 @@ export async function fetchFlagships() {
         // 해외 1주 가격 → 국내 1주 값(원)
         const krw = ((abr.price * unitScale(abr.currency)) / f.abroad.sharesPerUnit) * rate;
 
-        // 비교 기준: 해외 값이 더 최근이면 국내 현재가(=오늘 종가), 아니면 국내 전일 종가
-        const abroadNewer = new Date(abr.asOf) > new Date(dom.asOf);
-        const prevClose = typeof dom.changePct === "number" ? dom.price / (1 + dom.changePct / 100) : null;
-        const base = abroadNewer ? dom.price : prevClose;
+        // [2026-10-28 변경] 비교 기준은 항상 국내 최신 가격(장중엔 현재가, 장 뒤엔 오늘 종가).
+        //   → "해외에서 국내보다 몇 % 비싸게/싸게 거래되나"(프리미엄). 밤사이 반응은 abroad.changePct로 따로 봄.
+        const maxGap = typeof f.abroad.maxGap === "number" ? f.abroad.maxGap : MAX_RATIO_GAP;
 
         // 안전장치: 비율이 틀렸으면 환산하지 않음
-        if (Math.abs(krw / dom.price - 1) <= MAX_RATIO_GAP) {
+        if (dom.price && Math.abs(krw / dom.price - 1) <= maxGap) {
           out.abroad.krwPerShare = Math.round(krw);
-          if (base) {
-            out.abroad.gapPct = (krw / base - 1) * 100;
-            out.abroad.gapBase = abroadNewer ? "국내 마지막 종가" : "국내 전일 종가";
-          }
+          out.abroad.gapPct = (krw / dom.price - 1) * 100;
+          out.abroad.gapBase = "국내가";
         }
       }
     }
