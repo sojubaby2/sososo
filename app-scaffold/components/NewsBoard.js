@@ -261,7 +261,10 @@ export default function NewsBoard({ items, newIds, ad = null }) {
         {lead.stocks?.length > 0 && (
           <aside className="nb-lead-side" aria-label="관련 종목">
             <p className="nb-label">관련 종목</p>
-            {/* [2026-10-26 변경] 종목 한 줄을 누르면 일봉 차트 창이 뜹니다 */}
+            {/* [2026-10-26 변경] 종목 한 줄을 누르면 일봉 차트 창이 뜹니다
+                [2026-10-28 변경] 재성님: "관련주가 많으면 하단 공간이 너무 여백이 큰데 관련주를 그냥 밑으로 넣는게 낫지않아?"
+                → 오른쪽 세로 칸 대신 기사 아래에 바둑판(한 줄에 3~4개)으로. 모양은 globals.css .nb-stk-grid */}
+            <div className="nb-stk-grid">
             {lead.stocks.map((s, i) => (
               <button
                 type="button"
@@ -279,6 +282,7 @@ export default function NewsBoard({ items, newIds, ad = null }) {
                 {lead.reasons?.[i] && <span className="nb-stk-why">{lead.reasons[i]}</span>}
               </button>
             ))}
+            </div>
           </aside>
         )}
       </article>

@@ -377,18 +377,28 @@ export async function GET() {
 }
 
 export async function POST(request) {
-  const ingestSecret = process.env.TELEGRAM_INGEST_SECRET;
+  // [2026-10-28 수정] 재성님: 수집기 로그에 "401 인증되지 않은 요청"이 계속 찍히는데 두 곳 값은 똑같다고 확인.
+  //   클라우드플레어 화면에 값을 붙여 넣을 때 앞뒤 빈칸·줄바꿈·따옴표가 같이 들어가는 경우가 흔해서,
+  //   비교하기 전에 양쪽 다 앞뒤 빈칸·줄바꿈·따옴표를 떼고 비교합니다(보안 수준은 그대로).
+  const clean = (v) => String(v || "").trim().replace(/^["'`]+|["'`]+$/g, "").trim();
+  const ingestSecret = clean(process.env.TELEGRAM_INGEST_SECRET);
   if (!ingestSecret) {
     return Response.json(
       { error: "TELEGRAM_INGEST_SECRET 환경변수가 설정되지 않았습니다." },
       { status: 500 }
     );
   }
-  const provided =
-    request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ||
-    new URL(request.url).searchParams.get("secret");
+  const provided = clean(
+    request.headers.get("authorization")?.replace(/^\s*Bearer\s+/i, "") ||
+      new URL(request.url).searchParams.get("secret")
+  );
   if (provided !== ingestSecret) {
-    return Response.json({ error: "인증되지 않은 요청입니다." }, { status: 401 });
+    // 원인 찾기용: 값 자체는 절대 내보내지 않고 "글자 수"만 알려 줌(수집기 로그에 찍힘).
+    //   두 숫자가 다르면 클라우드플레어 쪽 값이 수집기(listener.py) 값과 다르다는 뜻입니다.
+    return Response.json(
+      { error: "인증되지 않은 요청입니다.", siteSecretLength: ingestSecret.length, sentSecretLength: provided.length },
+      { status: 401 }
+    );
   }
 
   let body;

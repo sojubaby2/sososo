@@ -2446,3 +2446,19 @@ img { -webkit-user-drag: none; }
   .m-market .m-radar-wrap .tr { margin: 6px 0 0; }
   .m-market .m-feedtop { margin-bottom: -4px; }
 }
+
+/* [2026-10-28 오후] PC 홈 맨 위 큰 속보(헤드라인)의 관련주를 오른쪽 칸 → 기사 아래 바둑판으로
+   재성님: "관련주가 많으면 하단 공간이 너무 여백이 큰데 관련주를 그냥 밑으로 넣는게 낫지않아?"
+   한 줄에 칸 폭(약 210px)만큼 들어가는 대로 3~4개씩, 많으면 여러 줄. 근거 문구는 2줄까지만. */
+.nb-lead { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.nb-lead-sum { max-width: 80ch; }
+.nb-lead-side { border-left: none; padding-left: 0; border-top: 1px solid var(--border); padding-top: 14px; }
+.nb-stk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; }
+.nb-lead-side button.nb-stk, .nb-lead-side button.nb-stk:last-child {
+  height: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2);
+  align-content: start; transition: border-color 0.15s ease;
+}
+.nb-lead-side button.nb-stk:hover { border-color: var(--border-strong); }
+.nb-lead-side .nb-stk-why { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.nb-lead-side .nb-stk-nm { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nb-lead-side .nb-stk-nm svg { vertical-align: -1px; margin-right: 3px; }
