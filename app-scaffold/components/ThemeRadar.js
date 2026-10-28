@@ -16,7 +16,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronRight, AlertTriangle } from "lucide-react";
 import { openStockChart } from "../lib/openStockChart";
-import { themeStats, todaysOf, heatClass, pct, tone, isNum, hhmm, kstParts, splitTags } from "./MobileFeed";
+import { themeStats, todaysOf, heatClass, pct, tone, isNum, hhmm, kstParts, splitTags, shortTheme } from "./MobileFeed";
 
 const MAX_BUBBLES = 9;
 const FIELD_H = 300;
@@ -122,7 +122,7 @@ export default function ThemeRadar({ items, onOpen, goText = "넘겨보기" }) {
               aria-label={`${b.theme}, 속보 ${b.count}건, 관련주 평균 ${pct(b.avg)}`}
               onClick={() => setPick(b.theme)}
             >
-              <b>{b.theme}</b>
+              <b>{b.r >= 52 && b.theme.length <= 7 ? b.theme : shortTheme(b.theme, 6)}</b>
               {isNum(b.avg) && <span className="mono">{pct(b.avg)}</span>}
               {b.r >= 52 && <small>속보 {b.count}</small>}
             </button>

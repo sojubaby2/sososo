@@ -33,6 +33,7 @@ import {
   isNum,
   minutesAgo,
   pct,
+  shortTheme,
   splitTags,
   Spark,
   themeStats,
@@ -416,7 +417,7 @@ export default function MobileShorts({ items, newIds, filter, onFilter, focusId,
               aria-label={`${t.theme} 테마 속보 ${t.count}건만 보기`}
             >
               <span className="ms-ring-c">
-                <span>{t.theme.length > 4 ? t.theme.slice(0, 4) : t.theme}</span>
+                <span>{shortTheme(t.theme, 4)}</span>
               </span>
               <small className={`mono ${tone(t.avg)}`}>{isNum(t.avg) ? pct(t.avg) : `${t.count}건`}</small>
             </button>

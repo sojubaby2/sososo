@@ -69,6 +69,16 @@ export function splitTags(headline) {
   }
   return { tags, text };
 }
+// [2026-10-28 추가] 좁은 자리(테마 동그라미)에 쓸 짧은 테마 이름
+//   "반도체 기술(유리기판)" → "유리기판", "반도체 제품(HBM/HBM3E)" → "HBM", "전력저장장치(ESS)" → "ESS"
+//   괄호가 없으면 그대로(너무 길면 앞부분만). 예전엔 앞 4글자만 잘라서 "반도체"가 두 개씩 보였음.
+export function shortTheme(theme, max = 5) {
+  const t = String(theme || "").trim();
+  const m = t.match(/\(([^)]+)\)/);
+  let s = m ? m[1].split("/")[0].trim() : t;
+  if (!s) s = t;
+  return s.length > max ? s.slice(0, max).trim() : s;
+}
 export const HOT_TAGS = new Set(["단독", "속보", "긴급", "1보", "2보"]);
 
 // 1분마다 다시 그리기("3분 전" 갱신용)
