@@ -2050,3 +2050,17 @@ img { -webkit-user-drag: none; }
   .mf-dots button.ad { background: transparent; box-shadow: inset 0 0 0 1.5px var(--border-strong); }
   .mf-dots button.ad.on { background: var(--ink-soft); box-shadow: none; }
 }
+
+/* [2026-10-28 오전] 재성님: "사이드레일 광고 메인홈에 안뜨게 할수있어? 너무 지저분하네"
+   → 넓은 PC 화면에서 홈 화면을 모니터 폭에 맞게 넓혀 양옆 빈자리를 없앱니다.
+     구글 사이드 레일 광고는 내용 양옆에 빈자리가 있을 때만 들어가서, 빈자리가 없으면 홈에는 안 나옵니다.
+     (다른 페이지는 지금처럼 가운데 좁은 폭 → 사이드 레일 광고가 그대로 나옴)
+   아주 넓은 모니터에서 가운데 속보 칸만 지나치게 길어지지 않게 양옆 칸도 조금 넓힙니다. */
+@media (min-width: 1181px) {
+  .container-wide.home-main,
+  .brief-band .container-wide,
+  body:has(.home-main) .site-header .container-wide { max-width: none; }
+}
+@media (min-width: 1700px) {
+  .home-grid { grid-template-columns: 320px minmax(0, 1fr) 340px; gap: 28px; }
+}
