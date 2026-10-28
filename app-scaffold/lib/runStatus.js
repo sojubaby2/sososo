@@ -57,3 +57,41 @@ export async function readRun(redis, name) {
     return null;
   }
 }
+
+// ── [2026-10-28 추가] 텔레그램 메시지 "단계별 개수" 하루치 집계 ──────────────
+// 재성님: "텔레그램 뉴스는 엄청 많이 발생되는데 내 사이트에는 너무 적게 올라와"
+// 예전엔 "마지막 메시지 1건의 결과"만 남아서, 하루에 몇 건이 들어와 어느 단계에서 몇 건이
+// 빠지는지 알 수 없었습니다. 이제 메시지마다 결과 이름(게재 / 재료성 부족 / 후보 종목 없음 …)별로
+// 하루 개수를 셉니다. /health 화면 "텔레그램 수집" 칸에 오늘·어제 숫자가 나옵니다.
+// 비용: 메시지 1건당 Redis 명령 1번(+ 하루에 이름별로 첫 1번만 만료 시간 설정). 8일 뒤 자동 삭제.
+const TG_COUNT_PREFIX = "status:tgcount:";
+const TG_COUNT_TTL_SECONDS = 60 * 60 * 24 * 8;
+
+export function kstDayKey(date = new Date()) {
+  const k = new Date(date.getTime() + 9 * 3600 * 1000);
+  return `${k.getUTCFullYear()}${String(k.getUTCMonth() + 1).padStart(2, "0")}${String(k.getUTCDate()).padStart(2, "0")}`;
+}
+
+export async function countIngest(redis, label) {
+  if (!redis || !label) return;
+  try {
+    const key = TG_COUNT_PREFIX + kstDayKey();
+    const n = await redis.hincrby(key, String(label).slice(0, 40), 1);
+    if (n === 1) await redis.expire(key, TG_COUNT_TTL_SECONDS);
+  } catch {
+    // 집계 실패는 무시 — 본 작업을 막으면 안 됨.
+  }
+}
+
+export async function readIngestCounts(redis, dayKey) {
+  if (!redis) return null;
+  try {
+    const raw = await redis.hgetall(TG_COUNT_PREFIX + dayKey);
+    if (!raw) return null;
+    const out = {};
+    for (const [k, v] of Object.entries(raw)) out[k] = Number(v) || 0;
+    return out;
+  } catch {
+    return null;
+  }
+}

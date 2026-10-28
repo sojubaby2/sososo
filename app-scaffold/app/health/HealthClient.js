@@ -41,6 +41,20 @@ function formatAgo(mins) {
   return `${d}일 ${h % 24}시간 전`;
 }
 
+// [2026-10-28 추가] 텔레그램 단계별 개수 한 줄: "오늘 받은 메시지 120건 → 게재 30 · 재료성 부족 40 · …"
+const COUNT_ORDER = ["게재", "같은 이야기 중복", "재료성 부족", "후보 종목 없음(AI 호출 안 함)", "관련 종목/테마 없음", "뉴스 링크 없음", "중복", "광고성 태그", "빈 메시지", "제목 못 찾음(링크만)", "오류"];
+function countLine(label, counts) {
+  if (!counts) return "";
+  const total = Object.values(counts).reduce((a, b) => a + b, 0);
+  if (!total) return "";
+  const keys = Object.keys(counts).sort((a, b) => {
+    const ia = COUNT_ORDER.indexOf(a);
+    const ib = COUNT_ORDER.indexOf(b);
+    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+  });
+  return `${label} 받은 메시지 ${total}건 → ${keys.map((k) => `${k} ${counts[k]}`).join(" · ")}`;
+}
+
 // 각 항목에서 사람이 읽기 좋은 "요약 한 줄"을 만들어 줌.
 function summarize(check) {
   switch (check.key) {
@@ -52,10 +66,13 @@ function summarize(check) {
     // 단계에서 무슨 에러가 났는지를 바로 같이 보여줍니다.
     case "telegram": {
       const base = `마지막 수신: ${formatKst(check.latestAt)} ${formatAgo(check.minutesAgo)}`;
+      // [2026-10-28 추가] 오늘·어제 메시지가 어느 단계에서 몇 건씩 빠졌는지
+      const counts = [countLine("오늘", check.countsToday), countLine("어제", check.countsYesterday)].filter(Boolean).join("\n");
+      const tail = counts ? `\n${counts}` : "";
       if (!check.lastError) {
-        return check.lastStage ? `${base} · 처리 결과: ${check.lastStage}` : base;
+        return (check.lastStage ? `${base} · 처리 결과: ${check.lastStage}` : base) + tail;
       }
-      return `${base}\n실패한 단계: ${check.lastStep || "알 수 없음"}\n마지막 오류: ${check.lastError}`;
+      return `${base}\n실패한 단계: ${check.lastStep || "알 수 없음"}\n마지막 오류: ${check.lastError}${tail}`;
     }
     case "poll":
       return `마지막 실행: ${formatKst(check.latestAt)} ${formatAgo(check.minutesAgo)}`;

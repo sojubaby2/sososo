@@ -22,7 +22,7 @@
 // 죽어서인지, 아니면 메시지는 오는데 전부 필터링되고 있어서인지"를 구분하기
 // 위함. 자세한 배경은 lib/runStatus.js 상단 설명 참고.
 import { getRedis } from "../../../lib/redis";
-import { recordRun, RUN_TELEGRAM } from "../../../lib/runStatus";
+import { recordRun, RUN_TELEGRAM, countIngest } from "../../../lib/runStatus";
 import {
   extractMatchCandidates,
   getCachedUniverse,
@@ -420,8 +420,12 @@ export async function POST(request) {
   // — 메시지 한 건당 Redis 쓰기는 예전과 똑같이 1회입니다(각 갈래에서 딱
   // 한 번만 호출되므로).
   const preview = rawText.replace(/\s+/g, " ").trim().slice(0, 80);
+  // [2026-10-28 추가] 결과별 하루 개수도 같이 셈(lib/runStatus.js countIngest) — /health에서 "어디서 몇 건 빠졌는지" 확인용
   const logIngest = (outcome) =>
-    recordRun(redis, RUN_TELEGRAM, { channel, messageId, preview, ...outcome });
+    Promise.all([
+      recordRun(redis, RUN_TELEGRAM, { channel, messageId, preview, ...outcome }),
+      countIngest(redis, outcome.stage === "제외" ? outcome.reason : outcome.stage),
+    ]);
 
   const key = telegramMessageKey(channel, messageId);
   const alreadySeen = await redis.get(key);
@@ -438,6 +442,7 @@ export async function POST(request) {
 
   const { title: rawTitle, summary: telegramSummary } = splitMessageText(rawText);
   if (!rawTitle) {
+    await logIngest({ stage: "제외", reason: "빈 메시지" });
     return Response.json({ published: false, reason: "빈 메시지" });
   }
 
@@ -475,6 +480,7 @@ export async function POST(request) {
         // 원문 기사에서도 제목을 못 뽑으면, URL을 그대로 제목으로 노출시키느니
         // 게재를 건너뜀(재성님 리포트 — 카드 제목이 통째로 URL로 뜨는 문제).
         await redis.set(key, "1", { ex: SEEN_TTL_SECONDS });
+        await logIngest({ stage: "제외", reason: "제목 못 찾음(링크만)" });
         return Response.json({ published: false, reason: "제목을 찾을 수 없음(링크만 있는 메시지)" });
       }
       // isOperatorComment인데 원문에서도 제목을 못 가져온 경우엔, 운영자
@@ -567,6 +573,11 @@ export async function POST(request) {
     []
   );
 
-  await logIngest({ stage: "게재", title: String(title).slice(0, 80), matchCount: matches.length });
+  // [2026-10-28 수정] 예전엔 "같은 이야기 중복"으로 안 올라간 경우도 "게재"로 기록돼서 원인을 못 찾았음
+  if (result.published) {
+    await logIngest({ stage: "게재", title: String(title).slice(0, 80), matchCount: matches.length });
+  } else {
+    await logIngest({ stage: "제외", reason: "같은 이야기 중복", title: String(title).slice(0, 80) });
+  }
   return Response.json(result);
 }

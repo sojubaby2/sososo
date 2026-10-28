@@ -20,7 +20,7 @@ import { getRedis } from "../../../lib/redis";
 import { getStoredDayCount, getStoredDatesAscending, HISTORY_LOOKBACK_DAYS } from "../../../lib/priceHistory";
 import { RESULTS_CACHE_KEY, RESULTS_CACHE_TTL_SECONDS } from "../../../lib/patternsScan";
 import { getCachedDailyOutlook } from "../../../lib/dailyOutlook";
-import { readRun, RUN_POLL, RUN_TELEGRAM, RUN_DAILY_OUTLOOK } from "../../../lib/runStatus";
+import { readRun, RUN_POLL, RUN_TELEGRAM, RUN_DAILY_OUTLOOK, readIngestCounts, kstDayKey } from "../../../lib/runStatus";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -117,6 +117,11 @@ export async function GET(request) {
   // 않아도 "무엇이 왜 실패했는지"가 바로 보입니다.
   try {
     const run = await readRun(redis, RUN_TELEGRAM);
+    // [2026-10-28 추가] 오늘·어제 텔레그램 메시지가 단계별로 몇 건씩 처리됐는지(lib/runStatus.js countIngest)
+    const [countsToday, countsYesterday] = await Promise.all([
+      readIngestCounts(redis, kstDayKey()),
+      readIngestCounts(redis, kstDayKey(new Date(Date.now() - 86400000))),
+    ]);
     const mins = minutesAgo(run?.at);
     const okMax = isWeekend || isQuietHours ? 60 * 24 * 3 : 180;
     const warnMax = isWeekend || isQuietHours ? 60 * 24 * 4 : 60 * 8;
@@ -130,6 +135,8 @@ export async function GET(request) {
       lastStage: run?.stage || null,
       lastStep: run?.step || null,
       lastError: hadError ? String(run?.error || "").slice(0, 300) : null,
+      countsToday: countsToday || null,
+      countsYesterday: countsYesterday || null,
       detail: run || null,
       hint: hadError
         ? "메시지는 잘 도착했는데 그 다음 처리에서 실패했습니다. 위 '마지막 오류' 문구를 보세요 — API key is invalid 계열이면 Vercel의 ANTHROPIC_API_KEY 값 문제입니다."

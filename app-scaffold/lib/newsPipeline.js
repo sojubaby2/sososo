@@ -765,25 +765,70 @@ export function finalizeMatches(matches, priceMap) {
 }
 
 const STORY_DEDUP_WINDOW_MS = 6 * 60 * 60 * 1000; // 6 hours
-const STORY_DEDUP_CHECK_COUNT = 20; // how many recent feed items to check against
+const STORY_DEDUP_CHECK_COUNT = 30; // how many recent feed items to check against
+
+// [2026-10-28 변경 — 속보가 너무 적게 올라오던 큰 원인]
+// 재성님: "텔레그램 뉴스는 엄청 많이 발생되는데 내 사이트에는 너무 적게 올라와"
+//
+// 예전 규칙: 새 속보의 "대표 종목"(관련주 맨 앞)이 최근 6시간 안에 올라간 속보의 대표 종목과 같으면
+//   기사 내용과 상관없이 "같은 이야기"로 보고 버렸습니다. 그래서 삼성전자·SK하이닉스·한화에어로스페이스처럼
+//   하루에도 여러 다른 소식이 나오는 종목은 6시간에 1건밖에 못 올라갔습니다.
+//   게다가 이 검사는 AI 두 번(재료성 판단 + 종목 매칭)을 다 쓴 "뒤"에 해서, 돈은 쓰고 버리는 셈이었습니다.
+//
+// 바뀐 규칙: 대표 종목이 같고 + 제목의 핵심 단어가 2개 이상 겹칠 때만 "같은 이야기"로 봅니다.
+//   예) "SK하이닉스, HBM4 12단 엔비디아 최종 인증 통과" ↔ "하이닉스 HBM4 엔비디아 퀄 통과…공급 본격화"
+//       → HBM4·엔비디아·통과가 겹침 → 같은 이야기(여러 언론사가 같은 소식을 낸 것) → 1건만
+//   예) "삼성전자, 휴머노이드 전담 조직 신설" ↔ "삼성전자, 美 텍사스 공장 2나노 양산 시작"
+//       → 종목 이름 말고 겹치는 단어 없음 → 다른 소식 → 둘 다 올라감
+// 비용 변화 없음(이미 쓴 AI 결과를 덜 버리는 것뿐).
+const DEDUP_MIN_SHARED = 2;
+const DEDUP_MIN_RATIO = 0.34;
+const DEDUP_STOPWORDS = new Set([
+  "속보", "단독", "특징주", "종합", "공시", "뉴스", "관련", "관련주", "주가", "상승", "하락", "급등", "급락", "강세", "약세",
+  "기대", "전망", "확대", "추진", "본격", "가속", "예정", "발표", "공개", "국내", "최초", "세계", "글로벌", "업계", "시장",
+  "the", "and", "for", "with",
+]);
+function headlineTokens(title, leadName) {
+  const lead = String(leadName || "").replace(/\s+/g, "");
+  const words = String(title || "")
+    .replace(/\[[^\]]{0,12}\]/g, " ")
+    .split(/[^0-9A-Za-z가-힣]+/)
+    .map((w) => w.trim())
+    .filter((w) => w.length >= 2 && !DEDUP_STOPWORDS.has(w.toLowerCase()));
+  // 대표 종목 이름(또는 그 일부)은 당연히 겹치므로 빼고 비교
+  return new Set(words.filter((w) => !lead || (!lead.includes(w) && !w.includes(lead))));
+}
+function sameStoryTitles(a, b, leadName) {
+  const A = headlineTokens(a, leadName);
+  const B = headlineTokens(b, leadName);
+  if (!A.size || !B.size) return false;
+  // "엔비디아"와 "엔비디아와"처럼 조사만 다른 단어도 같은 단어로 침(한쪽이 다른 쪽으로 시작하면 같음)
+  let shared = 0;
+  for (const w of A) {
+    for (const v of B) {
+      if (w === v || w.startsWith(v) || v.startsWith(w)) {
+        shared += 1;
+        break;
+      }
+    }
+  }
+  return shared >= DEDUP_MIN_SHARED && shared / Math.min(A.size, B.size) >= DEDUP_MIN_RATIO;
+}
 
 // Different outlets (or, now, a news wire vs a Telegram channel) cover the
-// same real event with completely different headlines, so title-based
-// dedup alone lets near-duplicate coverage of one story flood the feed.
-// This checks whether the new item's LEAD stock (matches[0], already
-// sorted to be the strongest/most relevant match) was already the lead
-// stock of something published recently — if so, treat it as the same
-// story, regardless of which source (poll or telegram-ingest) it came from.
-export async function isDuplicateStory(redis, matches, publishedThisRun = []) {
+// same real event with completely different headlines. This checks whether
+// the new item's LEAD stock (matches[0]) was the lead of something published
+// recently AND the headlines share enough key words (see above).
+// publishedThisRun entries: { matches, title } (old callers passed bare matches arrays — still accepted)
+export async function isDuplicateStory(redis, matches, publishedThisRun = [], title = "") {
   if (!matches.length) return false;
   const leadCode = matches[0].code;
+  const leadName = matches[0].name;
 
-  // Check against items already published earlier in THIS run first — this
-  // is what actually closes the race condition (multiple articles about
-  // one breaking story, processed concurrently, couldn't see each other in
-  // Redis yet since none had been written).
-  for (const publishedMatches of publishedThisRun) {
-    if (publishedMatches[0]?.code === leadCode) return true;
+  for (const entry of publishedThisRun) {
+    const m = Array.isArray(entry) ? entry : entry?.matches;
+    const t = Array.isArray(entry) ? "" : entry?.title;
+    if (m?.[0]?.code === leadCode && (!title || !t || sameStoryTitles(title, t, leadName))) return true;
   }
 
   let recentRaw;
@@ -804,7 +849,8 @@ export async function isDuplicateStory(redis, matches, publishedThisRun = []) {
     if (!item?.savedAt || !Array.isArray(item.matches) || !item.matches.length) continue;
     const age = now - new Date(item.savedAt).getTime();
     if (age > STORY_DEDUP_WINDOW_MS) continue;
-    if (item.matches[0].code === leadCode) return true;
+    if (item.matches[0].code !== leadCode) continue;
+    if (sameStoryTitles(title, item.title, leadName)) return true;
   }
   return false;
 }
@@ -835,7 +881,7 @@ export function telegramMessageKey(channel, messageId) {
 // telegram-ingest). source/channel are optional extra tags, currently
 // unused by the frontend but kept on the record for future filtering/UI.
 export async function publishFeedItem(redis, item, publishedThisRun) {
-  const isDupStory = await isDuplicateStory(redis, item.matches, publishedThisRun);
+  const isDupStory = await isDuplicateStory(redis, item.matches, publishedThisRun, item.title);
   if (isDupStory) {
     return { title: item.title, published: false, reason: "동일 종목 관련 최근 기사 이미 게재됨(중복 스토리)" };
   }
@@ -854,6 +900,6 @@ export async function publishFeedItem(redis, item, publishedThisRun) {
   };
   await redis.lpush("feed", JSON.stringify(feedItem));
   await redis.ltrim("feed", 0, FEED_MAX_LENGTH - 1);
-  publishedThisRun.push(item.matches); // so later candidates in this same run can see it too
+  publishedThisRun.push({ matches: item.matches, title: item.title }); // so later candidates in this same run can see it too
   return { title: item.title, published: true, matchCount: item.matches.length };
 }
