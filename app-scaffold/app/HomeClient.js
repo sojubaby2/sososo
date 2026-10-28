@@ -1053,6 +1053,12 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
           <aside className="home-col home-left" aria-label="오늘의 예측과 HOT 테마">
             <DailyOutlookBanner />
             <HotThemePanel />
+            {/* [2026-10-28] 재성님: "이쪽 칸 비우고 광고로 넣는게 낫지않아?" — HOT 테마 아래 빈자리에 광고.
+                PC·태블릿에서만(휴대폰 시장 탭에는 대표 종목 아래 광고가 따로 있음).
+                광고가 화면을 따라다니면 애드센스 정책 위반이라, 이 왼쪽 칸은 스크롤하면 같이 올라가게 바꿈(globals.css) */}
+            <div className="desk-only home-side-ad">
+              <AdSlot kind="display" />
+            </div>
           </aside>
 
           {/* ── 가운데 칸: 실시간 속보 ── */}

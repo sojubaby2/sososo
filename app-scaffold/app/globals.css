@@ -2025,3 +2025,8 @@ img { -webkit-user-drag: none; }
 /* [2026-10-28] 장 마감 정리 "잠정" 딱지 — 장 마감 직후 야후 시세로 먼저 올린 정리(다음 날 아침 확정치로 바뀜) */
 .mk-provisional { display: inline-block; margin: 0 6px 0 0; padding: 1px 7px; border-radius: 5px; font-size: 11.5px; font-weight: 700; vertical-align: 1px; background: var(--amber-tint); color: var(--amber-tint-ink); }
 .stock-h2 .mk-provisional { margin-left: 8px; }
+
+/* [2026-10-28] PC 홈 왼쪽 칸(오늘의 예측·HOT 테마) 아래 광고 — 광고가 들어가므로 왼쪽 칸은 따라다니지 않게(정책: 떠 있는 광고 금지).
+   오른쪽 칸(관심종목·대표 종목·급등주)은 지금처럼 따라다님 */
+.home-left { position: static; }
+.home-side-ad .ad-wrap:has(ins[data-ad-status="filled"]) { margin: 0; }
