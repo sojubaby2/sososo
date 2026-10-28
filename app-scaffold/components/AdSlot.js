@@ -6,6 +6,8 @@
 // [2026-10-28 개편] 광고 종류 4가지 + 화면 가까이 왔을 때만 불러오기(지연 불러오기).
 //
 // 쓰는 법: <AdSlot kind="display" />  /  "inFeed"  /  "inArticle"  /  "multiplex"
+//   box: 정해진 크기 칸에 꼭 맞는 광고(예: 휴대폰 속보 카드 사이 광고). 칸 크기는 CSS(.ad-box ins)가 정합니다.
+//        [2026-10-28 추가] 구글 안내: 반응형 광고에서 data-ad-format을 빼고 칸 너비·높이를 정해 주면 그 크기에 맞춰 나옴
 //   광고 단위 번호는 lib/ads.js의 AD_SLOTS에서 가져옵니다.
 //   그 종류 번호가 비어 있으면 display 번호로 대신 나오고, display도 비어 있으면 아무것도 그리지 않습니다.
 //
@@ -21,7 +23,8 @@ import { usePathname } from "next/navigation";
 import { AD_CLIENT, AD_SLOTS, AD_LAZY_MARGIN } from "../lib/ads";
 
 // 종류별 애드센스 표시 방식
-function adAttrs(kind) {
+function adAttrs(kind, box) {
+  if (box) return {}; // 칸 크기에 맞춤(CSS로 너비·높이 지정)
   if (kind === "inArticle") return { "data-ad-layout": "in-article", "data-ad-format": "fluid" };
   if (kind === "inFeed") return { "data-ad-format": "fluid", "data-ad-layout-key": AD_SLOTS.inFeedLayoutKey };
   if (kind === "multiplex") return { "data-ad-format": "autorelaxed" };
@@ -35,7 +38,7 @@ function resolveKind(kind) {
   return "display";
 }
 
-function AdBox({ slot, kind }) {
+function AdBox({ slot, kind, box }) {
   const insRef = useRef(null);
   useEffect(() => {
     const ins = insRef.current;
@@ -89,21 +92,21 @@ function AdBox({ slot, kind }) {
       style={{ display: "block", textAlign: kind === "inArticle" ? "center" : undefined }}
       data-ad-client={AD_CLIENT}
       data-ad-slot={slot}
-      {...adAttrs(kind)}
+      {...adAttrs(kind, box)}
     />
   );
 }
 
-export default function AdSlot({ kind = "display", className = "" }) {
+export default function AdSlot({ kind = "display", className = "", box = false }) {
   const pathname = usePathname();
-  const real = resolveKind(kind);
+  const real = box ? "display" : resolveKind(kind);
   const slot = AD_SLOTS[real];
   if (!slot) return null;
   return (
-    <aside className={`ad-wrap ad-${real} ${className}`} aria-label="광고">
+    <aside className={`ad-wrap ad-${real} ${box ? "ad-box" : ""} ${className}`} aria-label="광고">
       <span className="ad-label">광고</span>
       {/* key: 페이지가 바뀌면 칸을 새로 만들어 새 광고를 받음 */}
-      <AdBox key={`${pathname}-${real}-${slot}`} slot={slot} kind={real} />
+      <AdBox key={`${pathname}-${real}-${slot}-${box ? "b" : ""}`} slot={slot} kind={real} box={box} />
     </aside>
   );
 }

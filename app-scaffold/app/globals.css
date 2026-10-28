@@ -2030,3 +2030,23 @@ img { -webkit-user-drag: none; }
    오른쪽 칸(관심종목·대표 종목·급등주)은 지금처럼 따라다님 */
 .home-left { position: static; }
 .home-side-ad .ad-wrap:has(ins[data-ad-status="filled"]) { margin: 0; }
+
+/* [2026-10-28 오전] HOT 테마를 오른쪽 칸으로 옮기면서 오른쪽 칸이 화면보다 길어짐 →
+   따라다니게 두면 아래쪽(HOT 테마·급등주)이 페이지 끝까지 가려지므로, 오른쪽 칸도 스크롤하면 같이 올라가게 */
+.home-right { position: static; }
+/* 왼쪽 두 번째 광고는 넓은 PC(3칸 화면)에서만 — 노트북·태블릿에선 왼쪽 칸이 아래로 내려가서 광고 1개면 충분 */
+@media (max-width: 1180px) { .home-side-ad2 { display: none; } }
+
+/* [2026-10-28] 휴대폰 속보 카드 사이 광고 카드 — 속보 카드와 확실히 구분되게 밝은 바탕 + "광고" 표시 */
+@media (max-width: 760px) {
+  .mf-card.mf-adcard {
+    display: flex; flex-direction: column; padding: 10px; overflow: visible;
+    background: var(--surface); color: var(--ink); border: 1px solid var(--border); box-shadow: none;
+  }
+  .mf-card.mf-adcard::after { display: none; }
+  .mf-card.mf-adcard .mf-adslot.ad-wrap { flex: 1; display: flex; flex-direction: column; margin: 0; }
+  .mf-card.mf-adcard .mf-adslot .ad-label { display: block; margin: 0 2px 6px; }
+  .mf-adcard .ad-box ins, .mf-adcard .mf-adslot ins { flex: 1; width: 100%; min-height: 250px; } /* 300×250(가장 흔하고 단가 좋은 크기)이 들어가게 */
+  .mf-dots button.ad { background: transparent; box-shadow: inset 0 0 0 1.5px var(--border-strong); }
+  .mf-dots button.ad.on { background: var(--ink-soft); box-shadow: none; }
+}

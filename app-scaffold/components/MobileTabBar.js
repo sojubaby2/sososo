@@ -149,6 +149,14 @@ export default function MobileTabBar() {
                   <span className="m-menu-lb">{m.short || m.label}</span>
                 </>
               );
+              // [2026-10-28] 전면 광고를 허용한 메뉴(테마별 종목정리)는 일반 링크(<a>)로 — lib/siteMenu.js 설명 참고
+              if (m.vignette && !m.external) {
+                return (
+                  <a key={m.href} href={m.href} className={`m-menu-item ${on ? "on" : ""}`} data-vignette-allow="">
+                    {inner}
+                  </a>
+                );
+              }
               return m.external ? (
                 <a key={m.href} href={m.href} target="_blank" rel="noopener noreferrer" className="m-menu-item">
                   {inner}

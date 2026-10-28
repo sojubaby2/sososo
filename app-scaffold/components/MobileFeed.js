@@ -23,9 +23,13 @@ import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 
 import { ChevronDown, ExternalLink, Flame, AlertTriangle } from "lucide-react";
 import { openStockChart } from "../lib/openStockChart";
 import { isPoliticalTheme } from "../lib/themeData";
+import { AD_SLOTS } from "../lib/ads";
+import AdSlot from "./AdSlot";
 
 const FRESH_MINUTES = 15; // 이 시간 안의 속보에 빨간 "속보" 딱지
 const HERO_COUNT = 5;
+const HERO_AD_AT = 2; // [2026-10-28] 속보 카드 사이 광고 자리(0부터 셈 → 2 = 세 번째 자리). 끄려면 HERO_AD를 false로
+const HERO_AD = Boolean(AD_SLOTS.display);
 const MAP_COUNT = 8;
 const OPEN_GROUPS = 2; // 처음에 펼쳐 둘 시간 묶음 수
 
@@ -158,10 +162,23 @@ function Spark({ code, market, active }) {
 export function MobileHero({ items }) {
   const now = useNow();
   const list = useMemo(() => items.filter((n) => n.stocks?.length).slice(0, HERO_COUNT), [items]);
+  // [2026-10-28 추가] 카드 사이 광고 한 장 — 재성님: "모바일버전은 최신 속보카드 사이에 광고 들어가게 해줘"
+  //   2장째 속보 카드 다음(3번째 자리)에 광고 카드 1장. 맨 앞 카드엔 넣지 않습니다(첫 화면은 속보가 먼저).
+  //   · 넘겨서 그 자리에 왔을 때 광고를 불러옵니다(안 넘기는 사람에겐 광고 요청 자체를 안 함 → 가시성↑)
+  //   · 채울 광고가 없거나 광고 차단기로 막히면 그 카드를 통째로 빼서 빈 카드가 남지 않게 합니다
+  //   · 카드 번호(1/5)는 속보 카드만 셉니다
+  const [adGone, setAdGone] = useState(false);
+  const showAd = HERO_AD && !adGone && list.length > HERO_AD_AT;
+  const slides = useMemo(() => {
+    const s = list.map((n, k) => ({ key: n.id, n, num: k + 1 }));
+    if (showAd) s.splice(HERO_AD_AT, 0, { key: "ad", ad: true });
+    return s;
+  }, [list, showAd]);
   const [idx, setIdx] = useState(0);
   const idxRef = useRef(0);
-  const viewedRef = useRef(null); // 지금 보고 있는 카드의 속보 id
+  const viewedRef = useRef(null); // 지금 보고 있는 카드(속보 id 또는 "ad")
   const trackRef = useRef(null);
+  const adCardRef = useRef(null);
   const leadId = list[0]?.id;
   const prevLead = useRef(leadId);
   // [2026-10-27 추가] 새 속보가 들어왔을 때 — 재성님: "속보가 뜨면 카드뉴스는 어떻게 변해?" → 개선
@@ -185,8 +202,8 @@ export function MobileHero({ items }) {
     if (el && idxRef.current > 0) {
       // 읽던 카드 그대로: 그 카드가 새 순서에서 몇 번째인지 찾아 그 자리로(앞에 한 장이 끼어들었으니 보통 한 칸 뒤)
       //   (휴대폰 브라우저에 따라 스스로 자리를 지켜 주기도 해서, "몇 칸 더"가 아니라 "그 카드 자리"로 맞춥니다)
-      const j = list.findIndex((n) => n.id === viewedRef.current);
-      const target = j >= 0 ? j : list.length - 1;
+      const j = slides.findIndex((x) => x.key === viewedRef.current);
+      const target = j >= 0 ? j : slides.length - 1;
       el.scrollLeft = target * step();
       idxRef.current = target;
       setIdx(target);
@@ -198,13 +215,57 @@ export function MobileHero({ items }) {
     return () => clearTimeout(t);
   }, [leadId]);
 
+  // 광고 카드가 빠질 때 — 광고 뒤 카드를 보던 중이면 같은 카드가 계속 보이게 한 칸 당겨 줍니다.
+  useLayoutEffect(() => {
+    if (!adGone) return;
+    const el = trackRef.current;
+    if (!el) return;
+    const i = idxRef.current;
+    const target = i > HERO_AD_AT ? i - 1 : i;
+    if (target !== i) el.scrollLeft = target * step();
+    idxRef.current = target;
+    viewedRef.current = list[target]?.id ?? null;
+    setIdx(target);
+  }, [adGone]);
+
+  // 광고 카드 지켜보기: 채울 광고가 없다고 나오거나(unfilled), 요청하고 8초가 지나도 안 채워지면(광고 차단 등) 카드를 뺌
+  useEffect(() => {
+    if (!showAd) return;
+    const card = adCardRef.current;
+    if (!card) return;
+    let timer = null;
+    const check = () => {
+      const ins = card.querySelector("ins");
+      if (!ins) return;
+      const st = ins.getAttribute("data-ad-status");
+      if (st === "unfilled") return setAdGone(true);
+      if (st === "filled") {
+        clearTimeout(timer);
+        timer = null;
+        return;
+      }
+      if (!timer && ins.classList.contains("adsbygoogle")) {
+        timer = setTimeout(() => {
+          if (ins.getAttribute("data-ad-status") !== "filled") setAdGone(true);
+        }, 8000);
+      }
+    };
+    const mo = new MutationObserver(check);
+    mo.observe(card, { subtree: true, attributes: true, attributeFilter: ["class", "data-ad-status"] });
+    check();
+    return () => {
+      mo.disconnect();
+      clearTimeout(timer);
+    };
+  }, [showAd]);
+
   function onScroll() {
     const el = trackRef.current;
     const w = step();
     if (!el || !w) return;
     const i = Math.round(el.scrollLeft / w);
     idxRef.current = i;
-    viewedRef.current = list[i]?.id ?? null;
+    viewedRef.current = slides[i]?.key ?? null;
     setIdx(i);
     if (i === 0) setPending(false);
   }
@@ -218,7 +279,15 @@ export function MobileHero({ items }) {
   return (
     <section className="mf-hero m-only" aria-label="방금 들어온 속보">
       <div className="mf-hero-track" ref={trackRef} onScroll={onScroll}>
-        {list.map((n, i) => {
+        {slides.map((sl, i) => {
+          if (sl.ad) {
+            return (
+              <div key="ad" ref={adCardRef} className="mf-card mf-adcard">
+                <AdSlot box className="mf-adslot" />
+              </div>
+            );
+          }
+          const n = sl.n;
           const m = minutesAgo(n.ts, now);
           const fresh = m !== null && m < FRESH_MINUTES;
           const { tags: rawTags, text } = splitTags(n.headline);
@@ -237,7 +306,7 @@ export function MobileHero({ items }) {
                 <span className="mono">{hhmm(kstParts(n.ts))}</span>
                 {n.theme && <span>· {n.theme}</span>}
                 <span className="mf-count mono">
-                  {i + 1}/{list.length}
+                  {sl.num}/{list.length}
                 </span>
               </div>
               <h2 className="mf-card-title">{text}</h2>
@@ -273,16 +342,16 @@ export function MobileHero({ items }) {
           ← 새 속보
         </button>
       )}
-      {list.length > 1 && (
+      {slides.length > 1 && (
         <div className="mf-dots" role="tablist" aria-label="속보 카드 넘기기">
-          {list.map((n, i) => (
+          {slides.map((sl, i) => (
             <button
               type="button"
-              key={n.id}
+              key={sl.key}
               role="tab"
               aria-selected={i === idx}
-              aria-label={`${i + 1}번째 속보`}
-              className={i === idx ? "on" : ""}
+              aria-label={sl.ad ? "광고" : `${sl.num}번째 속보`}
+              className={`${i === idx ? "on" : ""} ${sl.ad ? "ad" : ""}`}
               onClick={() => go(i)}
             />
           ))}

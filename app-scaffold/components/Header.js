@@ -83,6 +83,15 @@ export default function Header() {
               );
             }
             const active = isMenuActive(m, pathname);
+            // [2026-10-28] 전면 광고를 허용한 메뉴(테마별 종목정리)는 일반 링크(<a>)로 — 페이지를 새로 여는 방식이라야
+            //   구글 전면 광고가 그 사이에 뜰 수 있습니다. 설명은 lib/siteMenu.js, components/VignetteGuard.js
+            if (m.vignette) {
+              return (
+                <a key={m.href} href={m.href} className={`nav-btn ${active ? "active" : ""}`} data-vignette-allow="">
+                  {m.label}
+                </a>
+              );
+            }
             return (
               <Link key={m.href} href={m.href} className={`nav-btn ${active ? "active" : ""}`}>
                 {m.label}

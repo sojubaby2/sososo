@@ -1050,13 +1050,18 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
 
         <div className="home-grid">
           {/* ── 왼쪽 칸 ── */}
-          <aside className="home-col home-left" aria-label="오늘의 예측과 HOT 테마">
+          <aside className="home-col home-left" aria-label="오늘의 예측과 광고">
             <DailyOutlookBanner />
-            <HotThemePanel />
-            {/* [2026-10-28] 재성님: "이쪽 칸 비우고 광고로 넣는게 낫지않아?" — HOT 테마 아래 빈자리에 광고.
+            {/* [2026-10-28] 재성님: "이쪽 칸 비우고 광고로 넣는게 낫지않아?" → 이어서
+                "hot테마를 아예 오른쪽으로 배치해버리면 안되나? 왼쪽 공간에는 지금처럼 긴 광고를 2개정도 넣고"
+                → HOT 테마는 오른쪽 칸(대표 종목 아래)으로 옮기고, 왼쪽은 오늘의 예측 + 광고 2개.
                 PC·태블릿에서만(휴대폰 시장 탭에는 대표 종목 아래 광고가 따로 있음).
-                광고가 화면을 따라다니면 애드센스 정책 위반이라, 이 왼쪽 칸은 스크롤하면 같이 올라가게 바꿈(globals.css) */}
+                광고가 화면을 따라다니면 애드센스 정책 위반이라, 이 왼쪽 칸은 스크롤하면 같이 올라가게 바꿈(globals.css).
+                두 번째 광고는 아래로 내려 거기까지 왔을 때만 불러옵니다(지연 불러오기). */}
             <div className="desk-only home-side-ad">
+              <AdSlot kind="display" />
+            </div>
+            <div className="desk-only home-side-ad home-side-ad2">
               <AdSlot kind="display" />
             </div>
           </aside>
@@ -1164,7 +1169,7 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
           </section>
 
           {/* ── 오른쪽 칸 ── */}
-          <aside className="home-col home-right" aria-label="대표 종목과 전일 급등주">
+          <aside className="home-col home-right" aria-label="관심종목·대표 종목·HOT 테마·전일 급등주">
             {/* [2026-10-27] 관심종목 칸 — WatchPanel 설명 참고 */}
             <WatchPanel
               list={watch.list}
@@ -1175,10 +1180,12 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
             />
             {/* 대표 종목(삼성전자·SK하이닉스) — 2026-10-26 추가, FlagshipStrip 설명 참고 */}
             <FlagshipStrip filter={filter} onPick={(name) => filterAndShow("stock", name)} />
-            {/* [2026-10-27] 광고 — 휴대폰 시장 탭에서만(PC 오른쪽 칸은 화면을 따라다니는 칸이라 광고를 넣지 않음) */}
+            {/* [2026-10-27] 광고 — 휴대폰 시장 탭에서만(PC 오른쪽 칸에는 광고를 넣지 않음) */}
             <div className="m-only m-market-ad">
               <AdSlot />
             </div>
+            {/* [2026-10-28] HOT 테마 — 왼쪽 칸에서 이리로 옮김(왼쪽은 광고 자리) */}
+            <HotThemePanel />
             <DailyMoversPanel />
           </aside>
         </div>

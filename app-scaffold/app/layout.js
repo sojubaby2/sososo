@@ -7,6 +7,7 @@ import NoDrag from "../components/NoDrag";
 import MobileTabBar from "../components/MobileTabBar";
 // [2026-10-28 추가] 구글 앵커 광고가 뜨면 탭 줄·머리띠를 비켜 줌
 import AnchorAdSpacer from "../components/AnchorAdSpacer";
+import VignetteGuard from "../components/VignetteGuard";
 
 const SITE_URL = "https://newsmeme.co.kr";
 const TITLE = "뉴스매매 — 실시간 뉴스 속보와 관련주 매칭";
@@ -116,6 +117,8 @@ export default function RootLayout({ children }) {
         <MobileTabBar />
         {/* [2026-10-28] 앵커 광고와 겹치지 않게 (components/AnchorAdSpacer.js) */}
         <AnchorAdSpacer />
+        {/* [2026-10-28] 전면 광고는 "테마별 종목정리" 메뉴에서만 (components/VignetteGuard.js) */}
+        <VignetteGuard />
       </body>
     </html>
   );
