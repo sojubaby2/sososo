@@ -20,7 +20,7 @@ import { getRedis } from "../../../lib/redis";
 import { getStoredDayCount, getStoredDatesAscending, HISTORY_LOOKBACK_DAYS } from "../../../lib/priceHistory";
 import { RESULTS_CACHE_KEY, RESULTS_CACHE_TTL_SECONDS } from "../../../lib/patternsScan";
 import { getCachedDailyOutlook } from "../../../lib/dailyOutlook";
-import { readRun, RUN_POLL, RUN_TELEGRAM, RUN_DAILY_OUTLOOK, readIngestCounts, kstDayKey, readRejected } from "../../../lib/runStatus";
+import { readRun, RUN_POLL, RUN_TELEGRAM, RUN_DAILY_OUTLOOK, readIngestCounts, kstDayKey, readRejected, readAiCost, AI_STAGE_LABELS, USD_KRW } from "../../../lib/runStatus";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -284,6 +284,33 @@ export async function GET(request) {
     }
   } else {
     report.envNote = "환경변수 설정 여부까지 보려면 주소 뒤에 ?secret=<CRON_SECRET> 을 붙이세요.";
+  }
+
+  // ── [2026-10-29 추가] AI 비용(실제 사용 토큰 기준, lib/runStatus.js recordAiUsage) ──────────
+  // 재성님: "비용계산 잘해줘봐". 최근 7일치를 읽어 오늘·어제·7일 평균·한 달 예상(평균×30)을 보여줌. 신호등은 항상 정상.
+  try {
+    const days = [];
+    for (let i = 0; i < 7; i++) {
+      const k = kstDayKey(new Date(Date.now() - i * 86400000));
+      days.push({ day: k, ...((await readAiCost(redis, k)) || { stages: {}, krw: 0 }) });
+    }
+    const counted = days.filter((d) => Object.keys(d.stages).length > 0);
+    const avg = counted.length ? Math.round(counted.reduce((a, d) => a + d.krw, 0) / counted.length) : 0;
+    report.checks.push({
+      key: "aiCost",
+      label: "AI 비용 (실제 사용량)",
+      level: "ok",
+      today: days[0],
+      yesterday: days[1],
+      days,
+      avgKrw: avg,
+      monthKrw: avg * 30,
+      countedDays: counted.length,
+      stageLabels: AI_STAGE_LABELS,
+      hint: `Claude Haiku 4.5 공식 가격, 1달러=${USD_KRW.toLocaleString()}원으로 계산. 2026-10-29 배포분부터 쌓입니다. 정확한 청구액은 Anthropic Console의 Usage 화면이 기준입니다.`,
+    });
+  } catch {
+    // 비용 칸 실패는 무시
   }
 
   const worst = report.checks.some((c) => c.level === "red")

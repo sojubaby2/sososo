@@ -88,6 +88,19 @@ function summarize(check) {
       return `${check.storedDays ?? 0}일 / 목표 ${check.targetDays ?? "?"}일 · 최신 데이터: ${check.newestBasDt || "없음"}`;
     case "dailyOutlook":
       return `${check.dateLabel || "-"} · 생성 시각: ${formatKst(check.latestAt)} (${formatAgo(check.minutesAgo)})`;
+    // [2026-10-29 추가] AI 비용 — 오늘 단계별 호출 수·금액, 어제, 7일 평균과 한 달 예상
+    case "aiCost": {
+      const won = (n) => `${Number(n || 0).toLocaleString()}원`;
+      const stageLine = (d) =>
+        Object.entries(d?.stages || {})
+          .map(([k, v]) => `${check.stageLabels?.[k] || k} ${v.n}번 ${won(v.krw)}`)
+          .join(" · ") || "기록 없음";
+      return [
+        `오늘 ${won(check.today?.krw)} (${stageLine(check.today)})`,
+        `어제 ${won(check.yesterday?.krw)} (${stageLine(check.yesterday)})`,
+        check.countedDays ? `최근 ${check.countedDays}일 하루 평균 ${won(check.avgKrw)} → 한 달 예상 약 ${won(check.monthKrw)}` : "아직 쌓인 기록이 없습니다",
+      ].join("\n");
+    }
     default:
       return "";
   }

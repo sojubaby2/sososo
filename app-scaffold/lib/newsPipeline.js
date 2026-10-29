@@ -13,6 +13,9 @@
 import rawThemeData from "./themeData.json";
 import { SUBSIDIARY_MAP } from "./subsidiaryMap";
 import { fetchLatestAvailable } from "./krxOpenApi";
+// [2026-10-29 추가] AI 비용 계량기(실제 사용 토큰을 하루 단위로 셈) — lib/runStatus.js recordAiUsage
+import { getRedis } from "./redis";
+import { recordAiUsage } from "./runStatus";
 
 const MAX_STOCKS_PER_PRIMARY_THEME = 6;
 const MAX_STOCKS_PER_SECONDARY_THEME = 3;
@@ -625,6 +628,25 @@ const FILTER_SYSTEM_PROMPT = `너는 한국 주식시장 뉴스 큐레이터야.
 응답은 반드시 아래 형식의 JSON 객체 하나만, 다른 텍스트 없이:
 {"include":true}`;
 
+// [2026-10-29 추가] 재료성 판단(필터)용 고정 덩어리 = 지시문 + 테마별 대표 종목 3개 목록. 모듈 로드 때 한 번만 만듦.
+let FILTER_STATIC_CONTEXT = null;
+function buildFilterStaticContext() {
+  if (FILTER_STATIC_CONTEXT) return FILTER_STATIC_CONTEXT;
+  const byTheme = new Map();
+  for (const r of rawThemeData) {
+    const a = byTheme.get(r.theme) || [];
+    if (a.length < 3) a.push(r.name);
+    byTheme.set(r.theme, a);
+  }
+  const lines = Array.from(byTheme.entries()).map(([t, names]) => `${t}: ${names.join(", ")}`);
+  FILTER_STATIC_CONTEXT = `${FILTER_SYSTEM_PROMPT}
+
+[참고: 우리 사이트가 관리하는 투자 테마와 대표 종목(테마: 종목, 종목, 종목)]
+기사가 아래 테마 중 하나의 사업(제품·기술·정책·수요)과 연결되면 재료가 될 수 있다는 뜻이야 — 이 경우 위 제외 목록에 분명히 해당하지 않는 한 포함 쪽으로 판단해.
+${lines.join("\n")}`;
+  return FILTER_STATIC_CONTEXT;
+}
+
 export async function isMarketMovingHeadline(title, summary) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY 환경변수가 설정되지 않았습니다.");
@@ -635,7 +657,12 @@ export async function isMarketMovingHeadline(title, summary) {
     body: JSON.stringify({
       model: "claude-haiku-4-5-20251001",
       max_tokens: 32,
-      system: FILTER_SYSTEM_PROMPT,
+      // [2026-10-29 변경 — 비용 절감] 지시문 + "우리 테마와 대표 종목 목록"을 한 덩어리로 묶어 캐시에 올립니다.
+      //   예전 지시문만으로는 약 3천 토큰이라 AI 쪽 캐시 최소 길이(Haiku 4.5는 4,096토큰)에 못 미쳐서
+      //   기사마다 지시문 전체 값을 매번 냈습니다. 목록을 붙이면 길이가 넘어서 캐시가 걸리고,
+      //   두 번째 기사부터는 지시문 값이 10분의 1로 줄어듭니다(1시간 안에 다음 기사가 오면 계속 유지).
+      //   목록은 "이 업종들과 관련 있으면 통과"라는 판단 근거로도 쓰입니다.
+      system: [{ type: "text", text: buildFilterStaticContext(), cache_control: { type: "ephemeral", ttl: "1h" } }],
       messages: [
         { role: "user", content: `뉴스 제목: ${title}\n뉴스 요약: ${summary}` },
         { role: "assistant", content: "{" },
@@ -644,6 +671,7 @@ export async function isMarketMovingHeadline(title, summary) {
   });
   const data = await res.json();
   if (!res.ok) throw new Error("Claude API(필터) 오류: " + JSON.stringify(data));
+  await recordAiUsage(getRedis(), "filter", data?.usage);
   const continuation = data?.content?.find((c) => c.type === "text")?.text || "\"include\":false}";
   try {
     const parsed = JSON.parse(extractJsonObject("{" + continuation));
@@ -697,6 +725,7 @@ export async function matchStocks(title, summary, universeCompanyList) {
   });
   const data = await res.json();
   if (!res.ok) throw new Error("Claude API 오류: " + JSON.stringify(data));
+  await recordAiUsage(getRedis(), "match", data?.usage);
   const continuation = data?.content?.find((c) => c.type === "text")?.text || "}";
 
   let parsed;

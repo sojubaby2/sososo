@@ -25,6 +25,7 @@ import { STOCKS } from "./stockDirectory";
 import { getRecentFeed } from "./recentFeed";
 import { getMarketDates, getMarketDay } from "./marketDay";
 import { getMarketFlow } from "./investorFlow";
+import { recordAiUsage } from "./runStatus"; // [2026-10-29] AI 비용 계량기
 
 const YAHOO_URL = "https://query1.finance.yahoo.com/v8/finance/chart";
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36";
@@ -284,6 +285,7 @@ export async function refreshPremarket(redis, { force = false, now = new Date() 
   const themes = getAllThemeNames();
   const { system, user } = buildPrompt({ us, news, prevDay, prevFlow, themes, todayIso: iso });
   const { text, usage } = await askClaude(system, user);
+  await recordAiUsage(redis, "premarket", usage); // [2026-10-29] AI 비용 계량기(lib/runStatus.js)
   let parsed;
   try {
     parsed = JSON.parse(extractJson(text) || "null");

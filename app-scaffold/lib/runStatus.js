@@ -122,3 +122,54 @@ export async function readRejected(redis) {
     return [];
   }
 }
+
+// ── [2026-10-29 추가] AI 비용 계량기 — 하루 단위로 "실제로 쓴 토큰"을 셈 ─────────────
+// 재성님: "비용계산 잘해줘봐". 지금까지는 글자 수로 어림했는데, 이제 AI가 응답할 때마다 돌려주는
+// 실제 사용량(usage: 입력·출력·캐시 저장·캐시 재사용 토큰)을 단계별로 더해 둡니다.
+// /api/health 의 "AI 비용" 칸에 오늘·어제·최근 7일 원화 금액이 나옵니다.
+// 가격: Claude Haiku 4.5 공식 가격(100만 토큰당 달러) — 입력 $1, 출력 $5, 캐시 저장(1시간) $2, 캐시 재사용 $0.10.
+// 환율은 1달러 = 1,450원으로 계산(대략값). 비용: AI 호출 1번당 Redis 명령 1번(묶음 전송). 40일 뒤 자동 삭제.
+const AI_COST_PREFIX = "status:aicost:";
+const AI_COST_TTL_SECONDS = 60 * 60 * 24 * 40;
+export const USD_KRW = 1450;
+const PRICE_PER_MTOK = { in: 1, out: 5, cw: 2, cr: 0.1 };
+export const AI_STAGE_LABELS = { filter: "재료성 판단", match: "종목 매칭", premarket: "장전 브리핑" };
+
+export async function recordAiUsage(redis, stage, usage) {
+  if (!redis || !stage || !usage) return;
+  try {
+    const key = AI_COST_PREFIX + kstDayKey();
+    const p = redis.pipeline();
+    p.hincrby(key, `${stage}:n`, 1);
+    p.hincrby(key, `${stage}:in`, Number(usage.input_tokens) || 0);
+    p.hincrby(key, `${stage}:out`, Number(usage.output_tokens) || 0);
+    p.hincrby(key, `${stage}:cw`, Number(usage.cache_creation_input_tokens) || 0);
+    p.hincrby(key, `${stage}:cr`, Number(usage.cache_read_input_tokens) || 0);
+    p.expire(key, AI_COST_TTL_SECONDS);
+    await p.exec();
+  } catch {
+    // 계량 실패는 무시 — 본 작업을 막으면 안 됨.
+  }
+}
+
+// 하루치 → { stages: { filter: { n, in, out, cw, cr, krw }, ... }, krw }
+export async function readAiCost(redis, dayKey) {
+  if (!redis) return null;
+  try {
+    const raw = (await redis.hgetall(AI_COST_PREFIX + dayKey)) || {};
+    const stages = {};
+    for (const [k, v] of Object.entries(raw)) {
+      const [stage, f] = k.split(":");
+      (stages[stage] ||= { n: 0, in: 0, out: 0, cw: 0, cr: 0 })[f] = Number(v) || 0;
+    }
+    let total = 0;
+    for (const s of Object.values(stages)) {
+      const usd = (s.in * PRICE_PER_MTOK.in + s.out * PRICE_PER_MTOK.out + s.cw * PRICE_PER_MTOK.cw + s.cr * PRICE_PER_MTOK.cr) / 1e6;
+      s.krw = Math.round(usd * USD_KRW);
+      total += usd;
+    }
+    return { stages, krw: Math.round(total * USD_KRW) };
+  } catch {
+    return null;
+  }
+}
