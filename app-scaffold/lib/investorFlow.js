@@ -8,6 +8,9 @@
 //     · 지수 마감: 네이버 대신 야후(^KS11 코스피, ^KQ11 코스닥) — 사이트 위쪽 지수 띠가 이미 야후로 잘 받고 있음
 //     · 수급: 네이버 요청에 평범한 브라우저 표시(User-Agent·Referer)를 붙여 다시 시도
 //     · 왜 안 되는지 바로 볼 수 있게 /api/market-flow?date=YYYY-MM-DD&diag=1 진단 주소를 만듦(app/api/market-flow/route.js)
+//   [2026-10-29 오전 진단 결과] 네이버 PC 수급 페이지가 사이트 서버에 "410(없어진 페이지, Npay 증권 안내)"을 돌려줌.
+//     → 수급 자료를 받을 곳을 여러 군데 차례로 시도: ① 네이버 증권 모바일(m.stock.naver.com) ② 다음 금융 ③ 네이버 PC.
+//       받은 모양이 무엇이든 "날짜 + 개인/외국인/기관" 칸을 찾아 읽고, 합이 0 근처인지(누가 사면 누군가는 판다) 검사해서 맞을 때만 씀.
 //
 // 자료:
 //   · 투자자별 매매동향(일별): finance.naver.com/sise/investorDealTrendDay.naver?bizdate=YYYYMMDD&sosok=01(코스피)/02(코스닥)
@@ -105,11 +108,96 @@ function parseFlow(html, iso) {
   return null;
 }
 
-// 한 시장(sosok 01=코스피, 02=코스닥)의 그날 투자자별 순매수(억 원). 그날 행이 없으면 null
+// ── JSON 자료에서 수급 찾기(받는 곳마다 모양이 달라서 이름으로 찾음) ──
+const isoOf = (v) => {
+  const m = String(v ?? "").match(/^(\d{4})[-.]?(\d{2})[-.]?(\d{2})/);
+  return m ? `${m[1]}-${m[2]}-${m[3]}` : null;
+};
+const numOf = (v) => (typeof v === "number" ? v : toNum(v));
+function pickBy(obj, re) {
+  for (const k of Object.keys(obj)) if (re.test(k)) { const n = numOf(obj[k]); if (typeof n === "number") return n; }
+  return undefined;
+}
+// 단위 맞추기 → 억 원. (하루 순매수는 많아야 수조 원 = 수만 억)
+function toEok(vals) {
+  const mx = Math.max(...vals.map((v) => Math.abs(v || 0)));
+  const div = mx > 1e9 ? 1e8 : mx > 2e5 ? 100 : 1; // 원 / 백만 원 / 억 원
+  return vals.map((v) => (typeof v === "number" ? Math.round(v / div) : v));
+}
+function flowFromItem(it) {
+  const individual = pickBy(it, /individual|personal|person|indv|retail/i);
+  const foreign = pickBy(it, /foreign|frgn/i);
+  const institution = pickBy(it, /institution|organ|inst/i);
+  const pension = pickBy(it, /pension/i);
+  if (![individual, foreign, institution].every((n) => typeof n === "number")) return null;
+  const [a, b, c, d] = toEok([individual, foreign, institution, pension]);
+  const scale = Math.abs(a) + Math.abs(b) + Math.abs(c) + 1;
+  if (Math.abs(a + b + c) > scale * 0.35 + 100) return null; // 기타법인 몫을 생각해 넉넉히
+  return { individual: a, foreign: b, institution: c, pension: typeof d === "number" ? d : null };
+}
+// 객체 안을 훑어 "날짜가 iso인 항목"에서 수급을 찾음
+function findFlowInJson(root, iso) {
+  const stack = [root];
+  let seen = 0;
+  while (stack.length && seen < 5000) {
+    const v = stack.pop();
+    seen += 1;
+    if (Array.isArray(v)) { for (const x of v) stack.push(x); continue; }
+    if (!v || typeof v !== "object") continue;
+    const dKey = Object.keys(v).find((k) => /date|bizdate|dt|day/i.test(k) && isoOf(v[k]));
+    if (dKey && isoOf(v[dKey]) === iso) {
+      const f = flowFromItem(v);
+      if (f) return f;
+    }
+    for (const k of Object.keys(v)) if (v[k] && typeof v[k] === "object") stack.push(v[k]);
+  }
+  return null;
+}
+
+const MK_CODE = { "01": "KOSPI", "02": "KOSDAQ" };
+// 수급을 받을 곳들(앞에서부터 시도)
+function flowSources(sosok, iso) {
+  const mk = MK_CODE[sosok];
+  return [
+    {
+      name: "네이버 증권 모바일",
+      url: `https://m.stock.naver.com/api/index/${mk}/integration`,
+      headers: { Referer: `https://m.stock.naver.com/domestic/index/${mk}/total`, Accept: "application/json,text/plain,*/*" },
+      kind: "json",
+    },
+    {
+      name: "다음 금융",
+      url: `https://finance.daum.net/api/investor/days?page=1&perPage=30&market=${mk}&pagination=true`,
+      headers: { Referer: "https://finance.daum.net/domestic/investors", Accept: "application/json,text/plain,*/*" },
+      kind: "json",
+    },
+    { name: "네이버 PC", url: flowUrl(sosok, iso), headers: NAVER_HEADERS, kind: "html" },
+  ];
+}
+async function trySource(src, iso) {
+  const r = await getText(src.url, src.headers);
+  if (!r.ok) return { r, flow: null };
+  if (src.kind === "html") return { r, flow: parseFlow(r.text, iso) };
+  let data = null;
+  try {
+    data = JSON.parse(r.text);
+  } catch {
+    return { r, flow: null };
+  }
+  return { r, flow: findFlowInJson(data, iso) };
+}
+
+// 한 시장(sosok 01=코스피, 02=코스닥)의 그날 투자자별 순매수(억 원). 어디서도 못 받으면 null
 async function fetchFlow(sosok, iso) {
-  const r = await getText(flowUrl(sosok, iso), NAVER_HEADERS);
-  if (!r.ok) throw new Error(`네이버 수급 요청 실패 (status ${r.status})`);
-  return parseFlow(r.text, iso);
+  for (const src of flowSources(sosok, iso)) {
+    try {
+      const { flow } = await trySource(src, iso);
+      if (flow) return { ...flow, source: src.name };
+    } catch {
+      // 다음 곳 시도
+    }
+  }
+  return null;
 }
 
 // 지수 하나(^KS11/^KQ11)의 그날 종가와 전일 대비 — 야후 일봉(최근 3달)에서 그 날짜를 찾음
@@ -167,8 +255,8 @@ async function compute(iso) {
   return result;
 }
 
-const cachedRecent = unstable_cache(compute, ["market-flow-recent-v2"], { revalidate: 600 });
-const cachedPast = unstable_cache(compute, ["market-flow-past-v2"], { revalidate: 7 * 86400 });
+const cachedRecent = unstable_cache(compute, ["market-flow-recent-v3"], { revalidate: 600 });
+const cachedPast = unstable_cache(compute, ["market-flow-past-v3"], { revalidate: 7 * 86400 });
 
 // 날짜 "2026-10-28" → { 코스피:{flow,index}, 코스닥:{flow,index} } 또는 null
 export async function getMarketFlow(iso, { latest = false } = {}) {
@@ -184,24 +272,40 @@ export async function getMarketFlow(iso, { latest = false } = {}) {
 export async function diagnoseFlow(iso) {
   const out = { date: iso, naver: {}, yahoo: {} };
   for (const [name, sosok] of [["코스피", "01"], ["코스닥", "02"]]) {
-    try {
-      const r = await getText(flowUrl(sosok, iso), NAVER_HEADERS);
-      const rows = tableRows(r.text);
-      out.naver[name] = {
-        status: r.status,
-        length: r.text.length,
-        head: r.text.slice(0, 200).replace(/\s+/g, " "),
-        rowCount: rows.length,
-        firstRows: rows.slice(0, 3),
-        parsed: parseFlow(r.text, iso),
-      };
-    } catch (e) {
-      out.naver[name] = { error: String(e?.message || e) };
+    out.naver[name] = [];
+    for (const src of flowSources(sosok, iso)) {
+      try {
+        const { r, flow } = await trySource(src, iso);
+        out.naver[name].push({
+          source: src.name,
+          url: src.url,
+          status: r.status,
+          length: r.text.length,
+          head: r.text.slice(0, 600).replace(/\s+/g, " "),
+          parsed: flow,
+        });
+      } catch (e) {
+        out.naver[name].push({ source: src.name, error: String(e?.message || e) });
+      }
     }
   }
   for (const [name, sym] of [["코스피", "^KS11"], ["코스닥", "^KQ11"]]) {
     try {
-      out.yahoo[name] = await fetchIndex(sym, iso);
+      const raw = await getText(`${YAHOO_URL}/${encodeURIComponent(sym)}?range=3mo&interval=1d`, { Accept: "application/json,text/plain,*/*" });
+      let tail = null;
+      try {
+        const j = JSON.parse(raw.text);
+        const rr = j?.chart?.result?.[0];
+        tail = {
+          ts: (rr?.timestamp || []).slice(-4),
+          close: (rr?.indicators?.quote?.[0]?.close || []).slice(-4),
+          meta: rr?.meta ? { t: rr.meta.regularMarketTime, p: rr.meta.regularMarketPrice, gmt: rr.meta.gmtoffset } : null,
+          err: j?.chart?.error || null,
+        };
+      } catch {
+        tail = raw.text.slice(0, 200);
+      }
+      out.yahoo[name] = { status: raw.status, tail, parsed: await fetchIndex(sym, iso).catch((e) => String(e?.message || e)) };
     } catch (e) {
       out.yahoo[name] = { error: String(e?.message || e) };
     }
