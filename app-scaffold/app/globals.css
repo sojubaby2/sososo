@@ -2700,3 +2700,40 @@ img { -webkit-user-drag: none; }
   .mkh-chart-d { font-size: 10px; }
   .mkh-lead { font-size: 14px; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   [2026-10-29] PC 위 메뉴 눈에 띄게 — components/Header.js
+   재성님: "이 메뉴들이 눈에 너무 안띄어"
+   · 글자만 있던 메뉴 → 그림 + 알약 모양 칸, 글자 더 진하고 굵게
+   · 지금 보고 있는 메뉴는 호박색 알약으로 채움
+   · 홈 · 뉴스 옆 깜빡이는 빨간 점(실시간), 장 마감 정리 옆 NEW 꼬리표(lib/siteMenu.js)
+   · 휴대폰(760px 이하)에서는 이 메뉴 줄 대신 아래 탭 줄을 써서 영향 없음
+   ═══════════════════════════════════════════════════════════════════════ */
+.site-header .nav { gap: 4px; }
+.site-header .nav-btn {
+  height: 36px; padding: 0 12px; border-radius: 999px; gap: 6px;
+  color: var(--on-deep); font-size: 14.5px; font-weight: 600; letter-spacing: -0.01em;
+  background: transparent;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.site-header .nav-btn .nav-ico { color: var(--amber); flex-shrink: 0; }
+.site-header .nav-btn:hover { background: color-mix(in oklab, var(--on-deep) 8%, transparent); color: var(--on-deep); }
+.site-header .nav-btn.active { background: var(--amber-tint); color: var(--amber-tint-ink); font-weight: 700; box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--amber) 45%, transparent); }
+.site-header .nav-btn.active::after { display: none; }
+.nav-live { width: 7px; height: 7px; border-radius: 50%; background: var(--up); flex-shrink: 0; animation: live-pulse 1.4s ease-in-out infinite; }
+.nav-badge { font-size: 10px; font-weight: 800; letter-spacing: 0.02em; color: #fff; background: var(--up); border-radius: 5px; padding: 1px 5px; line-height: 1.4; }
+/* 좁은 PC 화면: 그림과 로고 옆 설명을 숨겨 한 줄에 다 들어가게 */
+@media (max-width: 1280px) {
+  .site-header .nav-btn .nav-ico { display: none; }
+  .site-header .nav-btn { padding: 0 10px; font-size: 14px; }
+  .site-header .brand-tag { display: none; }
+}
+@media (max-width: 1000px) {
+  .site-header .nav-btn { padding: 0 8px; font-size: 13.5px; }
+  .site-header .nav { gap: 0; }
+}
+.site-header .brand { flex-shrink: 0; white-space: nowrap; }
+@media (max-width: 1000px) and (min-width: 761px) {
+  .site-header .theme-toggle-text { display: none; }
+  .site-header .theme-toggle { width: 34px; padding: 0; justify-content: center; }
+}

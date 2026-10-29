@@ -41,6 +41,24 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import ThemeToggle from "./ThemeToggle";
 import { MENU, isMenuActive } from "../lib/siteMenu";
+// [2026-10-29] 재성님: "이 메뉴들이 눈에 너무 안띄어" → 메뉴마다 작은 그림 + 알약 모양 + 꼬리표(lib/siteMenu.js의 live·badge)
+//   그림은 휴대폰 "전체" 창(components/MobileTabBar.js)과 같은 것. 좁은 PC 화면(1280px 아래)에서는 그림을 숨겨 한 줄에 들어가게(globals.css)
+import { Zap, CandlestickChart, Layers, Ticket, CalendarDays, BarChart3, LineChart, BookOpen, LayoutGrid } from "lucide-react";
+
+const ICONS = { zap: Zap, candle: CandlestickChart, layers: Layers, ticket: Ticket, calendar: CalendarDays, bars: BarChart3, line: LineChart, book: BookOpen };
+
+// 메뉴 한 칸의 안쪽(그림 + 이름 + 실시간 점/꼬리표)
+function NavInner({ m }) {
+  const Icon = ICONS[m.icon] || LayoutGrid;
+  return (
+    <>
+      <Icon className="nav-ico" size={16} strokeWidth={2} aria-hidden="true" />
+      <span>{m.label}</span>
+      {m.live && <span className="nav-live" aria-label="실시간" />}
+      {m.badge && <span className="nav-badge">{m.badge}</span>}
+    </>
+  );
+}
 
 // 로고 글씨에서 강조할 글자의 색입니다.
 const BRAND_ACCENT = "#ff5b4e";
@@ -78,7 +96,7 @@ export default function Header() {
             if (m.external) {
               return (
                 <a key={m.href} href={m.href} target="_blank" rel="noopener noreferrer" className="nav-btn">
-                  {m.label}
+                  <NavInner m={m} />
                 </a>
               );
             }
@@ -88,13 +106,13 @@ export default function Header() {
             if (m.vignette) {
               return (
                 <a key={m.href} href={m.href} className={`nav-btn ${active ? "active" : ""}`} data-vignette-allow="">
-                  {m.label}
+                  <NavInner m={m} />
                 </a>
               );
             }
             return (
               <Link key={m.href} href={m.href} className={`nav-btn ${active ? "active" : ""}`}>
-                {m.label}
+                <NavInner m={m} />
               </Link>
             );
           })}

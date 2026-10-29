@@ -17,15 +17,18 @@
 //     ★ 실제로 뜨게 하려면 애드센스 → 광고 → 사이트 설정(연필) → "전면 광고" 켜기가 필요합니다.
 //       구글이 정한 횟수 제한이 있어서 누를 때마다 뜨지는 않습니다.
 
+// [2026-10-29 추가] live: true → PC 메뉴에 깜빡이는 빨간 점(실시간), badge: "글자" → 메뉴 옆 작은 꼬리표
+//   재성님: "이 메뉴들이 눈에 너무 안띄어" → PC 위 메뉴에 그림·꼬리표를 붙여 눈에 띄게(components/Header.js)
+//   ★ 꼬리표를 없애려면 그 줄의 badge: "..." 를 지우면 됩니다.
 export const MENU = [
-  { href: "/", label: "홈 · 뉴스", short: "홈 · 속보", icon: "zap", match: (p) => p === "/" },
+  { href: "/", label: "홈 · 뉴스", short: "홈 · 속보", icon: "zap", match: (p) => p === "/", live: true },
   { href: "/patterns", label: "패턴검색", short: "패턴검색", icon: "candle" },
   { href: "/themes", label: "테마별 종목정리", short: "테마별 종목", icon: "layers", vignette: true },
   // [2026-10-26 변경] 바깥 DART 링크 → 우리 사이트 공모주 페이지(app/ipo, 3시간마다 자동 갱신)
   { href: "/ipo", label: "공모주 정보", short: "공모주", icon: "ticket" },
   // [2026-10-27 추가] DART 공시 일정·주요 공시(app/disclosure)
   { href: "/disclosure", label: "공시 일정", short: "공시 일정", icon: "calendar" },
-  { href: "/market", label: "장 마감 정리", short: "장 마감 정리", icon: "bars" },
+  { href: "/market", label: "장 마감 정리", short: "장 마감 정리", icon: "bars", badge: "NEW" },
   { href: "/guide", label: "차트 가이드", short: "차트 가이드", icon: "line" },
   { href: "/blog", label: "칼럼", short: "칼럼", icon: "book" },
 ];
