@@ -1,5 +1,9 @@
 "use client";
 
+// [2026-10-29 고침] 옅게 칠해야 하는 띠·구름·막대가 진하게(불투명하게) 보이던 문제 —
+//   opacity 값을 줘도 나타나기 애니메이션(demo-fade-in 등)이 끝나면 불투명도를 1로 덮어써서 생긴 일.
+//   그래서 애니메이션이 건드리지 않는 fillOpacity(채우기 투명도)로 바꿨습니다.
+
 import { useEffect, useId, useState } from "react";
 import {
   SAMPLE_CANDLES,
@@ -361,7 +365,7 @@ export default function IndicatorDemo({ visual }) {
         <Reveal id={clipId}>
           <Candles />
         </Reveal>
-        <rect y={priceToY(PRICE_MAX)} width={windowW} height={priceToY(PRICE_MIN) - priceToY(PRICE_MAX)} fill="var(--amber)" opacity={0.16}>
+        <rect y={priceToY(PRICE_MAX)} width={windowW} height={priceToY(PRICE_MIN) - priceToY(PRICE_MAX)} fill="var(--amber)" fillOpacity={0.16}>
           <animate attributeName="x" from={startX} to={endX} begin={`${IND_DELAY / 1000}s`} dur="0.75s" fill="freeze" />
         </rect>
         <AnimatedLine d={linePath(line, (v) => priceToY(v))} color="var(--amber)" width={1.3} />
@@ -444,7 +448,7 @@ export default function IndicatorDemo({ visual }) {
           <path
             d={cloudPath}
             fill={cloudUp ? UP : DOWN}
-            opacity={0.14}
+            fillOpacity={0.14}
             className="demo-fade-in"
             style={{ animationDelay: `${IND_DELAY}ms` }}
           />
@@ -523,7 +527,7 @@ export default function IndicatorDemo({ visual }) {
             width={96}
             height={priceToY(z.p - z.h / 2) - priceToY(z.p + z.h / 2)}
             fill="var(--amber)"
-            opacity={0.16}
+            fillOpacity={0.16}
             className="demo-fade-in"
             style={{ animationDelay: `${IND_DELAY + i * 250}ms` }}
           />
@@ -607,7 +611,7 @@ export default function IndicatorDemo({ visual }) {
               width={2.4}
               height={h}
               fill={up ? UP : DOWN}
-              opacity={0.8}
+              fillOpacity={0.8}
               className="demo-bar-grow"
               style={{ animationDelay: `${IND_DELAY + i * 22}ms`, transformOrigin: `${x}px 106px` }}
             />
@@ -635,8 +639,8 @@ export default function IndicatorDemo({ visual }) {
           <Candles />
           <line x1={2} x2={98} y1={106} y2={106} stroke="var(--border)" strokeWidth={0.4} />
         </Reveal>
-        {hi != null && <rect x={2} y={106} width={96} height={toY(hi) - 106} fill={UP} opacity={0.08} className="demo-fade-in" style={{ animationDelay: `${IND_DELAY}ms` }} />}
-        {lo != null && <rect x={2} y={toY(lo)} width={96} height={130 - toY(lo)} fill={DOWN} opacity={0.08} className="demo-fade-in" style={{ animationDelay: `${IND_DELAY}ms` }} />}
+        {hi != null && <rect x={2} y={106} width={96} height={toY(hi) - 106} fill={UP} fillOpacity={0.08} className="demo-fade-in" style={{ animationDelay: `${IND_DELAY}ms` }} />}
+        {lo != null && <rect x={2} y={toY(lo)} width={96} height={130 - toY(lo)} fill={DOWN} fillOpacity={0.08} className="demo-fade-in" style={{ animationDelay: `${IND_DELAY}ms` }} />}
         {hi != null && <line x1={2} x2={98} y1={toY(hi)} y2={toY(hi)} stroke="var(--border)" strokeDasharray="2 2" strokeWidth={0.4} />}
         {lo != null && <line x1={2} x2={98} y1={toY(lo)} y2={toY(lo)} stroke="var(--border)" strokeDasharray="2 2" strokeWidth={0.4} />}
         <AnimatedLine d={linePath(series, toY)} color="var(--amber)" width={1.2} />
@@ -663,8 +667,8 @@ export default function IndicatorDemo({ visual }) {
           <Candles />
           <line x1={2} x2={98} y1={106} y2={106} stroke="var(--border)" strokeWidth={0.4} />
         </Reveal>
-        <rect x={2} y={106} width={96} height={Math.max(zeroY - 106, 0)} fill={UP} opacity={0.08} className="demo-fade-in" style={{ animationDelay: `${IND_DELAY}ms` }} />
-        <rect x={2} y={zeroY} width={96} height={Math.max(130 - zeroY, 0)} fill={DOWN} opacity={0.08} className="demo-fade-in" style={{ animationDelay: `${IND_DELAY}ms` }} />
+        <rect x={2} y={106} width={96} height={Math.max(zeroY - 106, 0)} fill={UP} fillOpacity={0.08} className="demo-fade-in" style={{ animationDelay: `${IND_DELAY}ms` }} />
+        <rect x={2} y={zeroY} width={96} height={Math.max(130 - zeroY, 0)} fill={DOWN} fillOpacity={0.08} className="demo-fade-in" style={{ animationDelay: `${IND_DELAY}ms` }} />
         <line x1={2} x2={98} y1={zeroY} y2={zeroY} stroke="var(--border)" strokeDasharray="2 2" strokeWidth={0.4} />
         <AnimatedLine d={linePath(series, toY)} color="var(--amber)" width={1.2} />
       </svg>
@@ -716,7 +720,7 @@ export default function IndicatorDemo({ visual }) {
               width={2.4}
               height={h}
               fill={up ? UP : DOWN}
-              opacity={0.5}
+              fillOpacity={0.5}
               className="demo-bar-grow"
               style={{ animationDelay: `${IND_DELAY + i * 22}ms`, transformOrigin: `${x}px 106px` }}
             />
@@ -752,7 +756,7 @@ export default function IndicatorDemo({ visual }) {
               width={2}
               height={h}
               fill={v >= 0 ? UP : DOWN}
-              opacity={0.55}
+              fillOpacity={0.55}
               className="demo-fade-in"
               style={{ animationDelay: `${IND_DELAY + i * 18}ms` }}
             />
