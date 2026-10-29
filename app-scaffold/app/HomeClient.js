@@ -1197,7 +1197,8 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
               {/* PC: 헤드라인 + 테이프 / 휴대폰: 시간대별 묶음 목록(components/MobileFeed.js) */}
               <div className="desk-only">
                 {/* [2026-10-28] PC 속보 목록 사이는 일반 광고(인피드 광고 단위는 휴대폰 모양으로 만들어서) */}
-                <NewsBoard items={visible} newIds={newIds} ad={<AdSlot kind="display" className="ad-in-feed" />} />
+                {/* [2026-10-29] 큰 상품 광고가 화면 반을 덮어 거슬린다는 재성님 의견 → 가로 띠 광고(banner)로 납작하게 */}
+                <NewsBoard items={visible} newIds={newIds} ad={<AdSlot kind="display" banner className="ad-in-feed" />} />
               </div>
               <HourTimeline
                 items={visible}

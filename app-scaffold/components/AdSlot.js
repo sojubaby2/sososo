@@ -9,6 +9,9 @@
 //   eager: 화면 가까이 왔는지 따지지 않고 보이는 즉시 요청(휴대폰 숏폼 광고 카드처럼, 부르는 쪽이 이미 "곧 볼 자리"일 때만 켜서 씀)
 //   box: 정해진 크기 칸에 꼭 맞는 광고(예: 휴대폰 속보 카드 사이 광고). 칸 크기는 CSS(.ad-box ins)가 정합니다.
 //        [2026-10-28 추가] 구글 안내: 반응형 광고에서 data-ad-format을 빼고 칸 너비·높이를 정해 주면 그 크기에 맞춰 나옴
+//   banner: [2026-10-29 추가] 가로로 납작한 띠 광고(높이 약 90px) — 재성님: "본문 중간중간 있는 광고들 … 좀 거슬리는거같은데"
+//        PC 속보 목록 사이 광고가 반응형(auto)이라 화면 반을 덮는 큰 상품 광고로 나와서, 구글 공식 옵션
+//        data-ad-format="horizontal"(가로형)로 바꿈. 광고 단위 번호는 display와 같은 것을 씀.
 //   광고 단위 번호는 lib/ads.js의 AD_SLOTS에서 가져옵니다.
 //   그 종류 번호가 비어 있으면 display 번호로 대신 나오고, display도 비어 있으면 아무것도 그리지 않습니다.
 //
@@ -24,8 +27,9 @@ import { usePathname } from "next/navigation";
 import { AD_CLIENT, AD_SLOTS, AD_LAZY_MARGIN } from "../lib/ads";
 
 // 종류별 애드센스 표시 방식
-function adAttrs(kind, box) {
+function adAttrs(kind, box, banner) {
   if (box) return {}; // 칸 크기에 맞춤(CSS로 너비·높이 지정)
+  if (banner) return { "data-ad-format": "horizontal", "data-full-width-responsive": "false" }; // 가로 띠
   if (kind === "inArticle") return { "data-ad-layout": "in-article", "data-ad-format": "fluid" };
   if (kind === "inFeed") return { "data-ad-format": "fluid", "data-ad-layout-key": AD_SLOTS.inFeedLayoutKey };
   if (kind === "multiplex") return { "data-ad-format": "autorelaxed" };
@@ -39,7 +43,7 @@ function resolveKind(kind) {
   return "display";
 }
 
-function AdBox({ slot, kind, box, eager }) {
+function AdBox({ slot, kind, box, banner, eager }) {
   const insRef = useRef(null);
   useEffect(() => {
     const ins = insRef.current;
@@ -93,21 +97,21 @@ function AdBox({ slot, kind, box, eager }) {
       style={{ display: "block", textAlign: kind === "inArticle" ? "center" : undefined }}
       data-ad-client={AD_CLIENT}
       data-ad-slot={slot}
-      {...adAttrs(kind, box)}
+      {...adAttrs(kind, box, banner)}
     />
   );
 }
 
-export default function AdSlot({ kind = "display", className = "", box = false, eager = false }) {
+export default function AdSlot({ kind = "display", className = "", box = false, banner = false, eager = false }) {
   const pathname = usePathname();
   const real = box ? "display" : resolveKind(kind);
   const slot = AD_SLOTS[real];
   if (!slot) return null;
   return (
-    <aside className={`ad-wrap ad-${real} ${box ? "ad-box" : ""} ${className}`} aria-label="광고">
+    <aside className={`ad-wrap ad-${real} ${box ? "ad-box" : ""} ${banner ? "ad-banner" : ""} ${className}`} aria-label="광고">
       <span className="ad-label">광고</span>
       {/* key: 페이지가 바뀌면 칸을 새로 만들어 새 광고를 받음 */}
-      <AdBox key={`${pathname}-${real}-${slot}-${box ? "b" : ""}`} slot={slot} kind={real} box={box} eager={eager} />
+      <AdBox key={`${pathname}-${real}-${slot}-${box ? "b" : ""}${banner ? "h" : ""}`} slot={slot} kind={real} box={box} banner={banner} eager={eager} />
     </aside>
   );
 }
