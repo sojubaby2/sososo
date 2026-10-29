@@ -39,6 +39,8 @@ export default function AnchorAdSpacer() {
       last = v;
       root.style.setProperty("--nm-anchor-top", `${Math.round(top)}px`);
       root.style.setProperty("--nm-anchor-bottom", `${Math.round(bottom)}px`);
+      // [2026-10-29 추가] 앵커가 떠 있는지 표시 — 홈 왼쪽 "따라다니는 광고"는 앵커가 떠 있는 동안 제자리에 둠(한 화면에 따라다니는 광고 1개)
+      root.classList.toggle("nm-anchor-on", top > 0 || bottom > 0);
     };
     tick();
     const t = setInterval(tick, 700);

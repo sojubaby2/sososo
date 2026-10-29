@@ -3157,3 +3157,13 @@ img { -webkit-user-drag: none; }
   .ss-back { display: inline-flex; }
   .ss-pv-head h3 { font-size: 20px; }
 }
+
+/* [2026-10-29] 홈 왼쪽 칸 — 두 번째 광고를 "따라다니는 광고"로 (재성님: "위에꺼를 앵커로 대체하고 아래꺼는 그대로")
+   · 넓은 PC(3칸 화면)에서만. 왼쪽 칸을 가운데 속보 칸 높이만큼 늘려야 그 안에서 광고가 끝까지 따라올 수 있음
+   · 그대로인 광고(위)를 덮지 않도록 따라다니는 광고는 아래 자리에서 출발
+   · 구글 아래쪽 앵커 광고가 떠 있으면(html.nm-anchor-on) 따라다니지 않음 — 따라다니는 광고는 한 화면에 1개만 */
+@media (min-width: 1181px) {
+  .home-left { align-self: stretch; }
+  .home-side-sticky { position: sticky; top: calc(76px + var(--nm-anchor-top)); }
+  html.nm-anchor-on .home-side-sticky { position: static; }
+}

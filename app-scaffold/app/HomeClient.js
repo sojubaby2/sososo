@@ -1101,10 +1101,17 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
                 PC·태블릿에서만(휴대폰 시장 탭에는 대표 종목 아래 광고가 따로 있음).
                 광고가 화면을 따라다니면 애드센스 정책 위반이라, 이 왼쪽 칸은 스크롤하면 같이 올라가게 바꿈(globals.css).
                 두 번째 광고는 아래로 내려 거기까지 왔을 때만 불러옵니다(지연 불러오기). */}
+            {/* [2026-10-29 변경] 재성님: "왼쪽사이드 광고중 위에꺼를 앵커로 대체하고 아래꺼는 그대로 두고"
+                → 광고 1개는 그대로(스크롤하면 같이 올라감), 다른 1개는 화면을 따라다니는 광고로.
+                따라다니는 광고가 그대로인 광고를 덮으면 안 되므로, 그대로인 광고를 위에 두고 따라다니는 광고를 그 아래에 둠
+                (내려가다 이 광고 자리에 닿으면 그때부터 화면 위쪽에 붙어 따라옴).
+                따라다니는 광고는 한 화면에 1개만 — 구글 아래쪽 앵커 광고가 떠 있는 동안에는 따라다니지 않고 제자리에 있음
+                (components/AnchorAdSpacer.js가 앵커가 떠 있는지 보고 html에 nm-anchor-on 표시를 붙임, globals.css 참고).
+                넓은 PC(3칸 화면)에서만 따라다니고, 노트북·태블릿에선 그냥 제자리 광고. */}
             <div className="desk-only home-side-ad">
               <AdSlot kind="display" />
             </div>
-            <div className="desk-only home-side-ad home-side-ad2">
+            <div className="desk-only home-side-ad home-side-ad2 home-side-sticky">
               <AdSlot kind="display" />
             </div>
           </aside>
