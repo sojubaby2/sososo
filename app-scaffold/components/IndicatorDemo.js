@@ -45,8 +45,45 @@ import {
 } from "../lib/chartDemoData";
 
 const N = SAMPLE_CANDLES.length;
-const UP = "#c23b3b"; // Korean convention: red = up
-const DOWN = "#2e5fa3"; // blue = down
+// [2026-10-29 개편] 재성님: "차트 애니메이션도 너무 허접하지않아?? 좀 예술적으로 못만드나?"
+//   → 모든 그림을 어두운 "트레이딩 화면" 무대(Stage) 위에 그립니다: 남색 그라데이션 바탕 + 은은한 빛 + 가는 격자.
+//     캔들은 하나씩 솟아오르고, 선은 빛나며 그려진 뒤 끝점에서 맥박이 뜁니다. 색은 어두운 바탕에 맞춘 밝은 빨강·파랑·금색.
+//   무대 안에서는 사이트 색 이름(--amber 등)을 무대 전용 색으로 바꿔 끼워서(globals.css .demo-stage),
+//   기존 그림 코드는 그대로 두고 전부 새 색으로 그려집니다.
+const UP = "#ff4d63"; // Korean convention: red = up (어두운 무대용 밝은 빨강)
+const DOWN = "#3b8cff"; // blue = down (어두운 무대용 밝은 파랑)
+
+// 무대 — 모든 그림의 바탕(어두운 그라데이션 + 오른쪽 위 은은한 금빛 + 가는 가로 격자)
+function Stage({ h = 100, children }) {
+  const uid = useId().replace(/[^a-zA-Z0-9]/g, "");
+  const grid = [];
+  for (let y = 12.5; y < Math.min(h, 100); y += 12.5) grid.push(y);
+  return (
+    <svg viewBox={`0 0 100 ${h}`} className="demo-svg demo-stage" style={{ aspectRatio: `100 / ${h}` }}>
+      <defs>
+        <linearGradient id={`${uid}bg`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#151b31" />
+          <stop offset="1" stopColor="#090c17" />
+        </linearGradient>
+        <radialGradient id={`${uid}glow`} cx="0.85" cy="0.1" r="0.75">
+          <stop offset="0" stopColor="#ffc24b" stopOpacity="0.16" />
+          <stop offset="1" stopColor="#ffc24b" stopOpacity="0" />
+        </radialGradient>
+        <radialGradient id={`${uid}glow2`} cx="0.05" cy="0.95" r="0.6">
+          <stop offset="0" stopColor="#3b8cff" stopOpacity="0.14" />
+          <stop offset="1" stopColor="#3b8cff" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+      <rect width="100" height={h} fill={`url(#${uid}bg)`} />
+      <rect width="100" height={h} fill={`url(#${uid}glow)`} />
+      <rect width="100" height={h} fill={`url(#${uid}glow2)`} />
+      {grid.map((y) => (
+        <line key={y} x1="0" x2="100" y1={y} y2={y} stroke="#ffffff" strokeOpacity="0.05" strokeWidth="0.25" />
+      ))}
+      {children}
+    </svg>
+  );
+}
 const REVEAL_MS = 850; // how long the base chart takes to sweep in
 const IND_DELAY = REVEAL_MS + 80; // indicators wait for the base chart to finish first
 
@@ -84,10 +121,11 @@ function Candles() {
         const yClose = priceToY(c.c);
         const bodyTop = Math.min(yOpen, yClose);
         const bodyH = Math.max(Math.abs(yOpen - yClose), 0.6);
+        // [2026-10-29] 캔들이 왼쪽부터 하나씩 솟아오름(demo-candle) + 둥근 몸통 + 은은한 빛(demo-glow)
         return (
-          <g key={i}>
-            <line x1={x} x2={x} y1={yHigh} y2={yLow} stroke={color} strokeWidth={0.5} />
-            <rect x={x - 1.3} y={bodyTop} width={2.6} height={bodyH} fill={color} />
+          <g key={i} className="demo-candle" style={{ animationDelay: `${i * 32}ms`, color }}>
+            <line x1={x} x2={x} y1={yHigh} y2={yLow} stroke={color} strokeWidth={0.45} strokeLinecap="round" />
+            <rect x={x - 1.3} y={bodyTop} width={2.6} height={bodyH} rx={0.45} fill={color} className="demo-glow" />
           </g>
         );
       })}
@@ -95,17 +133,28 @@ function Candles() {
   );
 }
 
+// [2026-10-29] 선: 둥근 끝 + 빛나는 효과로 그려지고, 다 그려지면 끝점에서 맥박 뛰는 점
 function AnimatedLine({ d, color, delay = IND_DELAY, dash = false, width = 1.1 }) {
+  const m = String(d || "").match(/([\d.]+)\s+([\d.]+)\s*$/);
   return (
-    <path
-      d={d}
-      fill="none"
-      stroke={color}
-      strokeWidth={width}
-      className="demo-draw-line"
-      strokeDasharray={dash ? "3 2" : undefined}
-      style={{ animationDelay: `${delay}ms` }}
-    />
+    <g>
+      <path
+        d={d}
+        fill="none"
+        stroke={color}
+        strokeWidth={width}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className={`demo-draw-line demo-glow ${dash ? "demo-dash" : ""}`}
+        style={{ animationDelay: `${delay}ms`, color }}
+      />
+      {m && !dash && (
+        <g className="demo-end" style={{ animationDelay: `${delay + 700}ms` }}>
+          <circle cx={m[1]} cy={m[2]} r={2.4} fill={color} className="demo-end-ring" style={{ animationDelay: `${delay + 700}ms` }} />
+          <circle cx={m[1]} cy={m[2]} r={0.95} fill={color} stroke="#0b0f1d" strokeWidth={0.35} />
+        </g>
+      )}
+    </g>
   );
 }
 
@@ -127,7 +176,7 @@ export default function IndicatorDemo({ visual }) {
       <div>
         <p className="guide-mini-label">일봉 — 하루에 캔들 1개 (24개)</p>
         <div className="demo-frame" style={{ paddingTop: "60%" }}>
-          <svg viewBox="0 0 100 60" className="demo-svg">
+          <Stage h={60}>
             <Reveal id={`${clipId}-a`} height={60}>
               {SAMPLE_CANDLES.map((c, i) => {
                 const x = dailyXAt(i);
@@ -145,11 +194,11 @@ export default function IndicatorDemo({ visual }) {
                 );
               })}
             </Reveal>
-          </svg>
+          </Stage>
         </div>
         <p className="guide-mini-label" style={{ marginTop: 10 }}>주봉 느낌 — 4일씩 묶어서 캔들 1개 (6개)</p>
         <div className="demo-frame" style={{ paddingTop: "60%" }}>
-          <svg viewBox="0 0 100 60" className="demo-svg">
+          <Stage h={60}>
             <Reveal id={`${clipId}-b`} height={60}>
               {weekly.map((c, i) => {
                 const x = weeklyXAt(i);
@@ -167,7 +216,7 @@ export default function IndicatorDemo({ visual }) {
                 );
               })}
             </Reveal>
-          </svg>
+          </Stage>
         </div>
       </div>
     );
@@ -177,28 +226,28 @@ export default function IndicatorDemo({ visual }) {
   if (visual.type === "chartform") {
     if (visual.form === "line") {
       return (
-        <svg viewBox="0 0 100 100" className="demo-svg" style={{ aspectRatio: "1 / 1" }} key={playKey}>
+        <Stage key={playKey}>
           <Reveal id={clipId}>
             <AnimatedLine d={linePath(closes, (v) => priceToY(v))} color="var(--amber)" delay={0} width={1.4} />
           </Reveal>
-        </svg>
+        </Stage>
       );
     }
     if (visual.form === "area") {
       const d = linePath(closes, (v) => priceToY(v));
       const areaD = `${d} L ${xAt(N - 1)} 96 L ${xAt(0)} 96 Z`;
       return (
-        <svg viewBox="0 0 100 100" className="demo-svg" style={{ aspectRatio: "1 / 1" }} key={playKey}>
+        <Stage key={playKey}>
           <Reveal id={clipId}>
             <path d={areaD} fill="var(--amber-tint)" />
             <AnimatedLine d={d} color="var(--amber)" delay={0} width={1.4} />
           </Reveal>
-        </svg>
+        </Stage>
       );
     }
     if (visual.form === "bar") {
       return (
-        <svg viewBox="0 0 100 100" className="demo-svg" style={{ aspectRatio: "1 / 1" }} key={playKey}>
+        <Stage key={playKey}>
           <Reveal id={clipId}>
             {SAMPLE_CANDLES.map((c, i) => {
               const x = xAt(i);
@@ -213,7 +262,7 @@ export default function IndicatorDemo({ visual }) {
               );
             })}
           </Reveal>
-        </svg>
+        </Stage>
       );
     }
     if (visual.form === "heikin") {
@@ -225,7 +274,7 @@ export default function IndicatorDemo({ visual }) {
         ha.push({ o: haOpen, c: haClose, h: Math.max(c.h, haOpen, haClose), l: Math.min(c.l, haOpen, haClose) });
       });
       return (
-        <svg viewBox="0 0 100 100" className="demo-svg" style={{ aspectRatio: "1 / 1" }} key={playKey}>
+        <Stage key={playKey}>
           <Reveal id={clipId}>
             {ha.map((c, i) => {
               const x = xAt(i);
@@ -241,7 +290,7 @@ export default function IndicatorDemo({ visual }) {
               );
             })}
           </Reveal>
-        </svg>
+        </Stage>
       );
     }
 
@@ -249,7 +298,7 @@ export default function IndicatorDemo({ visual }) {
       const bricks = renkoBricks(closes, 3);
       const bw = 90 / bricks.length;
       return (
-        <svg viewBox="0 0 100 100" className="demo-svg" style={{ aspectRatio: "1 / 1" }} key={playKey}>
+        <Stage key={playKey}>
           <Reveal id={clipId}>
             {bricks.map((b, i) => {
               const color = b.up ? UP : DOWN;
@@ -258,7 +307,7 @@ export default function IndicatorDemo({ visual }) {
               return <rect key={i} x={5 + i * bw} y={top} width={bw * 0.85} height={h} fill={color} stroke="var(--bg)" strokeWidth={0.3} />;
             })}
           </Reveal>
-        </svg>
+        </Stage>
       );
     }
 
@@ -272,7 +321,7 @@ export default function IndicatorDemo({ visual }) {
       }
       const colW = 88 / cols.length;
       return (
-        <svg viewBox="0 0 100 100" className="demo-svg" style={{ aspectRatio: "1 / 1" }} key={playKey}>
+        <Stage key={playKey}>
           <Reveal id={clipId}>
             {cols.map((col, ci) => {
               const color = col.up ? UP : DOWN;
@@ -284,7 +333,7 @@ export default function IndicatorDemo({ visual }) {
               ));
             })}
           </Reveal>
-        </svg>
+        </Stage>
       );
     }
 
@@ -292,7 +341,7 @@ export default function IndicatorDemo({ visual }) {
       const lines = threeLineBreak(closes);
       const bw = 90 / lines.length;
       return (
-        <svg viewBox="0 0 100 100" className="demo-svg" style={{ aspectRatio: "1 / 1" }} key={playKey}>
+        <Stage key={playKey}>
           <Reveal id={clipId}>
             {lines.map((b, i) => {
               const color = b.up ? UP : DOWN;
@@ -301,7 +350,7 @@ export default function IndicatorDemo({ visual }) {
               return <rect key={i} x={5 + i * bw} y={top} width={bw * 0.85} height={h} fill={color} stroke="var(--bg)" strokeWidth={0.3} />;
             })}
           </Reveal>
-        </svg>
+        </Stage>
       );
     }
 
@@ -314,11 +363,11 @@ export default function IndicatorDemo({ visual }) {
         d += i === 0 ? `M ${x} ${y}` : ` L ${x} ${y}`;
       });
       return (
-        <svg viewBox="0 0 100 100" className="demo-svg" style={{ aspectRatio: "1 / 1" }} key={playKey}>
+        <Stage key={playKey}>
           <Reveal id={clipId}>
             <path d={d} fill="none" stroke={UP} strokeWidth={1.6} strokeLinejoin="round" />
           </Reveal>
-        </svg>
+        </Stage>
       );
     }
 
@@ -331,7 +380,7 @@ export default function IndicatorDemo({ visual }) {
         d += i === 0 ? `M ${x} ${y}` : ` L ${x} ${y}`;
       });
       return (
-        <svg viewBox="0 0 100 100" className="demo-svg" style={{ aspectRatio: "1 / 1" }} key={playKey}>
+        <Stage key={playKey}>
           <Reveal id={clipId}>
             <Candles />
           </Reveal>
@@ -339,16 +388,16 @@ export default function IndicatorDemo({ visual }) {
           {pts.map((p, i) => (
             <circle key={i} cx={xAt(p.i)} cy={priceToY(p.price)} r={1.2} fill={UP} className="demo-dot-pop" style={{ animationDelay: `${IND_DELAY + i * 100}ms` }} />
           ))}
-        </svg>
+        </Stage>
       );
     }
 
     return (
-      <svg viewBox="0 0 100 100" className="demo-svg" style={{ aspectRatio: "1 / 1" }} key={playKey}>
+      <Stage key={playKey}>
         <Reveal id={clipId}>
           <Candles />
         </Reveal>
-      </svg>
+      </Stage>
     );
   }
 
@@ -361,15 +410,15 @@ export default function IndicatorDemo({ visual }) {
     const startX = xAt(0) - 1.3;
     const endX = xAt(N - period) - 1.3;
     return (
-      <svg viewBox="0 0 100 100" className="demo-svg" style={{ aspectRatio: "1 / 1" }} key={playKey}>
+      <Stage key={playKey}>
         <Reveal id={clipId}>
           <Candles />
         </Reveal>
-        <rect y={priceToY(PRICE_MAX)} width={windowW} height={priceToY(PRICE_MIN) - priceToY(PRICE_MAX)} fill="var(--amber)" fillOpacity={0.16}>
+        <rect y={priceToY(PRICE_MAX)} width={windowW} height={priceToY(PRICE_MIN) - priceToY(PRICE_MAX)} fill="var(--amber)" fillOpacity={0.24}>
           <animate attributeName="x" from={startX} to={endX} begin={`${IND_DELAY / 1000}s`} dur="0.75s" fill="freeze" />
         </rect>
         <AnimatedLine d={linePath(line, (v) => priceToY(v))} color="var(--amber)" width={1.3} />
-      </svg>
+      </Stage>
     );
   }
 
@@ -389,7 +438,7 @@ export default function IndicatorDemo({ visual }) {
       });
     }
     return (
-      <svg viewBox="0 0 100 100" className="demo-svg" style={{ aspectRatio: "1 / 1" }} key={playKey}>
+      <Stage key={playKey}>
         <Reveal id={clipId}>
           <Candles />
         </Reveal>
@@ -413,7 +462,7 @@ export default function IndicatorDemo({ visual }) {
             </text>
           </g>
         )}
-      </svg>
+      </Stage>
     );
   }
 
@@ -440,7 +489,7 @@ export default function IndicatorDemo({ visual }) {
         : "";
 
     return (
-      <svg viewBox="0 0 100 100" className="demo-svg" style={{ aspectRatio: "1 / 1" }} key={playKey}>
+      <Stage key={playKey}>
         <Reveal id={clipId}>
           <Candles />
         </Reveal>
@@ -448,7 +497,7 @@ export default function IndicatorDemo({ visual }) {
           <path
             d={cloudPath}
             fill={cloudUp ? UP : DOWN}
-            fillOpacity={0.14}
+            fillOpacity={0.3}
             className="demo-fade-in"
             style={{ animationDelay: `${IND_DELAY}ms` }}
           />
@@ -469,14 +518,14 @@ export default function IndicatorDemo({ visual }) {
         />
         <AnimatedLine d={linePath(tenkan, toY)} color={UP} delay={IND_DELAY + 150} width={1} />
         <AnimatedLine d={linePath(kijun, toY)} color={DOWN} delay={IND_DELAY + 220} width={1} />
-      </svg>
+      </Stage>
     );
   }
 
   if (visual.type === "overlay-dots") {
     const sar = simpleSar(SAMPLE_CANDLES);
     return (
-      <svg viewBox="0 0 100 100" className="demo-svg" style={{ aspectRatio: "1 / 1" }} key={playKey}>
+      <Stage key={playKey}>
         <Reveal id={clipId}>
           <Candles />
         </Reveal>
@@ -508,14 +557,14 @@ export default function IndicatorDemo({ visual }) {
             </g>
           );
         })}
-      </svg>
+      </Stage>
     );
   }
 
   if (visual.type === "overlay-zone") {
     const zones = [{ p: 53, h: 6 }, { p: 66, h: 4 }];
     return (
-      <svg viewBox="0 0 100 100" className="demo-svg" style={{ aspectRatio: "1 / 1" }} key={playKey}>
+      <Stage key={playKey}>
         <Reveal id={clipId}>
           <Candles />
         </Reveal>
@@ -527,12 +576,12 @@ export default function IndicatorDemo({ visual }) {
             width={96}
             height={priceToY(z.p - z.h / 2) - priceToY(z.p + z.h / 2)}
             fill="var(--amber)"
-            fillOpacity={0.16}
+            fillOpacity={0.24}
             className="demo-fade-in"
             style={{ animationDelay: `${IND_DELAY + i * 250}ms` }}
           />
         ))}
-      </svg>
+      </Stage>
     );
   }
 
@@ -544,7 +593,7 @@ export default function IndicatorDemo({ visual }) {
       { v: s1, label: "S1 지지", color: DOWN },
     ];
     return (
-      <svg viewBox="0 0 100 100" className="demo-svg" style={{ aspectRatio: "1 / 1" }} key={playKey}>
+      <Stage key={playKey}>
         <Reveal id={clipId}>
           <Candles />
         </Reveal>
@@ -554,7 +603,7 @@ export default function IndicatorDemo({ visual }) {
             <text x={4} y={priceToY(l.v) - 1.5} fontSize={3.4} fill={l.color} fontWeight="700">{l.label}</text>
           </g>
         ))}
-      </svg>
+      </Stage>
     );
   }
 
@@ -573,7 +622,7 @@ export default function IndicatorDemo({ visual }) {
     segments.push({ up: current[0].up, points: current, startIdx: trail.length - current.length });
 
     return (
-      <svg viewBox="0 0 100 100" className="demo-svg" style={{ aspectRatio: "1 / 1" }} key={playKey}>
+      <Stage key={playKey}>
         <Reveal id={clipId}>
           <Candles />
         </Reveal>
@@ -586,7 +635,7 @@ export default function IndicatorDemo({ visual }) {
           });
           return <AnimatedLine key={si} d={d} color={seg.up ? UP : DOWN} width={1.6} delay={IND_DELAY + si * 120} />;
         })}
-      </svg>
+      </Stage>
     );
   }
 
@@ -594,7 +643,7 @@ export default function IndicatorDemo({ visual }) {
   if (visual.type === "pane-bars") {
     const max = Math.max(...SAMPLE_VOLUME);
     return (
-      <svg viewBox="0 0 100 130" className="demo-svg" style={{ aspectRatio: "100 / 130" }} key={playKey}>
+      <Stage h={130} key={playKey}>
         <Reveal id={clipId} height={130}>
           <Candles />
           <line x1={2} x2={98} y1={106} y2={106} stroke="var(--border)" strokeWidth={0.4} />
@@ -617,7 +666,7 @@ export default function IndicatorDemo({ visual }) {
             />
           );
         })}
-      </svg>
+      </Stage>
     );
   }
 
@@ -634,17 +683,17 @@ export default function IndicatorDemo({ visual }) {
     const [lo, hi] = visual.bands;
     const toY = (v) => 106 + ((scaleMax - v) / (scaleMax - scaleMin)) * 24;
     return (
-      <svg viewBox="0 0 100 130" className="demo-svg" style={{ aspectRatio: "100 / 130" }} key={playKey}>
+      <Stage h={130} key={playKey}>
         <Reveal id={clipId} height={130}>
           <Candles />
           <line x1={2} x2={98} y1={106} y2={106} stroke="var(--border)" strokeWidth={0.4} />
         </Reveal>
-        {hi != null && <rect x={2} y={106} width={96} height={toY(hi) - 106} fill={UP} fillOpacity={0.08} className="demo-fade-in" style={{ animationDelay: `${IND_DELAY}ms` }} />}
-        {lo != null && <rect x={2} y={toY(lo)} width={96} height={130 - toY(lo)} fill={DOWN} fillOpacity={0.08} className="demo-fade-in" style={{ animationDelay: `${IND_DELAY}ms` }} />}
+        {hi != null && <rect x={2} y={106} width={96} height={toY(hi) - 106} fill={UP} fillOpacity={0.14} className="demo-fade-in" style={{ animationDelay: `${IND_DELAY}ms` }} />}
+        {lo != null && <rect x={2} y={toY(lo)} width={96} height={130 - toY(lo)} fill={DOWN} fillOpacity={0.14} className="demo-fade-in" style={{ animationDelay: `${IND_DELAY}ms` }} />}
         {hi != null && <line x1={2} x2={98} y1={toY(hi)} y2={toY(hi)} stroke="var(--border)" strokeDasharray="2 2" strokeWidth={0.4} />}
         {lo != null && <line x1={2} x2={98} y1={toY(lo)} y2={toY(lo)} stroke="var(--border)" strokeDasharray="2 2" strokeWidth={0.4} />}
         <AnimatedLine d={linePath(series, toY)} color="var(--amber)" width={1.2} />
-      </svg>
+      </Stage>
     );
   }
 
@@ -662,16 +711,16 @@ export default function IndicatorDemo({ visual }) {
     const toY = (v) => 130 - ((v - min) / (max - min || 1)) * 22 - 4;
     const zeroY = toY(centerVal);
     return (
-      <svg viewBox="0 0 100 130" className="demo-svg" style={{ aspectRatio: "100 / 130" }} key={playKey}>
+      <Stage h={130} key={playKey}>
         <Reveal id={clipId} height={130}>
           <Candles />
           <line x1={2} x2={98} y1={106} y2={106} stroke="var(--border)" strokeWidth={0.4} />
         </Reveal>
-        <rect x={2} y={106} width={96} height={Math.max(zeroY - 106, 0)} fill={UP} fillOpacity={0.08} className="demo-fade-in" style={{ animationDelay: `${IND_DELAY}ms` }} />
-        <rect x={2} y={zeroY} width={96} height={Math.max(130 - zeroY, 0)} fill={DOWN} fillOpacity={0.08} className="demo-fade-in" style={{ animationDelay: `${IND_DELAY}ms` }} />
+        <rect x={2} y={106} width={96} height={Math.max(zeroY - 106, 0)} fill={UP} fillOpacity={0.14} className="demo-fade-in" style={{ animationDelay: `${IND_DELAY}ms` }} />
+        <rect x={2} y={zeroY} width={96} height={Math.max(130 - zeroY, 0)} fill={DOWN} fillOpacity={0.14} className="demo-fade-in" style={{ animationDelay: `${IND_DELAY}ms` }} />
         <line x1={2} x2={98} y1={zeroY} y2={zeroY} stroke="var(--border)" strokeDasharray="2 2" strokeWidth={0.4} />
         <AnimatedLine d={linePath(series, toY)} color="var(--amber)" width={1.2} />
-      </svg>
+      </Stage>
     );
   }
 
@@ -688,13 +737,13 @@ export default function IndicatorDemo({ visual }) {
     const min = Math.min(...vals), max = Math.max(...vals);
     const toY = (v) => 130 - ((v - min) / (max - min || 1)) * 22 - 4;
     return (
-      <svg viewBox="0 0 100 130" className="demo-svg" style={{ aspectRatio: "100 / 130" }} key={playKey}>
+      <Stage h={130} key={playKey}>
         <Reveal id={clipId} height={130}>
           <Candles />
           <line x1={2} x2={98} y1={106} y2={106} stroke="var(--border)" strokeWidth={0.4} />
         </Reveal>
         <AnimatedLine d={linePath(series, toY)} color="var(--amber)" width={1.2} />
-      </svg>
+      </Stage>
     );
   }
 
@@ -703,7 +752,7 @@ export default function IndicatorDemo({ visual }) {
     const avg = volumeSma(SAMPLE_VOLUME, 5);
     const toY = (v) => 130 - (v / max) * 24;
     return (
-      <svg viewBox="0 0 100 130" className="demo-svg" style={{ aspectRatio: "100 / 130" }} key={playKey}>
+      <Stage h={130} key={playKey}>
         <Reveal id={clipId} height={130}>
           <Candles />
           <line x1={2} x2={98} y1={106} y2={106} stroke="var(--border)" strokeWidth={0.4} />
@@ -727,7 +776,7 @@ export default function IndicatorDemo({ visual }) {
           );
         })}
         <AnimatedLine d={linePath(avg, toY)} color="var(--amber)" delay={IND_DELAY + 300} width={1.3} />
-      </svg>
+      </Stage>
     );
   }
 
@@ -737,7 +786,7 @@ export default function IndicatorDemo({ visual }) {
     const min = Math.min(...vals), max = Math.max(...vals);
     const toY = (v) => 130 - ((v - min) / (max - min || 1)) * 22 - 4;
     return (
-      <svg viewBox="0 0 100 130" className="demo-svg" style={{ aspectRatio: "100 / 130" }} key={playKey}>
+      <Stage h={130} key={playKey}>
         <Reveal id={clipId} height={130}>
           <Candles />
           <line x1={2} x2={98} y1={106} y2={106} stroke="var(--border)" strokeWidth={0.4} />
@@ -779,7 +828,7 @@ export default function IndicatorDemo({ visual }) {
             </text>
           </g>
         ))}
-      </svg>
+      </Stage>
     );
   }
 

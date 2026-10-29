@@ -2965,3 +2965,38 @@ img { -webkit-user-drag: none; }
 @keyframes gd-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 @keyframes gd-fade { from { opacity: 0; } to { opacity: 1; } }
 .gd-sheet { animation: gd-in 220ms ease; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   [2026-10-29] 차트 가이드 그림 "트레이딩 무대" — components/IndicatorDemo.js의 Stage
+   재성님: "차트 애니메이션도 너무 허접하지않아?? 좀 예술적으로 못만드나?"
+   무대 안에서만 사이트 색 이름을 어두운 무대용 색으로 바꿔 끼웁니다(밝은/어두운 화면 상관없이 같은 모습).
+   ═══════════════════════════════════════════════════════════════════════ */
+.demo-stage {
+  --amber: #ffc24b; --amber-tint: rgba(255, 194, 75, 0.2); --up: #ff4d63; --down: #3b8cff;
+  --ink: #eef1fa; --ink-muted: #a9b3cf; --ink-soft: #7d88a8; --border: rgba(255, 255, 255, 0.16); --bg: #0b0f1d;
+  border-radius: 10px; overflow: hidden;
+}
+.demo-stage text { paint-order: stroke; stroke: #0b0f1d; stroke-width: 0.6px; }
+/* 캔들: 왼쪽부터 하나씩 솟아오름 */
+.demo-candle { transform-box: fill-box; transform-origin: 50% 50%; animation: demo-candle-in 520ms cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+@keyframes demo-candle-in { from { opacity: 0; transform: scaleY(0.15); } 60% { opacity: 1; } to { opacity: 1; transform: none; } }
+/* 빛 번짐 */
+.demo-glow { filter: drop-shadow(0 0 0.9px currentColor) drop-shadow(0 0 1.6px rgba(255, 255, 255, 0.08)); }
+.demo-stage .demo-draw-line { filter: drop-shadow(0 0 1.2px currentColor); animation-duration: 1100ms; }
+.demo-stage .demo-draw-line.demo-dash { stroke-dasharray: 2.2 1.6; stroke-dashoffset: 0; animation: simple-fade-in 700ms ease forwards; opacity: 0; }
+/* 선 끝 맥박 */
+.demo-end { opacity: 0; animation: simple-fade-in 300ms ease forwards; }
+.demo-end-ring { transform-box: fill-box; transform-origin: center; opacity: 0.35; animation: demo-pulse 1.8s ease-out infinite; }
+@keyframes demo-pulse { 0% { transform: scale(0.4); opacity: 0.55; } 100% { transform: scale(1.9); opacity: 0; } }
+/* 막대(거래량 등)는 무대 위에서 살짝 더 선명하게 */
+.demo-stage .demo-bar-grow { animation-duration: 520ms; }
+/* 그림 담는 칸도 무대 색으로 맞춤 */
+.gd-thumb, .gd-show-demo, .gd-sheet-demo { background: #0b0f1d !important; }
+.gd-thumb { border-bottom-color: #1b2238; }
+.gd-thumb .guide-mini-label, .gd-show-demo .guide-mini-label, .gd-sheet-demo .guide-mini-label { color: #a9b3cf; }
+.gd-sheet-demo .gd-replay { background: rgba(255, 255, 255, 0.06); border-color: rgba(255, 255, 255, 0.16); color: #d6dbea; }
+.gd-sheet-demo .gd-replay:hover { color: #ffc24b; border-color: #ffc24b; }
+.gd-show-demo { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06); }
+@media (prefers-reduced-motion: reduce) {
+  .demo-candle, .demo-end-ring { animation: none; }
+}
