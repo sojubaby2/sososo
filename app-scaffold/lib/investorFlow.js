@@ -11,6 +11,8 @@
 //   [2026-10-29 오전 진단 결과] 네이버 PC 수급 페이지가 사이트 서버에 "410(없어진 페이지, Npay 증권 안내)"을 돌려줌.
 //     → 수급 자료를 받을 곳을 여러 군데 차례로 시도: ① 네이버 증권 모바일(m.stock.naver.com) ② 다음 금융 ③ 네이버 PC.
 //       받은 모양이 무엇이든 "날짜 + 개인/외국인/기관" 칸을 찾아 읽고, 합이 0 근처인지(누가 사면 누군가는 판다) 검사해서 맞을 때만 씀.
+//   [2026-10-29 두 번째 진단] · 네이버 PC 페이지는 상태 번호만 410이고 내용(수급 표)은 그대로 옴 → 상태 번호와 상관없이 표를 읽음
+//     · 야후는 10/28 종가 칸이 비어 있음(야후 쪽 빈칸) → 지수는 네이버 증권 모바일 일별 시세를 먼저 쓰고, 야후는 예비로
 //
 // 자료:
 //   · 투자자별 매매동향(일별): finance.naver.com/sise/investorDealTrendDay.naver?bizdate=YYYYMMDD&sosok=01(코스피)/02(코스닥)
@@ -176,8 +178,9 @@ function flowSources(sosok, iso) {
 }
 async function trySource(src, iso) {
   const r = await getText(src.url, src.headers);
-  if (!r.ok) return { r, flow: null };
+  // 네이버 PC는 410을 주면서도 표를 보내므로 html은 상태 번호와 상관없이 읽어 봄
   if (src.kind === "html") return { r, flow: parseFlow(r.text, iso) };
+  if (!r.ok) return { r, flow: null };
   let data = null;
   try {
     data = JSON.parse(r.text);
@@ -200,7 +203,36 @@ async function fetchFlow(sosok, iso) {
   return null;
 }
 
-// 지수 하나(^KS11/^KQ11)의 그날 종가와 전일 대비 — 야후 일봉(최근 3달)에서 그 날짜를 찾음
+// 지수 일별 시세 — 네이버 증권 모바일(1순위). 항목 모양: { localTradedAt, closePrice, fluctuationsRatio, ... }
+function naverIndexUrl(mk) {
+  return `https://m.stock.naver.com/api/index/${mk}/price?pageSize=30&page=1`;
+}
+function indexFromJson(root, iso) {
+  const items = [];
+  const stack = [root];
+  while (stack.length && items.length < 500) {
+    const v = stack.pop();
+    if (Array.isArray(v)) { for (const x of v) stack.push(x); continue; }
+    if (!v || typeof v !== "object") continue;
+    const dKey = Object.keys(v).find((k) => /date|tradedat|dt|day/i.test(k) && isoOf(v[k]));
+    const close = pickBy(v, /^closePrice$|^close$|closeprice/i);
+    if (dKey && typeof close === "number") items.push({ date: isoOf(v[dKey]), close, ratio: pickBy(v, /fluctuationsRatio|changeRate|ratio/i) });
+    for (const k of Object.keys(v)) if (v[k] && typeof v[k] === "object") stack.push(v[k]);
+  }
+  items.sort((a, b) => (a.date < b.date ? -1 : 1));
+  const i = items.findIndex((x) => x.date === iso);
+  if (i < 0) return null;
+  const prev = i > 0 ? items[i - 1].close : null;
+  const chgPct = prev ? ((items[i].close - prev) / prev) * 100 : typeof items[i].ratio === "number" ? items[i].ratio : null;
+  return { close: Math.round(items[i].close * 100) / 100, chgPct };
+}
+async function fetchIndexNaver(mk, iso) {
+  const r = await getText(naverIndexUrl(mk), { Referer: `https://m.stock.naver.com/domestic/index/${mk}/total`, Accept: "application/json,text/plain,*/*" });
+  if (!r.ok) return null;
+  return indexFromJson(JSON.parse(r.text), iso);
+}
+
+// 지수 하나(^KS11/^KQ11)의 그날 종가와 전일 대비 — 야후 일봉(최근 3달)에서 그 날짜를 찾음(예비)
 async function fetchIndex(symbol, iso) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 8000);
@@ -242,8 +274,8 @@ async function compute(iso) {
   const [kpFlow, kqFlow, kpIdx, kqIdx] = await Promise.all([
     fetchFlow("01", iso).catch(() => null),
     fetchFlow("02", iso).catch(() => null),
-    fetchIndex("^KS11", iso).catch(() => null),
-    fetchIndex("^KQ11", iso).catch(() => null),
+    fetchIndexNaver("KOSPI", iso).catch(() => null).then((x) => x || fetchIndex("^KS11", iso).catch(() => null)),
+    fetchIndexNaver("KOSDAQ", iso).catch(() => null).then((x) => x || fetchIndex("^KQ11", iso).catch(() => null)),
   ]);
   const result = {
     date: iso,
@@ -255,8 +287,8 @@ async function compute(iso) {
   return result;
 }
 
-const cachedRecent = unstable_cache(compute, ["market-flow-recent-v3"], { revalidate: 600 });
-const cachedPast = unstable_cache(compute, ["market-flow-past-v3"], { revalidate: 7 * 86400 });
+const cachedRecent = unstable_cache(compute, ["market-flow-recent-v4"], { revalidate: 600 });
+const cachedPast = unstable_cache(compute, ["market-flow-past-v4"], { revalidate: 7 * 86400 });
 
 // 날짜 "2026-10-28" → { 코스피:{flow,index}, 코스닥:{flow,index} } 또는 null
 export async function getMarketFlow(iso, { latest = false } = {}) {
@@ -276,12 +308,27 @@ export async function diagnoseFlow(iso) {
     for (const src of flowSources(sosok, iso)) {
       try {
         const { r, flow } = await trySource(src, iso);
+        // 표/자료 구조를 보이게: html이면 표 앞 몇 줄, json이면 키 목록과 배열마다 첫 항목
+        let shape = null;
+        if (src.kind === "html") shape = tableRows(r.text).slice(0, 3);
+        else {
+          try {
+            const j = JSON.parse(r.text);
+            shape = {};
+            for (const k of Object.keys(j || {})) {
+              const v = j[k];
+              shape[k] = Array.isArray(v) ? { len: v.length, first: JSON.stringify(v[0] ?? null).slice(0, 500) } : typeof v === "object" && v ? `{${Object.keys(v).slice(0, 15).join(",")}}` : String(v).slice(0, 60);
+            }
+          } catch {
+            shape = null;
+          }
+        }
         out.naver[name].push({
           source: src.name,
           url: src.url,
           status: r.status,
           length: r.text.length,
-          head: r.text.slice(0, 600).replace(/\s+/g, " "),
+          shape,
           parsed: flow,
         });
       } catch (e) {
@@ -305,7 +352,20 @@ export async function diagnoseFlow(iso) {
       } catch {
         tail = raw.text.slice(0, 200);
       }
-      out.yahoo[name] = { status: raw.status, tail, parsed: await fetchIndex(sym, iso).catch((e) => String(e?.message || e)) };
+      const mk = name === "코스피" ? "KOSPI" : "KOSDAQ";
+      const nv = await getText(naverIndexUrl(mk), { Accept: "application/json,text/plain,*/*" }).catch((e) => ({ status: 0, text: String(e) }));
+      let naverParsed = null;
+      try {
+        naverParsed = indexFromJson(JSON.parse(nv.text), iso);
+      } catch {
+        naverParsed = null;
+      }
+      out.yahoo[name] = {
+        status: raw.status,
+        tail,
+        parsed: await fetchIndex(sym, iso).catch((e) => String(e?.message || e)),
+        naverIndex: { status: nv.status, head: String(nv.text).slice(0, 400), parsed: naverParsed },
+      };
     } catch (e) {
       out.yahoo[name] = { error: String(e?.message || e) };
     }
