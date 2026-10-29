@@ -128,12 +128,21 @@ export async function readRejected(redis) {
 // 실제 사용량(usage: 입력·출력·캐시 저장·캐시 재사용 토큰)을 단계별로 더해 둡니다.
 // /api/health 의 "AI 비용" 칸에 오늘·어제·최근 7일 원화 금액이 나옵니다.
 // 가격: Claude Haiku 4.5 공식 가격(100만 토큰당 달러) — 입력 $1, 출력 $5, 캐시 저장(1시간) $2, 캐시 재사용 $0.10.
+//   [2026-10-29] Haiku 5.5로 바꾼 뒤로는 단계 이름 끝에 "55"가 붙고 5.5 가격(입력 $0.10, 출력 $0.50, 캐시 저장 $0.20, 재사용 $0.01)으로 계산.
 // 환율은 1달러 = 1,450원으로 계산(대략값). 비용: AI 호출 1번당 Redis 명령 1번(묶음 전송). 40일 뒤 자동 삭제.
 const AI_COST_PREFIX = "status:aicost:";
 const AI_COST_TTL_SECONDS = 60 * 60 * 24 * 40;
 export const USD_KRW = 1450;
-const PRICE_PER_MTOK = { in: 1, out: 5, cw: 2, cr: 0.1 };
-export const AI_STAGE_LABELS = { filter: "재료성 판단", match: "종목 매칭", premarket: "장전 브리핑" };
+const PRICE_PER_MTOK = { in: 1, out: 5, cw: 2, cr: 0.1 }; // Haiku 4.5
+// [2026-10-29 추가] Haiku 5.5 가격(프롬프트 10만 토큰 이하) — 단계 이름이 "55"로 끝나면 이 값으로 계산(lib/claude.js)
+const PRICE_PER_MTOK_55 = { in: 0.1, out: 0.5, cw: 0.2, cr: 0.01 };
+const BASE_LABELS = { filter: "재료성 판단", match: "종목 매칭", premarket: "장전 브리핑", outlook: "오늘의 전망", review: "마감시황 글", matchApi: "매칭 API" };
+export const AI_STAGE_LABELS = Object.fromEntries(
+  Object.entries(BASE_LABELS).flatMap(([k, v]) => [
+    [`${k}55`, v],
+    [k, `${v}(4.5 대체)`],
+  ])
+);
 
 export async function recordAiUsage(redis, stage, usage) {
   if (!redis || !stage || !usage) return;
@@ -163,8 +172,9 @@ export async function readAiCost(redis, dayKey) {
       (stages[stage] ||= { n: 0, in: 0, out: 0, cw: 0, cr: 0 })[f] = Number(v) || 0;
     }
     let total = 0;
-    for (const s of Object.values(stages)) {
-      const usd = (s.in * PRICE_PER_MTOK.in + s.out * PRICE_PER_MTOK.out + s.cw * PRICE_PER_MTOK.cw + s.cr * PRICE_PER_MTOK.cr) / 1e6;
+    for (const [name, s] of Object.entries(stages)) {
+      const P = name.endsWith("55") ? PRICE_PER_MTOK_55 : PRICE_PER_MTOK;
+      const usd = (s.in * P.in + s.out * P.out + s.cw * P.cw + s.cr * P.cr) / 1e6;
       s.krw = Math.round(usd * USD_KRW);
       total += usd;
     }

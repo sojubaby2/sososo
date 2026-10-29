@@ -13,9 +13,8 @@
 import rawThemeData from "./themeData.json";
 import { SUBSIDIARY_MAP } from "./subsidiaryMap";
 import { fetchLatestAvailable } from "./krxOpenApi";
-// [2026-10-29 추가] AI 비용 계량기(실제 사용 토큰을 하루 단위로 셈) — lib/runStatus.js recordAiUsage
-import { getRedis } from "./redis";
-import { recordAiUsage } from "./runStatus";
+// [2026-10-29] AI 부르기는 lib/claude.js 한 곳에서(Haiku 5.5 + 실패 시 4.5 대체 + 비용 계량기 기록)
+import { askJson } from "./claude";
 
 const MAX_STOCKS_PER_PRIMARY_THEME = 6;
 const MAX_STOCKS_PER_SECONDARY_THEME = 3;
@@ -706,33 +705,18 @@ ${lines.join("\n")}`;
 }
 
 export async function isMarketMovingHeadline(title, summary) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error("ANTHROPIC_API_KEY 환경변수가 설정되지 않았습니다.");
-
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-    body: JSON.stringify({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 32,
-      // [2026-10-29 변경 — 비용 절감] 지시문 + "우리 테마와 대표 종목 목록"을 한 덩어리로 묶어 캐시에 올립니다.
-      //   예전 지시문만으로는 약 3천 토큰이라 AI 쪽 캐시 최소 길이(Haiku 4.5는 4,096토큰)에 못 미쳐서
-      //   기사마다 지시문 전체 값을 매번 냈습니다. 목록을 붙이면 길이가 넘어서 캐시가 걸리고,
-      //   두 번째 기사부터는 지시문 값이 10분의 1로 줄어듭니다(1시간 안에 다음 기사가 오면 계속 유지).
-      //   목록은 "이 업종들과 관련 있으면 통과"라는 판단 근거로도 쓰입니다.
-      system: [{ type: "text", text: buildFilterStaticContext(), cache_control: { type: "ephemeral", ttl: "1h" } }],
-      messages: [
-        { role: "user", content: `뉴스 제목: ${title}\n뉴스 요약: ${summary}` },
-        { role: "assistant", content: "{" },
-      ],
-    }),
+  // [2026-10-29 변경] Haiku 5.5로 바꿈(값 10분의 1) — 부르는 방법은 lib/claude.js askJson(실패하면 4.5로 자동 대체)
+  // [2026-10-29 변경 — 비용 절감] 지시문 + "우리 테마와 대표 종목 목록"을 한 덩어리로 묶어 1시간 캐시에 올립니다.
+  //   두 번째 기사부터는 지시문 값이 10분의 1로 줄어듭니다. 목록은 "이 업종들과 관련 있으면 통과"라는 판단 근거로도 쓰입니다.
+  const { text } = await askJson({
+    system: buildFilterStaticContext(),
+    cacheSystem: true,
+    user: `뉴스 제목: ${title}\n뉴스 요약: ${summary}`,
+    maxTokens: 32,
+    stage: "filter",
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error("Claude API(필터) 오류: " + JSON.stringify(data));
-  await recordAiUsage(getRedis(), "filter", data?.usage);
-  const continuation = data?.content?.find((c) => c.type === "text")?.text || "\"include\":false}";
   try {
-    const parsed = JSON.parse(extractJsonObject("{" + continuation));
+    const parsed = JSON.parse(extractJsonObject(text));
     return parsed.include === true;
   } catch {
     return false; // if we can't parse it, don't spend more money on the full match — skip.
@@ -758,37 +742,18 @@ export async function matchStocks(title, summary, universeCompanyList) {
     `[계열사-모회사 매핑]\n${candidates.subsidiaryBlock || "(이 기사와 관련된 항목 없음)"}`,
   ].join("\n\n");
 
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-    body: JSON.stringify({
-      model: "claude-haiku-4-5-20251001",
-      // Bumped from 1536: theme_stocks adds a per-code {code,theme} entry
-      // on top of everything matches/primary_theme/secondary_themes already
-      // needed — a bit more headroom avoids a truncated (unparseable) JSON
-      // response on articles that legitimately match several themes.
-      max_tokens: 2048,
-      system: [
-        {
-          type: "text",
-          text: staticContext,
-          cache_control: { type: "ephemeral", ttl: "1h" },
-        },
-      ],
-      messages: [
-        { role: "user", content: `${candidateContext}\n\n뉴스 제목: ${title}\n뉴스 요약: ${summary}` },
-        { role: "assistant", content: "{" },
-      ],
-    }),
+  // [2026-10-29 변경] Haiku 5.5(lib/claude.js askJson — 실패하면 4.5로 자동 대체). 답 길이 제한은 예전 2048 기준.
+  const { text } = await askJson({
+    system: staticContext,
+    cacheSystem: true,
+    user: `${candidateContext}\n\n뉴스 제목: ${title}\n뉴스 요약: ${summary}`,
+    maxTokens: 2048,
+    stage: "match",
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error("Claude API 오류: " + JSON.stringify(data));
-  await recordAiUsage(getRedis(), "match", data?.usage);
-  const continuation = data?.content?.find((c) => c.type === "text")?.text || "}";
 
   let parsed;
   try {
-    parsed = JSON.parse(extractJsonObject("{" + continuation));
+    parsed = JSON.parse(extractJsonObject(text));
   } catch {
     throw new Error("Claude 응답 파싱 실패");
   }

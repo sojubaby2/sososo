@@ -25,6 +25,7 @@
 
 import rawThemeData from "../../../lib/themeData.json";
 import { buildSubsidiaryPromptBlock } from "../../../lib/subsidiaryMap";
+import { askJson } from "../../../lib/claude"; // [2026-10-29] AI 부르기(Haiku 5.5 + 4.5 대체)
 
 function buildCompanyList() {
   const seen = new Map();
@@ -125,36 +126,16 @@ export async function matchStocks(title, summary = "") {
 
   const staticContext = `${SYSTEM_PROMPT}\n\n[테마 목록]\n${buildThemeList()}\n\n[종목 목록]\n${buildCompanyList()}\n\n[계열사-모회사 매핑]\n${buildSubsidiaryPromptBlock()}`;
 
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 1536,
-      system: [
-        {
-          type: "text",
-          text: staticContext,
-          cache_control: { type: "ephemeral", ttl: "1h" },
-        },
-      ],
-      messages: [
-        { role: "user", content: `뉴스 제목: ${title}\n뉴스 요약: ${summary}` },
-        { role: "assistant", content: "{" },
-      ],
-    }),
+  // [2026-10-29 변경] Haiku 5.5(lib/claude.js askJson — 실패하면 4.5로 자동 대체)
+  const { text: aiText } = await askJson({
+    system: staticContext,
+    cacheSystem: true,
+    user: `뉴스 제목: ${title}\n뉴스 요약: ${summary}`,
+    maxTokens: 1536,
+    stage: "matchApi",
   });
+  const continuation = aiText ? aiText.slice(1) : "}"; // 아래 예전 코드가 "{" + continuation 모양을 쓰므로 맞춤
 
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error("Claude API 오류: " + JSON.stringify(data));
-  }
-
-  const continuation = data?.content?.find((c) => c.type === "text")?.text || "}";
   const fullJson = extractJsonObject("{" + continuation);
 
   let parsed;

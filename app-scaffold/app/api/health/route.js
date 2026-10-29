@@ -307,7 +307,7 @@ export async function GET(request) {
       monthKrw: avg * 30,
       countedDays: counted.length,
       stageLabels: AI_STAGE_LABELS,
-      hint: `Claude Haiku 4.5 공식 가격, 1달러=${USD_KRW.toLocaleString()}원으로 계산. 2026-10-29 배포분부터 쌓입니다. 정확한 청구액은 Anthropic Console의 Usage 화면이 기준입니다.`,
+      hint: `Claude Haiku 5.5 공식 가격(5.5가 실패해 4.5로 대신 부른 건 4.5 가격), 1달러=${USD_KRW.toLocaleString()}원으로 계산. 2026-10-29 배포분부터 쌓입니다. 정확한 청구액은 Anthropic Console의 Usage 화면이 기준입니다.`,
     });
   } catch {
     // 비용 칸 실패는 무시

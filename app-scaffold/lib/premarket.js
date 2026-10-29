@@ -25,11 +25,10 @@ import { STOCKS } from "./stockDirectory";
 import { getRecentFeed } from "./recentFeed";
 import { getMarketDates, getMarketDay } from "./marketDay";
 import { getMarketFlow } from "./investorFlow";
-import { recordAiUsage } from "./runStatus"; // [2026-10-29] AI 비용 계량기
+import { askJson } from "./claude"; // [2026-10-29] AI 부르기(Haiku 5.5 + 4.5 대체 + 비용 계량기)
 
 const YAHOO_URL = "https://query1.finance.yahoo.com/v8/finance/chart";
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36";
-const MODEL = "claude-haiku-4-5-20251001";
 
 export const PREMARKET_PREFIX = "premarket:";
 export const PREMARKET_DATES = "premarket:dates";
@@ -242,26 +241,10 @@ function clean(parsed, themeSet, nameMap) {
   };
 }
 
+// [2026-10-29 변경] Haiku 5.5로 바꿈 — 부르는 방법은 lib/claude.js askJson(실패하면 4.5로 자동 대체, 비용 계량기 기록도 거기서)
 async function askClaude(system, user) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error("ANTHROPIC_API_KEY 환경변수가 없습니다.");
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-    body: JSON.stringify({
-      model: MODEL,
-      max_tokens: 2200,
-      system,
-      messages: [
-        { role: "user", content: user },
-        { role: "assistant", content: "{" },
-      ],
-    }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error("Claude API 오류: " + JSON.stringify(data).slice(0, 300));
-  const text = "{" + (data?.content?.find((c) => c.type === "text")?.text || "");
-  return { text, usage: data?.usage || null };
+  const { text, usage, model } = await askJson({ system, user, maxTokens: 2200, stage: "premarket" });
+  return { text, usage, model };
 }
 
 // 만들기 — force면 오늘 것이 있어도 다시 만듦
@@ -285,7 +268,6 @@ export async function refreshPremarket(redis, { force = false, now = new Date() 
   const themes = getAllThemeNames();
   const { system, user } = buildPrompt({ us, news, prevDay, prevFlow, themes, todayIso: iso });
   const { text, usage } = await askClaude(system, user);
-  await recordAiUsage(redis, "premarket", usage); // [2026-10-29] AI 비용 계량기(lib/runStatus.js)
   let parsed;
   try {
     parsed = JSON.parse(extractJson(text) || "null");

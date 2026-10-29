@@ -45,6 +45,7 @@
 // 이 목록 중에서만 theme을 고르도록 강제함(응답 파싱 후에도 한 번 더
 // 필터링 — 혹시 목록에 없는 이름을 냈으면 그 pick은 버림).
 import { getAllThemeNames } from "./themeData";
+import { askJson } from "./claude"; // [2026-10-29] AI 부르기(Haiku 5.5 + 4.5 대체)
 
 const ALLOWED_THEME_NAMES = getAllThemeNames();
 const ALLOWED_THEME_SET = new Set(ALLOWED_THEME_NAMES);
@@ -213,25 +214,14 @@ async function synthesizeOutlook(gainers, losers, news, weekend) {
   const losersBlock = rowsBlock(losers);
   const newsBlock = news.map((n) => `- ${n.title}\n  ${n.summary}`).join("\n") || "(데이터 없음)";
 
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-    body: JSON.stringify({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 400,
-      system: buildSynthSystemPrompt(weekend),
-      messages: [
-        {
-          role: "user",
-          content: `[나스닥 등 미국 상위 상승 종목]\n${gainersBlock}\n\n[나스닥 등 미국 상위 하락 종목]\n${losersBlock}\n\n[최근 기술/실적 뉴스]\n${newsBlock}`,
-        },
-        { role: "assistant", content: "{" },
-      ],
-    }),
+  // [2026-10-29 변경] Haiku 5.5(lib/claude.js askJson — 실패하면 4.5로 자동 대체)
+  const { text: aiText } = await askJson({
+    system: buildSynthSystemPrompt(weekend),
+    user: `[나스닥 등 미국 상위 상승 종목]\n${gainersBlock}\n\n[나스닥 등 미국 상위 하락 종목]\n${losersBlock}\n\n[최근 기술/실적 뉴스]\n${newsBlock}`,
+    maxTokens: 400,
+    stage: "outlook",
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error("Claude API 오류: " + JSON.stringify(data));
-  const continuation = data?.content?.find((c) => c.type === "text")?.text || '"picks":[]}';
+  const continuation = aiText ? aiText.slice(1) : '"picks":[]}'; // 아래 예전 코드가 "{" + continuation 모양을 쓰므로 맞춤
 
   const debug = {
     weekend: !!weekend,

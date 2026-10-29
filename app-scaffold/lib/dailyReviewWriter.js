@@ -16,6 +16,8 @@
 // /api/daily-review/refresh 하나만 호출해주면 됨(daily-outlook/refresh랑
 // 똑같은 구조).
 
+import { askJson } from "./claude"; // [2026-10-29] AI 부르기(Haiku 5.5 + 4.5 대체)
+
 const SYSTEM_PROMPT = `너는 한국 주식 뉴스/테마 사이트 "뉴스매매"(newsmeme.co.kr)의 "마감시황"(장 마감 후 자동 시황 글) 코너를 매 거래일 저녁 자동으로 쓰는 작성자다.
 
 [말투/원칙]
@@ -59,23 +61,14 @@ export async function synthesizeDailyReview(sourceData) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY 환경변수가 설정되지 않았습니다.");
 
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-    body: JSON.stringify({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 3000,
-      system: SYSTEM_PROMPT,
-      messages: [
-        { role: "user", content: "[오늘의 재료 데이터(JSON)]\n" + JSON.stringify(sourceData) },
-        { role: "assistant", content: "{" },
-      ],
-    }),
+  // [2026-10-29 변경] Haiku 5.5(lib/claude.js askJson — 실패하면 4.5로 자동 대체)
+  const { text: aiText } = await askJson({
+    system: SYSTEM_PROMPT,
+    user: "[오늘의 재료 데이터(JSON)]\n" + JSON.stringify(sourceData),
+    maxTokens: 3000,
+    stage: "review",
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error("Claude API 오류: " + JSON.stringify(data).slice(0, 500));
-
-  const continuation = data?.content?.find((c) => c.type === "text")?.text || "";
+  const continuation = aiText ? aiText.slice(1) : ""; // 아래 예전 코드가 "{" + continuation 모양을 쓰므로 맞춤
   let parsed;
   try {
     parsed = JSON.parse(extractJsonObject("{" + continuation));
