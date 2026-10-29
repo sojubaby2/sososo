@@ -10,6 +10,8 @@
 
 import { getRedis } from "../../../lib/redis";
 import { runMarketCloseStep } from "../../../lib/marketClose";
+// [2026-10-29 추가] 같은 예약 실행에서 그날 투자자별 수급(개인·외국인·기관)도 저장 — 장 마감 정리 "누가 사고, 누가 팔았나"
+import { snapshotFlow } from "../../../lib/investorFlow";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -29,6 +31,7 @@ export async function GET(request) {
   }
   try {
     const result = await runMarketCloseStep(redis, { force: searchParams.get("force") === "1" });
+    result.flow = await snapshotFlow(redis).catch((e) => ({ error: String(e?.message || e) }));
     if (result?.completed) console.log("market-close: 잠정 장 마감 정리 완성", JSON.stringify(result));
     return Response.json(result, { headers: { "Cache-Control": "no-store" } });
   } catch (err) {

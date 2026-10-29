@@ -13,6 +13,10 @@
 //       받은 모양이 무엇이든 "날짜 + 개인/외국인/기관" 칸을 찾아 읽고, 합이 0 근처인지(누가 사면 누군가는 판다) 검사해서 맞을 때만 씀.
 //   [2026-10-29 두 번째 진단] · 네이버 PC 페이지는 상태 번호만 410이고 내용(수급 표)은 그대로 옴 → 상태 번호와 상관없이 표를 읽음
 //     · 야후는 10/28 종가 칸이 비어 있음(야후 쪽 빈칸) → 지수는 네이버 증권 모바일 일별 시세를 먼저 쓰고, 야후는 예비로
+//   [2026-10-29 세 번째 진단] · 네이버 PC 410 페이지는 표 껍데기만 있고 숫자가 없음, 다음 금융은 서버 오류 → 둘 다 뺌
+//     · 네이버 증권 모바일(m.stock.naver.com/api/index/KOSPI/integration)의 dealTrendInfo에 "오늘" 수급만 들어 있음
+//       (지난 날짜는 없음) → 장 마감 뒤 예약 실행(/api/market-close, 평일 15:35~17:57 3분마다)이 그날 수급을
+//       Redis "flow:day:YYYYMMDD"에 저장해 두고, 장 마감 정리는 그 저장본을 읽습니다. 그래서 10/29 장 마감분부터 쌓입니다.
 //
 // 자료:
 //   · 투자자별 매매동향(일별): finance.naver.com/sise/investorDealTrendDay.naver?bizdate=YYYYMMDD&sosok=01(코스피)/02(코스닥)
@@ -25,6 +29,7 @@
 // 비용: 날짜 하나당 바깥 요청 몇 번(무료). 결과는 저장해 두고 재사용(가장 최근 날짜 10분, 지난 날짜 7일).
 
 import { unstable_cache } from "next/cache";
+import { getRedis } from "./redis";
 
 const FLOW_URL = "https://finance.naver.com/sise/investorDealTrendDay.naver";
 const YAHOO_URL = "https://query1.finance.yahoo.com/v8/finance/chart";
@@ -167,13 +172,6 @@ function flowSources(sosok, iso) {
       headers: { Referer: `https://m.stock.naver.com/domestic/index/${mk}/total`, Accept: "application/json,text/plain,*/*" },
       kind: "json",
     },
-    {
-      name: "다음 금융",
-      url: `https://finance.daum.net/api/investor/days?page=1&perPage=30&market=${mk}&pagination=true`,
-      headers: { Referer: "https://finance.daum.net/domestic/investors", Accept: "application/json,text/plain,*/*" },
-      kind: "json",
-    },
-    { name: "네이버 PC", url: flowUrl(sosok, iso), headers: NAVER_HEADERS, kind: "html" },
   ];
 }
 async function trySource(src, iso) {
@@ -191,7 +189,20 @@ async function trySource(src, iso) {
 }
 
 // 한 시장(sosok 01=코스피, 02=코스닥)의 그날 투자자별 순매수(억 원). 어디서도 못 받으면 null
+const FLOW_DAY_PREFIX = "flow:day:";
+const MK_NAME = { "01": "코스피", "02": "코스닥" };
 async function fetchFlow(sosok, iso) {
+  // 1) 장 마감 뒤 저장해 둔 그날 수급
+  try {
+    const redis = getRedis();
+    const raw = redis ? await redis.get(FLOW_DAY_PREFIX + iso.replace(/-/g, "")) : null;
+    const saved = typeof raw === "string" ? JSON.parse(raw) : raw;
+    const f = saved?.[MK_NAME[sosok]];
+    if (f && typeof f.individual === "number") return { ...f, source: "저장본" };
+  } catch {
+    // 저장소를 못 읽으면 바로 받기로
+  }
+  // 2) 지금 바로 받기(그날이 "오늘"일 때만 들어 있음)
   for (const src of flowSources(sosok, iso)) {
     try {
       const { flow } = await trySource(src, iso);
@@ -287,8 +298,32 @@ async function compute(iso) {
   return result;
 }
 
-const cachedRecent = unstable_cache(compute, ["market-flow-recent-v4"], { revalidate: 600 });
-const cachedPast = unstable_cache(compute, ["market-flow-past-v4"], { revalidate: 7 * 86400 });
+const cachedRecent = unstable_cache(compute, ["market-flow-recent-v5"], { revalidate: 600 });
+const cachedPast = unstable_cache(compute, ["market-flow-past-v5"], { revalidate: 7 * 86400 });
+
+// [2026-10-29 추가] 장 마감 뒤 그날 수급을 저장 — /api/market-close(예약 실행, 평일 15:00~17:57 3분마다)가 부릅니다.
+//   15:35 이후에만, 네이버가 알려 주는 날짜(bizdate)가 오늘일 때만 저장. 저녁까지 숫자가 조금씩 바뀌어서 매번 덮어씀.
+export async function snapshotFlow(redis, now = new Date()) {
+  if (!redis) return { skipped: "저장소 없음" };
+  const k = new Date(now.getTime() + 9 * 3600 * 1000);
+  const wd = k.getUTCDay();
+  const minutes = k.getUTCHours() * 60 + k.getUTCMinutes();
+  if (wd === 0 || wd === 6) return { skipped: "주말" };
+  if (minutes < 15 * 60 + 35) return { skipped: "장 마감 전" };
+  const iso = k.toISOString().slice(0, 10);
+  const out = { at: new Date().toISOString() };
+  for (const sosok of ["01", "02"]) {
+    try {
+      const { flow } = await trySource(flowSources(sosok, iso)[0], iso);
+      if (flow) out[MK_NAME[sosok]] = flow;
+    } catch {
+      // 한 시장 실패해도 다른 시장은 저장
+    }
+  }
+  if (!out["코스피"] && !out["코스닥"]) return { skipped: "오늘 수급 자료 없음(휴장일이거나 아직 안 나옴)", iso };
+  await redis.set(FLOW_DAY_PREFIX + iso.replace(/-/g, ""), JSON.stringify(out), { ex: 800 * 86400 });
+  return { saved: true, iso, 코스피: out["코스피"] || null, 코스닥: out["코스닥"] || null };
+}
 
 // 날짜 "2026-10-28" → { 코스피:{flow,index}, 코스닥:{flow,index} } 또는 null
 export async function getMarketFlow(iso, { latest = false } = {}) {
