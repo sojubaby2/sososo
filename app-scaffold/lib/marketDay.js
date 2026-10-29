@@ -19,7 +19,7 @@
 
 import { unstable_cache } from "next/cache";
 import { getRedis } from "./redis";
-import { allThemes, themeMembers } from "./stockDirectory";
+import { allThemes, themeMembers, getStock } from "./stockDirectory";
 // [2026-10-28 추가] 장 마감 직후 잠정 시세(야후) — 한국거래소 확정 자료가 다음 날 아침에야 나와서
 import { readPrelim, readPrelimLatest } from "./marketClose";
 
@@ -28,6 +28,14 @@ const DAY_PREFIX = "hist:day:";
 const MIN_PRICE = 1000;
 const TOP_N = 10;
 const THEME_N = 5;
+// [2026-10-29 추가] 화면 개편용 — 상한가/하한가 기준(가격제한폭 30%, 호가 단위 때문에 29.5%부터),
+//   등락 분포 칸, "주요 대형주" 목록(시가총액 순위가 아니라 사람들이 많이 보는 대형주 고정 목록)
+const LIMIT_PCT = 29.5;
+const HIST_EDGES = [-10, -5, -3, -1, 0, 1, 3, 5, 10]; // 칸 경계(%) → 등락률 분포 막대
+const BIG_CAPS = [
+  "005930", "000660", "373220", "207940", "005380", "000270", "068270", "105560",
+  "012450", "035420", "034020", "329180", "009150", "028260", "055550", "035720",
+];
 
 const toIso = (basDt) => `${basDt.slice(0, 4)}-${basDt.slice(4, 6)}-${basDt.slice(6, 8)}`;
 const toBas = (iso) => iso.replace(/-/g, "");
@@ -108,11 +116,48 @@ async function computeDay(iso) {
       down: list.filter((r) => r.chg < 0).length,
       flat: list.filter((r) => r.chg === 0).length,
       avg: list.length ? round2(list.reduce((s, r) => s + r.chg, 0) / list.length) : null,
+      // [2026-10-29 추가] 상한가·하한가 수, 거래대금 합(원)
+      limitUp: list.filter((r) => r.chg >= LIMIT_PCT).length,
+      limitDown: list.filter((r) => r.chg <= -LIMIT_PCT).length,
+      value: list.reduce((s, r) => s + (typeof r.value === "number" ? r.value : 0), 0),
     };
   }
 
+  // [2026-10-29 추가] 등락률 분포(전 종목) — 칸마다 종목 수. 0%(보합)는 따로 한 칸
+  const hist = [];
+  {
+    const edges = HIST_EDGES;
+    const labelOf = (i) =>
+      i === 0 ? `${edges[0]}% 이하` : i === edges.length ? `+${edges[edges.length - 1]}% 이상` : `${edges[i - 1] > 0 ? "+" : ""}${edges[i - 1]}~${edges[i] > 0 ? "+" : ""}${edges[i]}%`;
+    const buckets = Array.from({ length: edges.length + 1 }, (_, i) => ({ label: labelOf(i), n: 0, side: 0 }));
+    let flat = 0;
+    for (const r of rows) {
+      if (r.chg === 0) {
+        flat += 1;
+        continue;
+      }
+      let i = edges.findIndex((e) => r.chg <= e);
+      if (i === -1) i = edges.length;
+      buckets[i].n += 1;
+    }
+    buckets.forEach((b, i) => (b.side = i < edges.indexOf(0) + 1 ? -1 : 1));
+    const zero = edges.indexOf(0);
+    // 0 경계 바로 뒤에 "보합" 칸을 끼워 넣음(-1~0 다음, 0~+1 앞)
+    hist.push(...buckets.slice(0, zero + 1), { label: "보합", n: flat, side: 0 }, ...buckets.slice(zero + 1));
+  }
+  const totalValue = rows.reduce((s, r) => s + (typeof r.value === "number" ? r.value : 0), 0);
+
   const traded = rows.filter((r) => r.close >= MIN_PRICE && (r.vol === null || r.vol > 0));
-  const pick = (r) => ({ code: r.code, name: r.name, market: r.market, close: r.close, chg: r.chg, value: r.value });
+  // [2026-10-29] 종목마다 소속 테마 2개까지 붙임(화면에서 "왜 같이 움직였나" 힌트)
+  const pick = (r) => ({
+    code: r.code,
+    name: r.name,
+    market: r.market,
+    close: r.close,
+    chg: r.chg,
+    value: r.value,
+    themes: (getStock(r.code)?.themes || []).slice(0, 2),
+  });
   const gainers = [...traded].sort((a, b) => b.chg - a.chg).slice(0, TOP_N).map(pick);
   const losers = [...traded].sort((a, b) => a.chg - b.chg).slice(0, TOP_N).map(pick);
   const byValue = traded
@@ -140,6 +185,17 @@ async function computeDay(iso) {
   }
   themes.sort((a, b) => b.avg - a.avg);
 
+  // [2026-10-29 추가] 상한가 종목(전부, 최대 30), 주요 대형주 성적, 거래대금 상위 10의 비중
+  const limitUps = rows
+    .filter((r) => r.chg >= LIMIT_PCT)
+    .sort((a, b) => (b.value || 0) - (a.value || 0))
+    .slice(0, 30)
+    .map(pick);
+  const bigCaps = BIG_CAPS.map((c) => byCode.get(c)).filter(Boolean).map(pick);
+  const top10Value = byValue.reduce((s, r) => s + (r.value || 0), 0);
+  // 테마 지도용 — 전체 테마(3종목 이상)를 평균 등락률 순으로, 대장 종목 1개씩
+  const themeMap = themes.map((t) => ({ theme: t.theme, avg: t.avg, count: t.count, lead: (t.avg >= 0 ? t.best : t.worst)[0] || null }));
+
   return {
     date: iso,
     prevDate: prevIso,
@@ -151,16 +207,23 @@ async function computeDay(iso) {
     themesUp: themes.slice(0, THEME_N),
     themesDown: themes.slice(-THEME_N).reverse(),
     stockCount: rows.length,
+    // [2026-10-29 추가] 화면 개편용
+    hist,
+    totalValue,
+    top10Share: totalValue ? round2((top10Value / totalValue) * 100) : null,
+    limitUps,
+    bigCaps,
+    themeMap,
     // [2026-10-28] 잠정(장 마감 직후 야후 시세) 여부 — 다음 날 아침 한국거래소 확정치로 바뀜
     provisional: todayDay.provisional,
     provisionalAt: todayDay.at || null,
   };
 }
 
-const cachedRecent = unstable_cache(computeDay, ["market-day-recent-v2"], { revalidate: 3600 });
+const cachedRecent = unstable_cache(computeDay, ["market-day-recent-v3"], { revalidate: 3600 });
 // [2026-10-28] 가장 최근 날짜가 잠정 자료일 때 — 짧게 저장하고 이름표를 따로 둬서, 확정 자료가 오면 새로 계산됨
-const cachedProvisional = unstable_cache(computeDay, ["market-day-provisional-v2"], { revalidate: 600 });
-const cachedPast = unstable_cache(computeDay, ["market-day-past-v2"], { revalidate: 7 * 86400 });
+const cachedProvisional = unstable_cache(computeDay, ["market-day-provisional-v3"], { revalidate: 600 });
+const cachedPast = unstable_cache(computeDay, ["market-day-past-v3"], { revalidate: 7 * 86400 });
 
 // 날짜 "2026-10-27" → 정리 결과(없으면 null)
 export async function getMarketDay(iso) {

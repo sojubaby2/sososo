@@ -9,6 +9,8 @@ import Header from "../../components/Header";
 import { getMarketDates, getMarketDay, describeMarketDay, koreanDate } from "../../lib/marketDay";
 // [2026-10-28 추가] 지수 마감 + 투자자별 순매수 문장
 import { getMarketFlow, describeFlow } from "../../lib/investorFlow";
+// [2026-10-29 추가] 리포트 제목 한 줄(장 마감 정리 개편과 같은 문장)
+import { marketHeadline } from "../../lib/marketReport";
 
 // [2026-10-27] 저장소(Redis) 읽기는 "매번 새로" 방식이라 미리 만들어 두는 페이지와 함께 쓰면 오류가 납니다.
 // 그래서 요청 때 만들고, 무거운 계산 결과는 lib/marketDay.js가 날짜별로 저장해 둔 것을 씁니다(Redis 읽기 횟수는 같음).
@@ -34,6 +36,7 @@ export default async function MarketIndexPage() {
   const latest = list[0] ? await getMarketDay(list[0]) : null;
   const flow = latest ? await getMarketFlow(latest.date, { latest: true }) : null;
   const lines = [...describeFlow(flow), ...describeMarketDay(latest)];
+  const headline = latest ? marketHeadline(latest, flow) : "";
 
   return (
     <div>
@@ -51,6 +54,11 @@ export default async function MarketIndexPage() {
               <Link href={`/market/${latest.date}`}>최신: {koreanDate(latest.date)} →</Link>
               {latest.provisional && <span className="mk-provisional">잠정</span>}
             </h2>
+            {headline && (
+              <p className="stock-text">
+                <b>{headline}</b>
+              </p>
+            )}
             {lines.map((t, i) => (
               <p key={i} className="stock-text">
                 {t}
