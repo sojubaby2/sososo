@@ -95,3 +95,30 @@ export async function readIngestCounts(redis, dayKey) {
     return null;
   }
 }
+
+// ── [2026-10-29 추가] 최근에 "제외"된 텔레그램 기사 제목 60건 ──────────────
+// 재성님: "뉴스 필터링이 너무 강한거같은데 좀 풀까?" — 개수만으로는 "어떤 기사가 왜 빠졌는지" 몰라서
+// 필터를 어디까지 풀지 판단하기 어려웠습니다. 이제 빠진 기사 제목과 이유를 최근 60건만 남깁니다.
+// /api/health 의 "telegram" 칸 recentRejected 에 나옵니다. 비용: 빠진 기사 1건당 Redis 명령 2번. 3일 뒤 자동 삭제.
+const TG_REJECTED_KEY = "status:tgrejected";
+
+export async function logRejected(redis, entry) {
+  if (!redis || !entry?.title) return;
+  try {
+    await redis.lpush(TG_REJECTED_KEY, JSON.stringify({ at: new Date().toISOString(), ...entry }));
+    await redis.ltrim(TG_REJECTED_KEY, 0, 59);
+    await redis.expire(TG_REJECTED_KEY, 60 * 60 * 24 * 3);
+  } catch {
+    // 기록 실패는 무시 — 본 작업을 막으면 안 됨.
+  }
+}
+
+export async function readRejected(redis) {
+  if (!redis) return [];
+  try {
+    const raw = await redis.lrange(TG_REJECTED_KEY, 0, 59);
+    return (raw || []).map((x) => (typeof x === "string" ? JSON.parse(x) : x));
+  } catch {
+    return [];
+  }
+}

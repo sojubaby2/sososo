@@ -22,7 +22,7 @@
 // 죽어서인지, 아니면 메시지는 오는데 전부 필터링되고 있어서인지"를 구분하기
 // 위함. 자세한 배경은 lib/runStatus.js 상단 설명 참고.
 import { getRedis } from "../../../lib/redis";
-import { recordRun, RUN_TELEGRAM, countIngest } from "../../../lib/runStatus";
+import { recordRun, RUN_TELEGRAM, countIngest, logRejected } from "../../../lib/runStatus";
 import {
   extractMatchCandidates,
   getCachedUniverse,
@@ -431,10 +431,14 @@ export async function POST(request) {
   // 한 번만 호출되므로).
   const preview = rawText.replace(/\s+/g, " ").trim().slice(0, 80);
   // [2026-10-28 추가] 결과별 하루 개수도 같이 셈(lib/runStatus.js countIngest) — /health에서 "어디서 몇 건 빠졌는지" 확인용
+  // [2026-10-29 추가] 제목이 있는 "제외" 기사는 최근 60건 목록에도 남김(lib/runStatus.js logRejected) — 필터 조정용
   const logIngest = (outcome) =>
     Promise.all([
       recordRun(redis, RUN_TELEGRAM, { channel, messageId, preview, ...outcome }),
       countIngest(redis, outcome.stage === "제외" ? outcome.reason : outcome.stage),
+      outcome.stage === "제외" && outcome.title
+        ? logRejected(redis, { reason: outcome.reason, title: outcome.title, channel, messageId })
+        : null,
     ]);
 
   const key = telegramMessageKey(channel, messageId);
