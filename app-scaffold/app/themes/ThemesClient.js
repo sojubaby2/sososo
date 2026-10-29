@@ -117,6 +117,8 @@ export default function ThemesClient() {
   const [stockChanges1W, setStockChanges1W] = useState({}); // code -> change1W
   const [stockChanges1M, setStockChanges1M] = useState({}); // code -> change1M
   const [loadState, setLoadState] = useState("loading"); // loading | ready | error
+  // [2026-10-29 전체 점검] 등락률이 몇 월 며칠 확정 시세까지인지 표시("20261028" → "10/28")
+  const [baseDay, setBaseDay] = useState("");
   const [range, setRange] = useState("1W"); // "1W" | "1M" — 재성님 요청으로 기본값을 1주일로 변경
 
   // [2026-09-08 추가] 홈페이지 "국장 예측" 배너(components/DailyOutlookBanner.js)
@@ -142,6 +144,10 @@ export default function ThemesClient() {
           return;
         }
         setRawThemeChanges(data.themeChanges);
+        {
+          const d = String(data.recentBasDt || "");
+          if (/^\d{8}$/.test(d)) setBaseDay(`${Number(d.slice(4, 6))}/${Number(d.slice(6, 8))}`);
+        }
         setStockChanges1W(data.stockChanges1W || {});
         setStockChanges1M(data.stockChanges1M || {});
         setLoadState("ready");
@@ -174,7 +180,7 @@ export default function ThemesClient() {
       <>
         <div className="theme-heading">
           <h2>{group.theme}</h2>
-          <span className="text-xs" style={{ color: "var(--ink-muted)", fontSize: 12 }}>{rangeLabel} 누적 등락률 기준</span>
+          <span className="text-xs" style={{ color: "var(--ink-muted)", fontSize: 12 }}>{rangeLabel} 누적 등락률 기준{baseDay ? ` · ${baseDay} 종가까지` : ""}</span>
           {isPoliticalTheme(group.theme) && (
             <span className="political-tag">
               <ShieldAlert size={12} />정치테마주 — 사업 실적과 무관한 인맥 기반 편입, 투자 주의
@@ -289,7 +295,7 @@ export default function ThemesClient() {
 
         <div className="theme-layout">
           <aside>
-            <h2 className="section-title">전체 테마 ({sortedThemes.length}) · 🔥 {rangeLabel} 등락률 높은 순</h2>
+            <h2 className="section-title">전체 테마 ({sortedThemes.length}) · 🔥 {rangeLabel} 등락률 높은 순{baseDay ? ` (${baseDay} 종가까지)` : ""}</h2>
             <div className="theme-list">
               {sortedThemes.map((t) => {
                 const isActive = selected === t.theme;

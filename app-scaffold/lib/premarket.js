@@ -25,7 +25,9 @@ import { STOCKS } from "./stockDirectory";
 import { getRecentFeed } from "./recentFeed";
 import { getMarketDates, getMarketDay } from "./marketDay";
 import { getMarketFlow } from "./investorFlow";
-import { askJson } from "./claude"; // [2026-10-29] AI 부르기(Haiku 5.5 + 4.5 대체 + 비용 계량기)
+import { askJson } from "./claude";
+// [2026-10-29 추가] 밤사이 미국 주요 뉴스(미국 언론 RSS 제목·소개) — lib/usNews.js
+import { fetchUsNews } from "./usNews"; // [2026-10-29] AI 부르기(Haiku 5.5 + 4.5 대체 + 비용 계량기)
 
 const YAHOO_URL = "https://query1.finance.yahoo.com/v8/finance/chart";
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36";
@@ -127,7 +129,7 @@ function fmt(v, d = 2) {
 }
 const sgn = (v) => (typeof v === "number" ? `${v > 0 ? "+" : ""}${v.toFixed(2)}%` : "—");
 
-function buildPrompt({ us, news, prevDay, prevFlow, themes, todayIso }) {
+function buildPrompt({ us, news, usNews = [], prevDay, prevFlow, themes, todayIso }) {
   const usLines = us.filter((x) => x.ok).map((x) => `${x.name}: ${fmt(x.price)} (${sgn(x.chg)})`).join("\n") || "(못 받음)";
   let kr = "(자료 없음)";
   if (prevDay) {
@@ -154,6 +156,9 @@ function buildPrompt({ us, news, prevDay, prevFlow, themes, todayIso }) {
       })
       .join("\n") || "(속보 없음)";
 
+  const usNewsLines =
+    usNews.map((n, i) => `${i + 1}. [${n.source}${n.t ? ` ${kstHM(n.t)}` : ""}] ${n.title}${n.desc ? ` — ${n.desc.slice(0, 160)}` : ""}`).join("\n") || "(못 받음)";
+
   const system = `너는 한국 주식 투자자를 위한 "장전 브리핑"을 쓰는 애널리스트다. 오늘은 ${todayIso}(한국 시간), 한국장 개장(09:00) 전이다.
 아래 [자료]에 있는 사실만 근거로 써라. 숫자는 자료에 있는 것만 쓰고 절대 지어내지 마라. 자료에 없는 일정·실적·발언을 만들어내지 마라.
 "사라/팔라/매수 추천" 같은 투자 권유 표현은 쓰지 말고, "주목", "부담", "기대" 같은 관찰 표현만 써라. 쉬운 한국어로, 문장은 짧게.
@@ -164,6 +169,7 @@ function buildPrompt({ us, news, prevDay, prevFlow, themes, todayIso }) {
  "moodReason": "그렇게 본 이유 한 문장",
  "summary": ["핵심 요약 3~4문장, 각 문장 60자 이내"],
  "us": ["밤사이 미국장 핵심 3~5줄(지수·업종·종목 흐름, 자료 숫자 사용)"],
+ "usNews": [{"ref": 자료4의 번호(숫자), "title": "그 미국 뉴스를 한국어로 짧게(40자 이내)", "point": "무슨 일인지와 한국장(업종·종목)에 왜 중요한지 1~2문장"}],
  "news": [{"title": "주목할 뉴스(자료의 제목을 짧게)", "point": "한국장에 왜 중요한지 한 문장", "stocks": ["관련 국내 종목명"]}],
  "themes": [{"theme": "정식 테마명", "direction": "up 또는 down", "reason": "근거 한 문장"}],
  "stocks": [{"name": "국내 상장 종목명(정확한 이름)", "reason": "주목 이유 한 문장"}],
@@ -171,6 +177,8 @@ function buildPrompt({ us, news, prevDay, prevFlow, themes, todayIso }) {
  "checklist": ["오늘 장중에 확인할 것 2~4줄(자료에 근거한 것만)"]
 }
 news는 최대 6개, themes는 최대 6개, stocks는 최대 8개. 근거가 약하면 개수를 줄여라.
+usNews는 [4. 밤사이 미국 주요 뉴스]에서 한국 투자자에게 중요한 것만 최대 5개 골라라(연준·금리·물가 같은 거시, 빅테크·반도체 실적과 발표, 관세·정책, 국내 업종과 연결되는 산업 뉴스 우선). 같은 사건은 하나로 합쳐라. ref는 반드시 자료4에 있는 번호여야 한다. 자료4가 비어 있으면 usNews는 빈 배열.
+usNews에서 고른 뉴스는 "us"(미국장 핵심)·"summary"·"themes"·"risks" 판단에도 근거로 활용하라.
 themes의 theme은 반드시 다음 정식 테마명 목록 중에서만 그대로 골라라: ${themes.join(" | ")}`;
 
   const user = `[자료]
@@ -181,7 +189,10 @@ ${usLines}
 ${kr}
 
 [3. 어제 장 마감 이후~지금까지(없으면 최근) 속보 — 시각은 한국 시간]
-${newsLines}`;
+${newsLines}
+
+[4. 밤사이 미국 주요 뉴스 — 미국 언론 RSS 제목과 짧은 소개(영어), 번호. 시각은 한국 시간]
+${usNewsLines}`;
   return { system, user };
 }
 
@@ -205,7 +216,7 @@ const strArr = (a, n, max = 120) =>
     .slice(0, n)
     .map((x) => x.trim().slice(0, max));
 
-function clean(parsed, themeSet, nameMap) {
+function clean(parsed, themeSet, nameMap, usNewsSrc = []) {
   const stockOf = (name) => {
     const s = nameMap.get(String(name || "").trim());
     return s ? { code: s.code, name: s.name, market: s.market } : null;
@@ -233,6 +244,18 @@ function clean(parsed, themeSet, nameMap) {
     moodReason: String(parsed.moodReason || "").trim().slice(0, 140),
     summary: strArr(parsed.summary, 4, 140),
     usNotes: strArr(parsed.us, 5, 160), // AI가 쓴 "미국장 핵심" 문장(지표 목록 us와 이름이 겹치지 않게)
+    // [2026-10-29 추가] 밤사이 미국 주요 뉴스 — AI가 고른 번호(ref)로 원문 출처·링크를 붙임(번호가 엉뚱하면 버림)
+    usNews: (Array.isArray(parsed.usNews) ? parsed.usNews : [])
+      .map((n) => ({ n, src: usNewsSrc[Number(n?.ref) - 1] }))
+      .filter((x) => x.src && x.n?.title && x.n?.point)
+      .slice(0, 5)
+      .map(({ n, src }) => ({
+        title: String(n.title).trim().slice(0, 80),
+        point: String(n.point).trim().slice(0, 220),
+        source: src.source,
+        link: /^https?:\/\//.test(src.link || "") ? src.link : null,
+        origTitle: src.title.slice(0, 160),
+      })),
     news,
     themes,
     stocks,
@@ -256,7 +279,13 @@ export async function refreshPremarket(redis, { force = false, now = new Date() 
   if (!force && (await redis.get(key))) return { ok: true, skipped: true, reason: "오늘 브리핑이 이미 있음", date: iso };
 
   // 재료 모으기
-  const [us, feed, dates] = await Promise.all([usSnapshot(), getRecentFeed(), getMarketDates().catch(() => [])]);
+  const [us, feed, dates, usNewsRes] = await Promise.all([
+    usSnapshot(),
+    getRecentFeed(),
+    getMarketDates().catch(() => []),
+    fetchUsNews({ sinceMs: now.getTime() - 20 * 3600 * 1000 }).catch(() => ({ items: [], sources: [] })),
+  ]);
+  const usNews = usNewsRes.items || [];
   const prevIso = dates.filter((d) => d < iso).pop() || null;
   const [prevDay, prevFlow] = prevIso
     ? await Promise.all([getMarketDay(prevIso).catch(() => null), getMarketFlow(prevIso, { latest: true }).catch(() => null)])
@@ -266,7 +295,7 @@ export async function refreshPremarket(redis, { force = false, now = new Date() 
   const news = pickNews(feed, sinceMs);
 
   const themes = getAllThemeNames();
-  const { system, user } = buildPrompt({ us, news, prevDay, prevFlow, themes, todayIso: iso });
+  const { system, user } = buildPrompt({ us, news, usNews, prevDay, prevFlow, themes, todayIso: iso });
   const { text, usage } = await askClaude(system, user);
   let parsed;
   try {
@@ -277,7 +306,7 @@ export async function refreshPremarket(redis, { force = false, now = new Date() 
   if (!parsed) return { ok: false, reason: "AI 응답을 읽지 못함", preview: text.slice(0, 300) };
 
   const nameMap = new Map([...STOCKS.values()].map((s) => [s.name, s]));
-  const body = clean(parsed, new Set(themes), nameMap);
+  const body = clean(parsed, new Set(themes), nameMap, usNews);
   if (!body.headline || body.summary.length === 0) return { ok: false, reason: "AI 응답이 비어 있음", preview: text.slice(0, 300) };
 
   const record = {
@@ -286,6 +315,8 @@ export async function refreshPremarket(redis, { force = false, now = new Date() 
     prevDate: prevIso,
     us: us.filter((x) => x.ok).map(({ sym, name, group, price, chg }) => ({ sym, name, group, price, chg })),
     newsCount: news.length,
+    usNewsCount: usNews.length,
+    usNewsSources: usNewsRes.sources || [], // 어느 언론사 RSS를 받았는지(점검용)
     usage,
     ...body,
   };
@@ -301,7 +332,7 @@ export async function refreshPremarket(redis, { force = false, now = new Date() 
       { ex: 4 * 86400 }
     );
   }
-  return { ok: true, date: iso, headline: body.headline, themes: body.themes.length, usage };
+  return { ok: true, date: iso, headline: body.headline, themes: body.themes.length, usNews: body.usNews.length, usNewsSources: usNewsRes.sources || [], usage };
 }
 
 // 읽기

@@ -179,7 +179,9 @@ function toCardShape(item, liveQuotes) {
         catalyst: m.catalyst || null,
         // [2026-10-28] 휴대폰 숏폼 카드에 "왜 관련주인지" 한 줄(예: 수송선 개발 주체)
         reason: m.reason || "",
-        change: typeof live?.changePct === "number" ? live.changePct : m.change,
+        // [2026-10-29 전체 점검] 오늘 시세를 못 받은 종목은 등락률을 비워 둠 — 예전엔 기사 들어올 때 찍힌
+        //   "전 거래일" 등락률(m.change)이 오늘 숫자처럼 보였음(속보 40건 밖의 오래된 기사 등).
+        change: typeof live?.changePct === "number" ? live.changePct : null,
       };
     }),
   };
@@ -188,8 +190,12 @@ function toCardShape(item, liveQuotes) {
 // Compact sidebar panel — a smaller reference version of what used to be a
 // big colored grid across the top of the page. Toggle switches between the
 // 1-week and 1-month change field from /api/theme-momentum.
+// [2026-10-29 전체 점검] 패널 숫자가 몇 월 며칠 확정 시세 기준인지 보여 주기("20261028" → "10/28")
+const mdOf = (d) => (/^\d{8}$/.test(String(d || "")) ? `${Number(String(d).slice(4, 6))}/${Number(String(d).slice(6, 8))}` : "");
+
 function HotThemePanel() {
   const [rawThemes, setRawThemes] = useState([]);
+  const [baseDay, setBaseDay] = useState("");
   const [state, setState] = useState("loading");
   const [range, setRange] = useState("1W"); // "1W" | "1M" — 재성님 요청으로 기본값을 1주일로 변경
 
@@ -202,6 +208,7 @@ function HotThemePanel() {
           return;
         }
         setRawThemes(data.themeChanges);
+        setBaseDay(mdOf(data.recentBasDt));
         setState("ready");
       })
       .catch(() => setState("error"));
@@ -224,6 +231,7 @@ function HotThemePanel() {
         <h2 className="trending-panel-title">
           <Flame size={12} style={{ color: "var(--up)" }} />
           HOT 테마
+          {baseDay && <span className="trending-panel-day mono">{baseDay} 기준</span>}
         </h2>
         <div className="range-toggle">
           <button
@@ -275,6 +283,7 @@ function DailyMoversPanel() {
   const [movers, setMovers] = useState([]);
   const [themes, setThemes] = useState([]);
   const [state, setState] = useState("loading");
+  const [baseDay, setBaseDay] = useState("");
 
   useEffect(() => {
     fetch("/api/theme-momentum")
@@ -285,6 +294,7 @@ function DailyMoversPanel() {
           return;
         }
         setMovers(data.dailyMovers.slice(0, DAILY_MOVER_COUNT));
+        setBaseDay(mdOf(data.recentBasDt));
         const topThemes = data.themeChanges
           .filter((t) => typeof t.change1D === "number" && !isPoliticalTheme(t.theme))
           .sort((a, b) => b.change1D - a.change1D)
@@ -301,7 +311,8 @@ function DailyMoversPanel() {
     <aside className="trending-panel">
       <h2 className="trending-panel-title">
         <Flame size={12} style={{ color: "var(--up)" }} />
-        전일 급등주 · 급등테마
+        {/* [2026-10-29 전체 점검] "전일"이 며칠인지 — 장 마감 뒤엔 오늘이 아니라 그 전 거래일 숫자라 헷갈렸음 */}
+        {baseDay ? `${baseDay} 급등주 · 급등테마` : "전일 급등주 · 급등테마"}
       </h2>
       {state === "loading" ? (
         <p className="trending-empty">불러오는 중...</p>
@@ -633,7 +644,29 @@ function AboutSiteSection() {
   );
 }
 
-export default function HomeClient({ initialItems = [], worldIndices = null, brief = null, liveQuotes = {}, strip = null }) {
+export default function HomeClient({ initialItems = [], worldIndices: worldIndicesInit = null, brief = null, liveQuotes = {}, strip = null }) {
+  // [2026-10-29 전체 점검] 홈 화면은 미리 만들어 둔 화면을 보여 주는데, 한동안 방문자가 없으면 첫 방문자에게
+  //   몇 시간 전 화면이 나갈 수 있음(오후 5시 19분에 코스피가 오후 장중 값 5,968로 보였음). 그래서 화면이 뜬 뒤
+  //   세계 지수를 한 번 새로 받아 덮어쓰고, 보고 있는 동안 5분마다 다시 받음(서버가 5분 저장 — 비용 0).
+  const [worldIndices, setWorldIndices] = useState(worldIndicesInit);
+  useEffect(() => {
+    let alive = true;
+    const load = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      fetch("/api/world-indices?v=4")
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          if (alive && Array.isArray(d?.items) && d.items.length) setWorldIndices(d);
+        })
+        .catch(() => {});
+    };
+    load();
+    const t = setInterval(load, 5 * 60 * 1000);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, []);
   // [2026-10-14 변경] 서버(app/page.js)가 미리 가져다 준 기사들로 시작합니다.
   // 예전에는 빈 배열로 시작해서 브라우저가 불러올 때까지 화면이 비어 있었고,
   // 그 빈 화면이 크롤러에게 그대로 노출됐습니다.

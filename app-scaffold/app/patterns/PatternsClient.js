@@ -70,8 +70,10 @@ function AboutPatternsSection() {
       <p style={aboutPStyle}>
         국내 상장 종목의 일별 시세를 저장해두고, 종목마다 최근 구간의 가격 흐름을 미리 정의해둔 차트 패턴의 모양과
         비교합니다. 두 곡선이 얼마나 닮았는지를 0에서 100 사이의 숫자로 환산한 값이 표에 보이는 유사도이고,
-        55% 이상인 종목만 목록에 올립니다. 계산은 30분마다 자동으로 다시 돌기 때문에, 장중에 모양이 만들어진
-        종목은 다음 갱신에서 목록에 나타납니다.
+        55% 이상인 종목만 목록에 올립니다. {/* [2026-10-29 전체 점검] 예전 문구("장중에 모양이 만들어진 종목은 다음 갱신에서")는
+        사실과 달랐음 — 계산에 쓰는 일별 시세는 한국거래소 확정치라 다음 날 아침에 들어옴 */}
+        계산에 쓰는 일별 시세는 한국거래소 확정 시세라서, 그날 장이 끝난 뒤 다음 날 아침에 들어오면 새로 계산됩니다.
+        (화면 위에 몇 월 며칠 종가 기준인지 적혀 있어요)
       </p>
       <h3 style={aboutH3Style}>패턴마다 필요한 기간이 다릅니다</h3>
       <p style={aboutPStyle}>
@@ -104,6 +106,12 @@ export default function PatternsClient({ initialData = null }) {
   const [patterns, setPatterns] = useState(initialData?.patterns || {});
   const [historyDays, setHistoryDays] = useState(initialData?.historyDays || 0);
   const [historyTarget, setHistoryTarget] = useState(initialData?.historyTarget || 750);
+  // [2026-10-29 전체 점검] 결과가 몇 월 며칠 종가 기준인지(각 결과의 asOfDate 중 가장 최근)
+  const asOfDay = useMemo(() => {
+    let best = "";
+    for (const list of Object.values(patterns || {})) for (const r of list || []) if (r?.asOfDate && r.asOfDate > best) best = r.asOfDate;
+    return /^\d{8}$/.test(best) ? `${Number(best.slice(4, 6))}/${Number(best.slice(6, 8))}` : "";
+  }, [patterns]);
 
   // 서버가 넘겨준 값으로 첫 화면 상태를 정합니다(아래 useEffect에서 전체
   // 목록을 다시 받아 덮어씁니다).
@@ -276,7 +284,8 @@ export default function PatternsClient({ initialData = null }) {
         <div className="theme-heading" style={{ marginBottom: 8 }}>
           <h2>패턴검색</h2>
           <span className="text-xs" style={{ color: "var(--ink-muted)", fontSize: 12 }}>
-            최근 시세 흐름을 24가지 차트 패턴과 비교해 유사도가 높은 종목을 찾아드립니다
+            최근 시세 흐름을 {patternDefs.length || 24}가지 차트 패턴과 비교해 유사도가 높은 종목을 찾아드립니다
+            {asOfDay && <b style={{ marginLeft: 6, color: "var(--ink)" }}>· {asOfDay} 종가 기준</b>}
           </span>
         </div>
 

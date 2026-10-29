@@ -104,6 +104,35 @@ export default function BriefingView({ b, latest = false }) {
         </section>
       )}
 
+      {/* [2026-10-29 추가] 밤사이 미국 주요 뉴스 — 미국 언론 RSS 제목을 AI가 한국어로 요약·분석(lib/usNews.js) */}
+      {b.usNews?.length > 0 && (
+        <section className="panel stock-section">
+          <h2 className="stock-h2">밤사이 미국 주요 뉴스</h2>
+          <div className="pmk-news">
+            {b.usNews.map((n, i) => (
+              <article key={i} className="pmk-news-card">
+                <span className="mk2-rank mono">{i + 1}</span>
+                <div>
+                  <h3>{n.title}</h3>
+                  <p>{n.point}</p>
+                  <span className="pmk-src">
+                    출처 {n.source}
+                    {n.link && (
+                      <>
+                        {" · "}
+                        <a href={n.link} target="_blank" rel="noopener noreferrer">
+                          원문(영어)
+                        </a>
+                      </>
+                    )}
+                  </span>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
+
       {b.news?.length > 0 && (
         <section className="panel stock-section">
           <h2 className="stock-h2">주목할 뉴스</h2>
@@ -198,7 +227,7 @@ export default function BriefingView({ b, latest = false }) {
       )}
 
       <p className="stock-disclaimer">
-        이 브리핑은 밤사이 해외 시세(야후), 이 사이트 속보, 전 거래일 장 마감 자료를 바탕으로 AI가 매일 아침 자동으로 정리한 참고 자료입니다.
+        이 브리핑은 밤사이 해외 시세(야후), 미국 언론 기사 제목(CNBC·MarketWatch·야후 파이낸스·CNN 등), 이 사이트 속보, 전 거래일 장 마감 자료를 바탕으로 AI가 매일 아침 자동으로 정리한 참고 자료입니다.
         틀린 내용이 있을 수 있고, 투자 권유가 아닙니다. 투자 판단과 책임은 본인에게 있습니다.
         {latest ? " 매 거래일 아침 7시 40분쯤 새로 올라옵니다." : ""}
       </p>

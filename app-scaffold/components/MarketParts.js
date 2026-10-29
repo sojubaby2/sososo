@@ -58,7 +58,7 @@ export function IndexCard({ mk, b, ix }) {
             </span>
             {typeof b.value === "number" && b.value > 0 && (
               <span>
-                거래대금 <b className="mono">{eok(b.value)}</b>
+                거래대금 약 <b className="mono">{eok(b.value)}</b>
               </span>
             )}
           </div>
