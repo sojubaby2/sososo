@@ -40,10 +40,12 @@ import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import ThemeToggle from "./ThemeToggle";
+// [2026-10-29 추가] 종목 검색 단추(돋보기) — 누르면 검색 창(components/StockSearch.js)
+import { openStockSearch } from "../lib/openStockSearch";
 import { MENU, isMenuActive } from "../lib/siteMenu";
 // [2026-10-29] 재성님: "이 메뉴들이 눈에 너무 안띄어" → 메뉴마다 작은 그림 + 알약 모양 + 꼬리표(lib/siteMenu.js의 live·badge)
 //   그림은 휴대폰 "전체" 창(components/MobileTabBar.js)과 같은 것. 좁은 PC 화면(1280px 아래)에서는 그림을 숨겨 한 줄에 들어가게(globals.css)
-import { Zap, CandlestickChart, Layers, Ticket, CalendarDays, BarChart3, LineChart, BookOpen, LayoutGrid, Sunrise } from "lucide-react";
+import { Zap, CandlestickChart, Layers, Ticket, CalendarDays, BarChart3, LineChart, BookOpen, LayoutGrid, Sunrise, Search } from "lucide-react";
 
 const ICONS = { zap: Zap, candle: CandlestickChart, layers: Layers, ticket: Ticket, calendar: CalendarDays, bars: BarChart3, line: LineChart, book: BookOpen, sunrise: Sunrise };
 
@@ -118,6 +120,11 @@ export default function Header() {
           })}
         </nav>
 
+        {/* [2026-10-29] 종목 검색 — PC·휴대폰 모두 */}
+        <button type="button" className="hdr-search" onClick={() => openStockSearch()} aria-label="종목 검색" title="종목 검색 (/)">
+          <Search size={16} />
+          <span className="hdr-search-text">종목 검색</span>
+        </button>
         {/* [2026-10-26 추가] 어두운 화면 ↔ 밝은 화면 전환 단추 */}
         <ThemeToggle />
       </div>

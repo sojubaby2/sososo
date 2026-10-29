@@ -12,7 +12,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Newspaper, Loader2, Flame, Bell, BellOff, Volume2, VolumeX, Smartphone, X, ArrowUp, Star } from "lucide-react";
+import { Newspaper, Loader2, Flame, Bell, BellOff, Volume2, VolumeX, Smartphone, X, ArrowUp, Star, Search } from "lucide-react";
 // [2026-10-21 추가] 뉴스 제목의 &#039; 같은 글자를 원래대로 되돌립니다.
 import { decodeEntities } from "../lib/decodeEntities";
 // [2026-10-21 추가] 속보를 채팅 말풍선으로 보여주는 컴포넌트.
@@ -26,6 +26,7 @@ import ThemeRadar from "../components/ThemeRadar";
 // [2026-10-27 추가] 애드센스 광고 칸(번호는 lib/ads.js)
 import AdSlot from "../components/AdSlot";
 import { openStockChart } from "../lib/openStockChart";
+import { openStockSearch } from "../lib/openStockSearch"; // [2026-10-29] 홈 종목 검색창
 import { useWatchlist } from "../lib/watchlist";
 import Header from "../components/Header";
 import DailyOutlookBanner from "../components/DailyOutlookBanner";
@@ -1110,6 +1111,13 @@ export default function HomeClient({ initialItems = [], worldIndices = null, bri
 
           {/* ── 가운데 칸: 실시간 속보 ── */}
           <section className="home-col home-center" aria-label="실시간 속보">
+            {/* [2026-10-29 추가] 종목 검색창 — 재성님: "홈에서 종목 검색도 할수있는걸 하나 만들어줘"
+                누르면 검색 창(components/StockSearch.js)이 열림. 휴대폰은 위 머리띠의 돋보기 단추를 씀 */}
+            <button type="button" className="home-search desk-only" onClick={() => openStockSearch()}>
+              <Search size={18} />
+              <span>종목명 · 초성 · 테마로 검색 — 관련 속보와 차트를 바로 확인</span>
+              <kbd>/</kbd>
+            </button>
             <div className="panel feed-panel">
               <div className="live-head" ref={feedTopRef}>
                 {/* 화면의 대표 제목(h1) — 검색엔진과 화면 읽기 프로그램이 "이 페이지는

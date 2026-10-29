@@ -9,6 +9,8 @@ import MobileTabBar from "../components/MobileTabBar";
 import AnchorAdSpacer from "../components/AnchorAdSpacer";
 import VignetteGuard from "../components/VignetteGuard";
 import SideAds from "../components/SideAds";
+// [2026-10-29 추가] 종목 검색 창 — 위 메뉴줄 돋보기·홈 검색창·"/" 키로 열림(components/StockSearch.js)
+import StockSearch from "../components/StockSearch";
 
 const SITE_URL = "https://newsmeme.co.kr";
 const TITLE = "뉴스매매 — 실시간 뉴스 속보와 관련주 매칭";
@@ -112,6 +114,8 @@ export default function RootLayout({ children }) {
         {children}
         <SiteFooterNav />
         <StockChartModal />
+        {/* [2026-10-29] 종목 검색 창 (components/StockSearch.js) */}
+        <StockSearch />
         {/* [2026-10-27] 드래그 방지 (components/NoDrag.js) */}
         <NoDrag />
         {/* [2026-10-27] 휴대폰 전용 맨 아래 탭 줄 (components/MobileTabBar.js) */}
