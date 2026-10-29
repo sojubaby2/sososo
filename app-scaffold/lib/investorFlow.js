@@ -139,7 +139,11 @@ function flowFromItem(it) {
   if (![individual, foreign, institution].every((n) => typeof n === "number")) return null;
   const [a, b, c, d] = toEok([individual, foreign, institution, pension]);
   const scale = Math.abs(a) + Math.abs(b) + Math.abs(c) + 1;
-  if (Math.abs(a + b + c) > scale * 0.35 + 100) return null; // 기타법인 몫을 생각해 넉넉히
+  // [2026-10-29 수정] 예전 기준(합이 35% 넘게 어긋나면 버림)이 너무 빡빡했음 — 재성님: "코스피는 어디갔어"
+  //   10/29 코스피는 개인·외국인 순매수가 작고 기관 순매도·기타법인 순매수가 커서, 셋의 합이 크게 어긋나 통째로 버려졌음.
+  //   기타법인(일반 회사·은행 등) 몫이 큰 날도 있으니, 숫자가 아예 엉뚱한 경우(단위 착오 등)만 거르도록 넓힘.
+  if (Math.abs(a + b + c) > scale * 0.9 + 1000) return null;
+  if ([a, b, c].some((v) => Math.abs(v) > 300000)) return null; // 하루 30조 원 넘는 순매수는 단위 착오로 봄
   return { individual: a, foreign: b, institution: c, pension: typeof d === "number" ? d : null };
 }
 // 객체 안을 훑어 "날짜가 iso인 항목"에서 수급을 찾음
@@ -298,31 +302,70 @@ async function compute(iso) {
   return result;
 }
 
-const cachedRecent = unstable_cache(compute, ["market-flow-recent-v5"], { revalidate: 600 });
-const cachedPast = unstable_cache(compute, ["market-flow-past-v5"], { revalidate: 7 * 86400 });
+const cachedRecent = unstable_cache(compute, ["market-flow-recent-v6"], { revalidate: 600 });
+const cachedPast = unstable_cache(compute, ["market-flow-past-v6"], { revalidate: 7 * 86400 });
 
 // [2026-10-29 추가] 장 마감 뒤 그날 수급을 저장 — /api/market-close(예약 실행, 평일 15:00~17:57 3분마다)가 부릅니다.
-//   15:35 이후에만, 네이버가 알려 주는 날짜(bizdate)가 오늘일 때만 저장. 저녁까지 숫자가 조금씩 바뀌어서 매번 덮어씀.
+// [2026-10-29 저녁 개편] 재성님: "코스피는 어디갔어" — 저장 방식 두 가지를 고침
+//   ① 날짜를 "오늘"로 정하지 않고, 네이버가 알려 주는 날짜(bizdate)를 그대로 써서 그 날짜 칸에 저장
+//      → 다음 날 아침(장전 브리핑 예약 실행, 07:40)에 불러도 "어제" 수급이 제자리에 저장됨(그날 오후에 놓쳤을 때 메꾸기)
+//   ② 한 시장만 받았을 때 다른 시장의 기존 저장값을 지우지 않고 합쳐서 저장
+//   장 중(15:35 전)에 받은 숫자는 아직 바뀌는 중이라, "오늘" 날짜면 15:35 이후에만 저장.
+function latestFlowInJson(root) {
+  const stack = [root];
+  let seen = 0;
+  let best = null;
+  while (stack.length && seen < 5000) {
+    const v = stack.pop();
+    seen += 1;
+    if (Array.isArray(v)) { for (const x of v) stack.push(x); continue; }
+    if (!v || typeof v !== "object") continue;
+    const dKey = Object.keys(v).find((k) => /date|bizdate|dt|day/i.test(k) && isoOf(v[k]));
+    if (dKey) {
+      const f = flowFromItem(v);
+      const iso = isoOf(v[dKey]);
+      if (f && (!best || iso > best.iso)) best = { iso, flow: f };
+    }
+    for (const k of Object.keys(v)) if (v[k] && typeof v[k] === "object") stack.push(v[k]);
+  }
+  return best;
+}
 export async function snapshotFlow(redis, now = new Date()) {
   if (!redis) return { skipped: "저장소 없음" };
   const k = new Date(now.getTime() + 9 * 3600 * 1000);
-  const wd = k.getUTCDay();
+  const todayIso = k.toISOString().slice(0, 10);
   const minutes = k.getUTCHours() * 60 + k.getUTCMinutes();
-  if (wd === 0 || wd === 6) return { skipped: "주말" };
-  if (minutes < 15 * 60 + 35) return { skipped: "장 마감 전" };
-  const iso = k.toISOString().slice(0, 10);
-  const out = { at: new Date().toISOString() };
+  const byDate = {};
+  const notes = {};
   for (const sosok of ["01", "02"]) {
     try {
-      const { flow } = await trySource(flowSources(sosok, iso)[0], iso);
-      if (flow) out[MK_NAME[sosok]] = flow;
-    } catch {
-      // 한 시장 실패해도 다른 시장은 저장
+      const src = flowSources(sosok, todayIso)[0];
+      const r = await getText(src.url, src.headers);
+      if (!r.ok) { notes[MK_NAME[sosok]] = `HTTP ${r.status}`; continue; }
+      const got = latestFlowInJson(JSON.parse(r.text));
+      if (!got) { notes[MK_NAME[sosok]] = "수급 못 읽음"; continue; }
+      if (got.iso === todayIso && minutes < 15 * 60 + 35) { notes[MK_NAME[sosok]] = "장 마감 전(저장 안 함)"; continue; }
+      (byDate[got.iso] ||= {})[MK_NAME[sosok]] = got.flow;
+    } catch (e) {
+      notes[MK_NAME[sosok]] = String(e?.message || e).slice(0, 80);
     }
   }
-  if (!out["코스피"] && !out["코스닥"]) return { skipped: "오늘 수급 자료 없음(휴장일이거나 아직 안 나옴)", iso };
-  await redis.set(FLOW_DAY_PREFIX + iso.replace(/-/g, ""), JSON.stringify(out), { ex: 800 * 86400 });
-  return { saved: true, iso, 코스피: out["코스피"] || null, 코스닥: out["코스닥"] || null };
+  const saved = [];
+  for (const [iso, markets] of Object.entries(byDate)) {
+    const key = FLOW_DAY_PREFIX + iso.replace(/-/g, "");
+    let prev = null;
+    try {
+      const raw = await redis.get(key);
+      prev = typeof raw === "string" ? JSON.parse(raw) : raw;
+    } catch {
+      prev = null;
+    }
+    const out = { ...(prev || {}), ...markets, at: new Date().toISOString() };
+    await redis.set(key, JSON.stringify(out), { ex: 800 * 86400 });
+    saved.push({ iso, 코스피: out["코스피"] || null, 코스닥: out["코스닥"] || null });
+  }
+  if (!saved.length) return { skipped: "저장할 수급 없음", notes };
+  return { saved, notes };
 }
 
 // 날짜 "2026-10-28" → { 코스피:{flow,index}, 코스닥:{flow,index} } 또는 null
@@ -352,7 +395,7 @@ export async function diagnoseFlow(iso) {
             shape = {};
             for (const k of Object.keys(j || {})) {
               const v = j[k];
-              shape[k] = Array.isArray(v) ? { len: v.length, first: JSON.stringify(v[0] ?? null).slice(0, 500) } : typeof v === "object" && v ? `{${Object.keys(v).slice(0, 15).join(",")}}` : String(v).slice(0, 60);
+              shape[k] = Array.isArray(v) ? { len: v.length, first: JSON.stringify(v[0] ?? null).slice(0, 500) } : typeof v === "object" && v ? (/dealTrend/i.test(k) ? JSON.stringify(v).slice(0, 400) : `{${Object.keys(v).slice(0, 15).join(",")}}`) : String(v).slice(0, 60);
             }
           } catch {
             shape = null;
