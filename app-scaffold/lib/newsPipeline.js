@@ -333,15 +333,64 @@ function parseUniverseRows(universeCompanyList) {
   return rows;
 }
 
+// [2026-10-29 추가] 기사에 흔히 쓰는 회사 이름 → 거래소 등록 이름
+//   재성님 15시 점검 때 발견: "현대자동차, 잠정실적 공시"는 거래소 이름이 "현대차"라서, "JYP 지분 인수"는 "JYP Ent."라서
+//   후보 종목에 안 잡혀 통째로 빠졌습니다. 왼쪽 낱말이 기사에 나오면 오른쪽 이름의 종목을 후보에 넣습니다.
+const NAME_ALIASES = {
+  "현대자동차": "현대차", "기아자동차": "기아", "기아차": "기아",
+  "JYP": "JYP Ent.", "SM엔터": "에스엠", "에스엠엔터테인먼트": "에스엠", "YG엔터": "와이지엔터테인먼트",
+  "포스코홀딩스": "POSCO홀딩스", "네이버": "NAVER", "LG엔솔": "LG에너지솔루션",
+  "삼성바이오": "삼성바이오로직스", "삼바": "삼성바이오로직스", "하이닉스": "SK하이닉스",
+  "한화에어로": "한화에어로스페이스", "SK이노": "SK이노베이션", "한전": "한국전력", "한국전력공사": "한국전력",
+  "아시아나": "아시아나항공", "아모레": "아모레퍼시픽", "신한금융": "신한지주", "하나금융": "하나금융지주",
+  "우리금융": "우리금융지주", "SKT": "SK텔레콤", "KT&G": "KT&G", "에코프로BM": "에코프로비엠",
+};
+
+// [2026-10-29 추가] 제목 맨 앞에 나오는 상장사 = 기사의 주인공 (예: "삼성중공업, 3분기 영업이익 42% 증가")
+//   [속보]·[단독] 같은 머리표와 따옴표는 건너뛰고 봅니다. 이름 바로 뒤가 쉼표·띄어쓰기·가운뎃점 등일 때만 인정
+//   ("현대차그룹"처럼 이름 뒤에 글자가 붙어 다른 말이 되는 경우는 제외). 여러 개가 맞으면 가장 긴 이름.
+function findTitleSubject(title, rows, byName) {
+  const t = String(title || "")
+    .replace(/^\s*(\[[^\]]{1,12}\]\s*)+/, "")
+    .replace(/^["'“‘「]+/, "")
+    .trim();
+  const ok = (rest) => rest === "" || /^[\s,·…:'"’”(\-–—]/.test(rest);
+  let best = null;
+  for (const r of rows) {
+    // 두 글자 한글 이름("대상"·"효성"처럼 보통 낱말과 같은 이름)은 오인 위험이 있어 제외 — 영문 섞인 이름(SK·KT)은 허용
+    if (r.name.length < 2 || (r.name.length < 3 && /^[가-힣]+$/.test(r.name)) || !t.startsWith(r.name)) continue;
+    if (!ok(t.slice(r.name.length))) continue;
+    if (!best || r.name.length > best.name.length) best = r;
+  }
+  if (best) return best;
+  for (const [alias, krx] of Object.entries(NAME_ALIASES)) {
+    if (!t.startsWith(alias) || !ok(t.slice(alias.length))) continue;
+    const r = byName.get(krx);
+    if (r) return r;
+  }
+  return null;
+}
+
 // 뉴스 한 건에 대해 "AI에게 보여줄 후보"를 만들어냄.
-// 반환: { stockBlock, themeBlock, subsidiaryBlock, stockCount, themeCount, mentionedNames }
+// 반환: { stockBlock, themeBlock, subsidiaryBlock, stockCount, themeCount, mentionedNames, titleSubject }
 export function extractMatchCandidates(title, summary, universeCompanyList) {
   const text = `${title || ""}\n${summary || ""}`;
   const rows = parseUniverseRows(universeCompanyList);
+  const byName = new Map(rows.map((r) => [r.name, r]));
 
   // ① 이름이 본문에 그대로 등장하는 종목
   const mentioned = rows.filter((r) => r.name.length >= 2 && text.includes(r.name));
   const mentionedCodes = new Set(mentioned.map((r) => r.code));
+  // [2026-10-29] 흔히 쓰는 다른 이름(NAME_ALIASES)으로 나온 종목도
+  for (const [alias, krx] of Object.entries(NAME_ALIASES)) {
+    if (!text.includes(alias)) continue;
+    const r = byName.get(krx);
+    if (r && !mentionedCodes.has(r.code)) {
+      mentioned.push(r);
+      mentionedCodes.add(r.code);
+    }
+  }
+  const titleSubject = findTitleSubject(title, rows, byName);
 
   // ② 후보 테마 — 점수가 높을수록(더 긴 조각이 걸릴수록) 확실한 후보
   const themeScore = new Map();
@@ -408,6 +457,7 @@ export function extractMatchCandidates(title, summary, universeCompanyList) {
     stockCount: picked.size,
     themeCount: candidateThemes.length,
     mentionedNames: mentioned.map((r) => r.name),
+    titleSubject,
   };
 }
 
@@ -542,6 +592,8 @@ const SYSTEM_PROMPT = `너는 한국 주식 뉴스와 종목/테마를 연결하
 - 2차전지: 양극재·전구체 → "2차전지 소재(양극재)" / 음극재(흑연·실리콘) → "2차전지 소재(음극재)" / 전해질·전해액·리튬염 → "2차전지 소재(전해질)" / 분리막 → "2차전지 소재(분리막)" / 동박·전지박 → "2차전지 소재(동박)". 셀(배터리 완제품) 회사나 업황 전반 기사는 "2차전지".
 - 바이오: 항체약물접합체(ADC) 기술이전·임상·위탁생산 → "ADC(항체약물접합체)".
 
+**[2026-10-29 추가] 제목 맨 앞의 상장사(기사 주인공)는 반드시 넣어**: 제목이 "삼성중공업, 3분기 영업이익 42% 증가"·"현대차 3분기 영업익 증가"처럼 [후보 종목]에 있는 회사 이름으로 시작하고, 그 회사의 실적·공시·계약·투자·사업 소식이면 그 회사를 "confirmed"로 matches 맨 앞에 넣어. 실적이 좋든 나쁘든, 다른 회사 언급이 없어도 마찬가지야 — 이 기사는 이미 앞 단계에서 "재료가 있는 뉴스"로 판정돼서 여기까지 온 거야. (예외: 위 해킹·유출 사고의 피해 회사 규칙은 그대로 적용)
+
 **C. 부가 테마 (secondary_themes)**: 핵심만큼은 아니지만 함께 언급되거나 부차적으로 관련된 테마들. 최대 2개까지만, 배열로. 없으면 빈 배열.
 
 우선순위 판단 예시: "리튬 공급 부족으로 배터리 업체 비상"이라는 기사라면 → primary_theme: "원자재(리튬)", secondary_themes: ["2차전지"]. 자동차 완성차 얘기가 기사에 없다면 자동차 테마는 넣지 마.
@@ -611,6 +663,12 @@ const FILTER_SYSTEM_PROMPT = `너는 한국 주식시장 뉴스 큐레이터야.
   · 국방·공공 사업 선정, 인증·특허 등록, 우선협상대상자 선정, 선박·설비 확충
   · 해외 빅테크의 신제품 공개(애플 신형 맥북·아이폰 등) — 국내 부품 공급망의 재료야
   · 유가·원자재 가격 급변, 전쟁·휴전·북한 도발 같은 지정학 사건 — 정유·방산·해운 등 관련 업종의 재료야
+  · [2026-10-29 오후 추가] 아래도 꼭 포함해(실제로 잘못 빠졌던 사례):
+    - 정부의 산업 육성·지원 정책(예: "유망 바이오 200곳 키운다…최대 5년 집중지원") — 그 업종 전체의 재료
+    - 북한 미사일·발사체 발사, 군사 도발 — 방산·대북 관련주의 재료
+    - 해외 원전·방산·건설 수주 협상의 타결이나 결렬(예: "韓 원전 유럽 교두보, 협상 결렬") — 결렬 같은 악재라도 업종 전체 주가가 움직이므로 포함
+    - 거래소 공시 형태의 메시지(잠정실적, 단일판매·공급계약, 풍문 또는 보도에 대한 해명 등) — 공시는 그 자체로 재료
+    - 상장사가 주어인 실적 발표(좋든 나쁘든, 매출·영업이익 숫자가 있는 경우)
 
 **제외해야 할 것** (예시 — 이런 건 걸러내):
 - 부고, 인사동정 등 개인 신상 소식
@@ -619,7 +677,7 @@ const FILTER_SYSTEM_PROMPT = `너는 한국 주식시장 뉴스 큐레이터야.
 - "OO기업 주가 X원 X% 상승/하락" 식으로 숫자만 있고 구체적 이유(재료)가 없는 기계적 시세 리포트
 - 일반적 시황 칼럼, 기고, 사설, 거시경제 논평 (익명 전문가·평론가·기자가 쓴 시황 해설·전망 기사를 말하는 거야 — 위 "포함해야 할 것"에 있는, 실명의 대기업 총수·경제단체장·정부 고위 인사가 자기 이름으로 한 산업 정책 관련 발언은 이 항목으로 걸러내지 마. 예를 들어 "OO증권 리서치센터는 ~라고 전망했다" 식의 익명·범용 전망은 제외 대상이지만, "최태원 회장은 ~해야 한다고 말했다"처럼 특정 인물의 실명 발언을 전하는 기사는 제외 대상이 아니야)
 - 특정 종목과 무관한 일반 서비스 홍보(예: 은행의 시니어 돌봄서비스 출시 등)
-- **어떤 회사 자체의 주가 하락·실적 악화·신용등급 강등만 다루고, 다른 회사에 미치는 긍정적 영향(반사이익 등)이 전혀 없는 뉴스.** 예: "OO기업 3분기 실적 부진으로 주가 급락" (다른 회사 언급 없이 그 자체로 끝나는 경우) — 이런 건 "누구에게도 새로운 투자 기회가 아닌 단순 악재 보도"이므로 제외해
+- **어떤 회사 자체의 주가 하락·실적 악화·신용등급 강등만 다루고, 다른 회사에 미치는 긍정적 영향(반사이익 등)이 전혀 없는 뉴스.** 예: "OO기업 3분기 실적 부진으로 주가 급락" (다른 회사 언급 없이 그 자체로 끝나는 경우) — 이런 건 "누구에게도 새로운 투자 기회가 아닌 단순 악재 보도"이므로 제외해. [2026-10-29 예외] 단, 숫자가 나온 실적 발표 자체, 공시, 수주 협상 결렬처럼 업종 전체가 움직이는 사건은 위 "꼭 포함" 규칙이 우선이야
 - 경영상 심각한 문제 없이 발생한 소소한 주가 등락
 - 날씨 예보, 사건·사고(범죄·화재·교통사고), 정치인 간 공방, 스포츠, 생활 정보처럼 어느 업종의 사업과도 연결되지 않는 일반 사회 뉴스
 
@@ -817,6 +875,22 @@ export async function matchStocks(title, summary, universeCompanyList) {
   );
 
   const all = [...directMatches, ...themeMatches];
+
+  // [2026-10-29 추가] AI가 "관련 종목 없음"으로 답했는데 제목 맨 앞에 상장사(기사 주인공)가 있으면 그 회사를 넣음.
+  //   재성님 15시 점검: "삼성중공업, 3분기 영업이익 42% 증가", "현대차 3분기 영업익 5.5% 증가"가 관련 종목 없음으로 빠졌음.
+  //   이 단계까지 왔다는 건 앞 단계(재료성 판단)를 이미 통과했다는 뜻이라, 주인공 회사 자신은 관련주로 보는 게 맞습니다.
+  //   AI를 한 번 더 부르지 않으므로 비용 변화 없음.
+  if (all.length === 0 && candidates.titleSubject) {
+    const s0 = candidates.titleSubject;
+    all.push({
+      code: s0.code,
+      name: s0.name,
+      market: s0.market,
+      confidence: "confirmed",
+      reason: "기사 주인공 — 제목에 직접 등장한 회사",
+      tier: "direct",
+    });
+  }
 
   // [2026-10-19 추가] 이 기사의 테마를 첫 번째 종목에 붙여서 같이 저장합니다.
   //
