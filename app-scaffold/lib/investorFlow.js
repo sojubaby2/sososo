@@ -3,22 +3,28 @@
 // [2026-10-28 신설] 장 마감 정리에 "누가 사고 누가 팔았나"(투자자별 순매수)와 지수 마감을 넣기 위한 파일.
 //   재성님: "장마감 정리 내용에 외국인, 기관 등 매수, 매도 이런내용도 들어갔음 좋을듯"
 //
-// 자료: 네이버 금융 공개 페이지 2개(인증키·요금 없음, lib/marketIndex.js와 같은 방식으로 표를 읽음)
+// [2026-10-29 변경] 재성님: "누가 사고, 누가 팔았나 안보이고"
+//   → 사이트(Cloudflare)에서 네이버 금융 요청이 안 통하는 것으로 보여서(지수·수급 둘 다 비어 있었음):
+//     · 지수 마감: 네이버 대신 야후(^KS11 코스피, ^KQ11 코스닥) — 사이트 위쪽 지수 띠가 이미 야후로 잘 받고 있음
+//     · 수급: 네이버 요청에 평범한 브라우저 표시(User-Agent·Referer)를 붙여 다시 시도
+//     · 왜 안 되는지 바로 볼 수 있게 /api/market-flow?date=YYYY-MM-DD&diag=1 진단 주소를 만듦(app/api/market-flow/route.js)
+//
+// 자료:
 //   · 투자자별 매매동향(일별): finance.naver.com/sise/investorDealTrendDay.naver?bizdate=YYYYMMDD&sosok=01(코스피)/02(코스닥)
 //       표: 날짜 | 개인 | 외국인 | 기관계 | 금융투자 | 보험 | 투신 | 은행 | 기타금융 | 연기금등 | 기타법인   (단위: 억 원, 순매수)
-//   · 지수 일별시세: finance.naver.com/sise/sise_index_day.naver?code=KOSPI/KOSDAQ
+//   · 지수 일별 종가: 야후 차트(무료)
 //
 // 안전장치: 개인+외국인+기관+기타법인을 더하면 거의 0이 돼야 정상(누가 사면 누군가는 판 것).
 //   이 검사에 안 맞으면(네이버가 표 모양을 바꿨다는 뜻) 잘못된 숫자를 보여 주지 않고 그 칸만 숨깁니다.
 //
-// 비용: 날짜 하나당 네이버 요청 몇 번. 결과는 저장해 두고 재사용(가장 최근 날짜 10분, 지난 날짜 7일).
-//   네이버 수급 숫자는 장 마감 뒤에도 저녁까지 조금씩 바뀔 수 있어서 최근 날짜는 10분마다 새로 받습니다.
+// 비용: 날짜 하나당 바깥 요청 몇 번(무료). 결과는 저장해 두고 재사용(가장 최근 날짜 10분, 지난 날짜 7일).
 
 import { unstable_cache } from "next/cache";
 
 const FLOW_URL = "https://finance.naver.com/sise/investorDealTrendDay.naver";
-const INDEX_URL = "https://finance.naver.com/sise/sise_index_day.naver";
-const UA = "Mozilla/5.0 (compatible; newsmeme-bot/1.0)";
+const YAHOO_URL = "https://query1.finance.yahoo.com/v8/finance/chart";
+const BROWSER_UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36";
 
 const toNum = (s) => {
   const t = String(s || "").replace(/[,\s+]/g, "");
@@ -47,13 +53,22 @@ function tableRows(html) {
   return out;
 }
 
-async function getHtml(url) {
+async function getText(url, headers = {}) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 8000);
   try {
-    const res = await fetch(url, { headers: { "User-Agent": UA }, cache: "no-store", signal: ctrl.signal });
-    if (!res.ok) throw new Error(`네이버 요청 실패 (status ${res.status})`);
-    return await res.text();
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent": BROWSER_UA,
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "ko-KR,ko;q=0.9,en;q=0.8",
+        ...headers,
+      },
+      cache: "no-store",
+      signal: ctrl.signal,
+    });
+    const text = await res.text();
+    return { ok: res.ok, status: res.status, text };
   } finally {
     clearTimeout(timer);
   }
@@ -61,10 +76,13 @@ async function getHtml(url) {
 
 let loggedFlowSample = false;
 
-// 한 시장(sosok 01=코스피, 02=코스닥)의 그날 투자자별 순매수(억 원). 그날 행이 없으면 null
-async function fetchFlow(sosok, iso) {
-  const bizdate = iso.replace(/-/g, "");
-  const html = await getHtml(`${FLOW_URL}?bizdate=${bizdate}&sosok=${sosok}`);
+function flowUrl(sosok, iso) {
+  return `${FLOW_URL}?bizdate=${iso.replace(/-/g, "")}&sosok=${sosok}`;
+}
+const NAVER_HEADERS = { Referer: "https://finance.naver.com/sise/sise_trans_style.naver" };
+
+// 표에서 그날 행을 찾아 숫자로. 못 찾거나 모양이 이상하면 null
+function parseFlow(html, iso) {
   for (const c of tableRows(html)) {
     if (normDate(c[0]) !== iso) continue;
     const individual = toNum(c[1]);
@@ -73,7 +91,6 @@ async function fetchFlow(sosok, iso) {
     const pension = toNum(c[9]);
     const corp = toNum(c[10]);
     const ok = [individual, foreign, institution].every((n) => typeof n === "number");
-    // 합이 거의 0인지 확인(표 모양이 바뀌었으면 여기서 걸러짐)
     const sum = (individual || 0) + (foreign || 0) + (institution || 0) + (corp || 0);
     const scale = Math.abs(individual || 0) + Math.abs(foreign || 0) + Math.abs(institution || 0) + 1;
     if (!ok || Math.abs(sum) > scale * 0.15 + 50) {
@@ -88,45 +105,70 @@ async function fetchFlow(sosok, iso) {
   return null;
 }
 
-// 지수 하나(KOSPI/KOSDAQ)의 그날 종가와 전일 대비. 최근 3페이지(약 18거래일) 안에서 찾음
-async function fetchIndex(code, iso) {
-  const rows = [];
-  for (let page = 1; page <= 3; page++) {
-    const html = await getHtml(`${INDEX_URL}?code=${code}&page=${page}`);
-    for (const c of tableRows(html)) {
-      const date = normDate(c[0]);
-      const close = toNum(c[1]);
-      if (date && typeof close === "number") rows.push({ date, close });
+// 한 시장(sosok 01=코스피, 02=코스닥)의 그날 투자자별 순매수(억 원). 그날 행이 없으면 null
+async function fetchFlow(sosok, iso) {
+  const r = await getText(flowUrl(sosok, iso), NAVER_HEADERS);
+  if (!r.ok) throw new Error(`네이버 수급 요청 실패 (status ${r.status})`);
+  return parseFlow(r.text, iso);
+}
+
+// 지수 하나(^KS11/^KQ11)의 그날 종가와 전일 대비 — 야후 일봉(최근 3달)에서 그 날짜를 찾음
+async function fetchIndex(symbol, iso) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 8000);
+  try {
+    const res = await fetch(`${YAHOO_URL}/${encodeURIComponent(symbol)}?range=3mo&interval=1d`, {
+      headers: { "User-Agent": BROWSER_UA, Accept: "application/json,text/plain,*/*" },
+      cache: "no-store",
+      signal: ctrl.signal,
+    });
+    if (!res.ok) throw new Error(`야후 지수 요청 실패 (status ${res.status})`);
+    const data = await res.json();
+    const r = data?.chart?.result?.[0];
+    const ts = r?.timestamp || [];
+    const closes = r?.indicators?.quote?.[0]?.close || [];
+    const rows = [];
+    ts.forEach((t, i) => {
+      const c = closes[i];
+      if (typeof c !== "number" || !Number.isFinite(c)) return;
+      rows.push({ date: new Date((t + 9 * 3600) * 1000).toISOString().slice(0, 10), close: c });
+    });
+    // 오늘 장중/장 마감 직후엔 마지막 봉이 비어 있을 수 있어 meta 값으로 보충
+    const meta = r?.meta || {};
+    if (typeof meta.regularMarketPrice === "number" && typeof meta.regularMarketTime === "number") {
+      const d = new Date((meta.regularMarketTime + 9 * 3600) * 1000).toISOString().slice(0, 10);
+      const last = rows[rows.length - 1];
+      if (!last || last.date < d) rows.push({ date: d, close: meta.regularMarketPrice });
+      else if (last.date === d) last.close = meta.regularMarketPrice;
     }
-    const i = rows.findIndex((r) => r.date === iso);
-    if (i >= 0 && rows[i + 1]) {
-      const prev = rows[i + 1].close;
-      return { close: rows[i].close, chgPct: prev ? ((rows[i].close - prev) / prev) * 100 : null };
-    }
-    if (rows.length && rows[rows.length - 1].date < iso) break; // 이미 지나침
+    const i = rows.findIndex((x) => x.date === iso);
+    if (i <= 0) return null;
+    const prev = rows[i - 1].close;
+    return { close: Math.round(rows[i].close * 100) / 100, chgPct: prev ? ((rows[i].close - prev) / prev) * 100 : null };
+  } finally {
+    clearTimeout(timer);
   }
-  return null;
 }
 
 async function compute(iso) {
   const [kpFlow, kqFlow, kpIdx, kqIdx] = await Promise.all([
     fetchFlow("01", iso).catch(() => null),
     fetchFlow("02", iso).catch(() => null),
-    fetchIndex("KOSPI", iso).catch(() => null),
-    fetchIndex("KOSDAQ", iso).catch(() => null),
+    fetchIndex("^KS11", iso).catch(() => null),
+    fetchIndex("^KQ11", iso).catch(() => null),
   ]);
   const result = {
     date: iso,
     "코스피": { flow: kpFlow, index: kpIdx },
     "코스닥": { flow: kqFlow, index: kqIdx },
   };
-  // 하나도 못 받았으면 저장하지 않도록 오류로 던짐(잠시 네이버가 막혔을 때 빈 결과가 7일 동안 남지 않게)
+  // 하나도 못 받았으면 저장하지 않도록 오류로 던짐(잠시 막혔을 때 빈 결과가 7일 동안 남지 않게)
   if (!kpFlow && !kqFlow && !kpIdx && !kqIdx) throw new Error("수급·지수 자료 없음");
   return result;
 }
 
-const cachedRecent = unstable_cache(compute, ["market-flow-recent-v1"], { revalidate: 600 });
-const cachedPast = unstable_cache(compute, ["market-flow-past-v1"], { revalidate: 7 * 86400 });
+const cachedRecent = unstable_cache(compute, ["market-flow-recent-v2"], { revalidate: 600 });
+const cachedPast = unstable_cache(compute, ["market-flow-past-v2"], { revalidate: 7 * 86400 });
 
 // 날짜 "2026-10-28" → { 코스피:{flow,index}, 코스닥:{flow,index} } 또는 null
 export async function getMarketFlow(iso, { latest = false } = {}) {
@@ -136,6 +178,35 @@ export async function getMarketFlow(iso, { latest = false } = {}) {
   } catch {
     return null;
   }
+}
+
+// [2026-10-29 추가] 진단 — 네이버가 무엇을 돌려주는지 그대로 보여 줌(저장 안 함)
+export async function diagnoseFlow(iso) {
+  const out = { date: iso, naver: {}, yahoo: {} };
+  for (const [name, sosok] of [["코스피", "01"], ["코스닥", "02"]]) {
+    try {
+      const r = await getText(flowUrl(sosok, iso), NAVER_HEADERS);
+      const rows = tableRows(r.text);
+      out.naver[name] = {
+        status: r.status,
+        length: r.text.length,
+        head: r.text.slice(0, 200).replace(/\s+/g, " "),
+        rowCount: rows.length,
+        firstRows: rows.slice(0, 3),
+        parsed: parseFlow(r.text, iso),
+      };
+    } catch (e) {
+      out.naver[name] = { error: String(e?.message || e) };
+    }
+  }
+  for (const [name, sym] of [["코스피", "^KS11"], ["코스닥", "^KQ11"]]) {
+    try {
+      out.yahoo[name] = await fetchIndex(sym, iso);
+    } catch (e) {
+      out.yahoo[name] = { error: String(e?.message || e) };
+    }
+  }
+  return out;
 }
 
 // 억 원 → "1조 709억 원" / "574억 원"
