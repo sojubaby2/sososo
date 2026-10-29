@@ -18,6 +18,7 @@ import { getMarketDates, getMarketDay, koreanDate } from "../../lib/marketDay";
 import { getMarketFlow } from "../../lib/investorFlow";
 import { marketHeadline, marketPoints } from "../../lib/marketReport";
 import { pct1, tone, eok, heat, IndexCard } from "../../components/MarketParts";
+import { unstable_cache } from "next/cache";
 
 // [2026-10-27] 저장소(Redis) 읽기는 "매번 새로" 방식이라 미리 만들어 두는 페이지와 함께 쓰면 오류가 납니다.
 export const dynamic = "force-dynamic";
@@ -77,7 +78,12 @@ function buildCalendar(isoDates) {
   });
 }
 
-export default async function MarketIndexPage() {
+// [2026-10-29 추가 — 열리는 속도] 재성님: "장마감 정리를 누르면 다른메뉴보다 반응이 너무 느린거같은데"
+//   예전엔 이 화면을 열 때마다 최근 10거래일의 "하루 정리 전체"(날마다 종목 2,500여 개 분석 결과)를 10개 다 읽고,
+//   수급까지 읽은 뒤에야 그리기 시작해서 1.2~1.7초 걸렸습니다(다른 메뉴는 0.2초).
+//   이제 이 화면에 실제로 쓰는 것만 골라 작은 묶음 하나로 만들어 2분 동안 저장해 두고, 화면은 그 묶음 하나만 읽습니다.
+//   장 마감 직후 잠정 정리가 바뀌는 시간에도 2분 안에 새 내용이 반영됩니다. Redis·AI 비용은 늘지 않습니다(오히려 줄어듦).
+async function buildIndexData() {
   let dates = [];
   try {
     dates = await getMarketDates();
@@ -88,12 +94,51 @@ export default async function MarketIndexPage() {
   const usable = dates.slice(1);
   const list = [...usable].reverse().slice(0, SHOW_DATES);
   const recentIso = list.slice(0, RECENT_N);
-  const recent = (await Promise.all(recentIso.map((iso) => getMarketDay(iso).catch(() => null)))).filter(Boolean);
-  const latest = recent[0] || null;
-  const flow = latest ? await getMarketFlow(latest.date, { latest: true }) : null;
-  const headline = latest ? marketHeadline(latest, flow) : "";
-  const points = latest ? marketPoints(latest, flow).slice(0, 3) : [];
-  const ratioBy = new Map(recent.map((d) => [d.date, upRatio(d)]));
+  const full = (await Promise.all(recentIso.map((iso) => getMarketDay(iso).catch(() => null)))).filter(Boolean);
+  const top = full[0] || null;
+  const flowAll = top ? await getMarketFlow(top.date, { latest: true }).catch(() => null) : null;
+  const flow = flowAll
+    ? { 코스피: { index: flowAll["코스피"]?.index || null }, 코스닥: { index: flowAll["코스닥"]?.index || null } }
+    : null;
+  const pick = (s) => ({ code: s.code, name: s.name, chg: s.chg, value: s.value });
+  const latest = top
+    ? {
+        date: top.date,
+        provisional: !!top.provisional,
+        stockCount: top.stockCount || 0,
+        breadth: top.breadth,
+        peekThemes: (top.themeMap || top.themesUp || []).filter((t) => t.avg > 0).slice(0, 3).map((t) => ({ theme: t.theme, avg: t.avg })),
+        gainers: (top.gainers || []).slice(0, 3).map(pick),
+        byValue: (top.byValue || []).slice(0, 3).map(pick),
+      }
+    : null;
+  const recent = full.map((d) => ({
+    date: d.date,
+    provisional: !!d.provisional,
+    ratio: upRatio(d),
+    topTheme: (d.themesUp || [])[0] ? { theme: d.themesUp[0].theme, avg: d.themesUp[0].avg } : null,
+    topGainer: d.gainers?.[0] ? pick(d.gainers[0]) : null,
+  }));
+  return {
+    list,
+    recent,
+    latest,
+    flow,
+    headline: top ? marketHeadline(top, flowAll) : "",
+    points: top ? marketPoints(top, flowAll).slice(0, 3) : [],
+  };
+}
+const getIndexData = unstable_cache(buildIndexData, ["market-index-v1"], { revalidate: 120 });
+
+export default async function MarketIndexPage() {
+  let data = null;
+  try {
+    data = await getIndexData();
+  } catch {
+    data = null;
+  }
+  const { list = [], recent = [], latest = null, flow = null, headline = "", points = [] } = data || {};
+  const ratioBy = new Map(recent.map((d) => [d.date, d.ratio]));
   const calendar = buildCalendar(list.slice().reverse());
   const chart = [...recent].reverse(); // 오래된 → 최신
 
@@ -146,7 +191,7 @@ export default async function MarketIndexPage() {
             <div className="mkh-peek">
               <div className="mkh-peek-col">
                 <h3>🔥 강했던 테마</h3>
-                {(latest.themeMap || latest.themesUp || []).filter((t) => t.avg > 0).slice(0, 3).map((t, i) => (
+                {latest.peekThemes.map((t, i) => (
                   <Link key={t.theme} href={`/themes?theme=${encodeURIComponent(t.theme)}`} className="mkh-peek-row" style={heat(t.avg)}>
                     <span className="mkh-peek-n mono">{i + 1}</span>
                     <span className="mkh-peek-name">{t.theme}</span>
@@ -156,7 +201,7 @@ export default async function MarketIndexPage() {
               </div>
               <div className="mkh-peek-col">
                 <h3>🚀 많이 오른 종목</h3>
-                {latest.gainers.slice(0, 3).map((s, i) => (
+                {latest.gainers.map((s, i) => (
                   <Link key={s.code} href={`/stock/${s.code}`} className="mkh-peek-row">
                     <span className="mkh-peek-n mono">{i + 1}</span>
                     <span className="mkh-peek-name">{s.name}</span>
@@ -166,7 +211,7 @@ export default async function MarketIndexPage() {
               </div>
               <div className="mkh-peek-col">
                 <h3>💰 돈이 몰린 종목</h3>
-                {latest.byValue.slice(0, 3).map((s, i) => (
+                {latest.byValue.map((s, i) => (
                   <Link key={s.code} href={`/stock/${s.code}`} className="mkh-peek-row">
                     <span className="mkh-peek-n mono">{i + 1}</span>
                     <span className="mkh-peek-name">{s.name}</span>
@@ -214,8 +259,8 @@ export default async function MarketIndexPage() {
             <div className="mkh-days">
               {recent.slice(0, 6).map((d) => {
                 const r = ratioBy.get(d.date);
-                const t = (d.themesUp || [])[0];
-                const g = d.gainers[0];
+                const t = d.topTheme;
+                const g = d.topGainer;
                 return (
                   <Link key={d.date} href={`/market/${d.date}`} className="mkh-day">
                     <div className="mkh-day-top">
