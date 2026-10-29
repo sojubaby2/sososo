@@ -2737,3 +2737,71 @@ img { -webkit-user-drag: none; }
   .site-header .theme-toggle-text { display: none; }
   .site-header .theme-toggle { width: 34px; padding: 0; justify-content: center; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   [2026-10-29] 장전 브리핑 — components/BriefingView.js, app/briefing
+   재성님: "장전 브리핑 가능해? 오전 8시 정도에 … 종합적으로 분석하고 판단해서"
+   ═══════════════════════════════════════════════════════════════════════ */
+.pmk-hero { background:
+    radial-gradient(120% 90% at 100% 0%, color-mix(in oklab, var(--amber) 14%, transparent), transparent 60%),
+    radial-gradient(90% 80% at 0% 100%, color-mix(in oklab, var(--down) 8%, transparent), transparent 60%),
+    var(--surface); }
+.pmk-mood { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; padding: 10px 12px; border-radius: 10px; background: var(--surface-2); margin: 4px 0 12px; font-size: 14px; line-height: 1.5; word-break: keep-all; }
+.pmk-mood b { font-size: 13px; color: #fff; border-radius: 6px; padding: 2px 8px; white-space: nowrap; }
+.pmk-mood.up b { background: var(--up); }
+.pmk-mood.down b { background: var(--down); }
+.pmk-mood.flat b { background: var(--ink-soft); }
+.pmk-summary { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+.pmk-summary li { font-size: 15.5px; line-height: 1.65; word-break: keep-all; }
+.pmk-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 6px; }
+.pmk-tile { display: flex; flex-direction: column; gap: 1px; padding: 9px 11px; border-radius: 10px; min-width: 0; }
+.pmk-tile-name { font-size: 12px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pmk-tile-px { font-size: 15px; font-weight: 700; }
+.pmk-tile-chg { font-size: 13px; font-weight: 700; }
+.pmk-list { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+.pmk-list li { font-size: 14.5px; line-height: 1.65; word-break: keep-all; }
+.pmk-list.check { list-style: none; padding-left: 0; }
+.pmk-list.check li::before { content: "☐ "; color: var(--amber); font-weight: 700; }
+.pmk-news { display: grid; gap: 8px; }
+.pmk-news-card { display: flex; gap: 10px; border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; background: var(--surface); }
+.pmk-news-card h3 { margin: 0 0 4px; font-size: 15px; font-weight: 700; line-height: 1.45; word-break: keep-all; }
+.pmk-news-card p { margin: 0 0 6px; font-size: 14px; color: var(--ink-muted); line-height: 1.6; word-break: keep-all; }
+.pmk-themes { display: grid; gap: 6px; }
+.pmk-theme { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; border-radius: 10px; text-decoration: none; color: var(--ink); border: 1px solid var(--border); }
+.pmk-theme.up { background: color-mix(in oklab, var(--up) 9%, var(--surface)); border-color: color-mix(in oklab, var(--up) 30%, transparent); }
+.pmk-theme.down { background: color-mix(in oklab, var(--down) 9%, var(--surface)); border-color: color-mix(in oklab, var(--down) 30%, transparent); }
+.pmk-theme:hover { outline: 1px solid var(--amber); }
+.pmk-theme-top { display: flex; align-items: baseline; gap: 8px; }
+.pmk-theme-top b { font-size: 14.5px; }
+.pmk-dir { margin-left: auto; font-size: 12px; font-weight: 700; white-space: nowrap; }
+.pmk-dir.up { color: var(--up); }
+.pmk-dir.down { color: var(--down); }
+.pmk-theme-why { font-size: 13px; color: var(--ink-muted); line-height: 1.55; word-break: keep-all; }
+.pmk-stocks { list-style: none; margin: 0; padding: 0; }
+.pmk-stocks li { padding: 9px 0; border-bottom: 1px solid var(--border); }
+.pmk-stocks li:last-child { border-bottom: none; }
+.pmk-stocks a { font-size: 15px; font-weight: 700; color: var(--ink); text-decoration: none; }
+.pmk-stocks a:hover { color: var(--amber); }
+.pmk-stocks p { margin: 2px 0 0; font-size: 13.5px; color: var(--ink-muted); line-height: 1.55; word-break: keep-all; }
+.pmk-prev { margin: 4px 0 14px; }
+.daily-outlook-more { text-decoration: none; }
+@media (max-width: 720px) {
+  .pmk-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
+  .pmk-tile { padding: 7px 8px; }
+  .pmk-tile-name { font-size: 11px; }
+  .pmk-tile-px { font-size: 13px; }
+  .pmk-tile-chg { font-size: 12px; }
+  .pmk-summary li { font-size: 14.5px; }
+}
+/* PC 메뉴가 9개로 늘어 — 아주 넓은 화면이 아니면 로고 옆 설명은 숨김 */
+@media (max-width: 1500px) { .site-header .brand-tag { display: none; } }
+@media (min-width: 1281px) and (max-width: 1440px) { .site-header .nav-btn { padding: 0 9px; } }
+@media (max-width: 1280px) {
+  .site-header .nav-btn { padding: 0 7px; font-size: 13.5px; }
+  .site-header .nav { gap: 0; }
+  .site-header .nav-badge { display: none; }
+}
+@media (max-width: 1080px) {
+  .site-header .nav-btn { padding: 0 5px; font-size: 13px; }
+  .site-header .nav-live { display: none; }
+}

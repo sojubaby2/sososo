@@ -32,6 +32,7 @@ import {
   Ticket,
   LineChart,
   BookOpen,
+  Sunrise,
   X,
 } from "lucide-react";
 import { MENU, FOOTER_LINKS, isMenuActive } from "../lib/siteMenu";
@@ -55,6 +56,8 @@ const ICONS = {
   bars: BarChart3,
   line: LineChart,
   book: BookOpen,
+  // [2026-10-29 추가] 장전 브리핑
+  sunrise: Sunrise,
 };
 
 export default function MobileTabBar() {

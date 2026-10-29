@@ -81,6 +81,12 @@ export default function DailyOutlookBanner() {
       </p>
       {renderRow(firstPick, 0)}
       {expanded && restPicks.map((pick, i) => renderRow(pick, i + 1))}
+      {/* [2026-10-29 추가] 배너가 장전 브리핑에서 만들어졌으면 브리핑 전체 보기 링크 */}
+      {outlook.briefing && (
+        <Link href={outlook.briefing} className="daily-outlook-toggle daily-outlook-more">
+          장전 브리핑 전체 보기 <ChevronRight size={14} />
+        </Link>
+      )}
       {hasMore && (
         <button
           type="button"
