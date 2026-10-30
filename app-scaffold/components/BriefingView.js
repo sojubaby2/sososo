@@ -72,22 +72,38 @@ export default function BriefingView({ b, latest = false }) {
         </div>
       </header>
 
-      {idx.length > 0 && (
-        <section className="panel stock-section">
-          <h2 className="stock-h2">밤사이 해외 시장</h2>
-          <p className="mk2-cap">미국 정규장 마감 기준 · 색이 진할수록 많이 움직였어요</p>
-          <Tiles rows={idx} />
-          {stocks.length > 0 && (
-            <>
-              <h3 className="mk-h3 mk2-gap">미국 주요 종목</h3>
-              <Tiles rows={stocks} full={5} />
-            </>
+      {/* [2026-10-30 순서 변경] 재성님 요청: ① 오늘 주목할 테마 ② 미국장 핵심 ③ 미국 주요 뉴스 ④ 국내 주요 뉴스 ⑤ 밤사이 해외 시장 ⑥ 조심할 점·장중 체크리스트 */}
+      {(b.themes?.length > 0 || b.stocks?.length > 0) && (
+        <section className="panel stock-section mk-grid pmk-picks">
+          {b.themes?.length > 0 && (
+            <div>
+              <h2 className="stock-h2">오늘 주목할 테마</h2>
+              <div className="pmk-themes">
+                {b.themes.map((t) => (
+                  <Link key={t.theme} href={`/themes?theme=${encodeURIComponent(t.theme)}`} className={`pmk-theme ${t.direction === "up" ? "up" : "down"}`}>
+                    <span className="pmk-theme-top">
+                      <b>{t.theme}</b>
+                      <span className={`pmk-dir ${t.direction === "up" ? "up" : "down"}`}>{t.direction === "up" ? "▲ 강세 기대" : "▼ 약세 우려"}</span>
+                    </span>
+                    <span className="pmk-theme-why">{t.reason}</span>
+                  </Link>
+                ))}
+              </div>
+            </div>
           )}
-          {macro.length > 0 && (
-            <>
-              <h3 className="mk-h3 mk2-gap">환율 · 금리 · 원자재</h3>
-              <Tiles rows={macro} full={2} />
-            </>
+          {b.stocks?.length > 0 && (
+            <div>
+              <h2 className="stock-h2">주목 종목</h2>
+              <ul className="pmk-stocks">
+                {b.stocks.map((s) => (
+                  <li key={s.code}>
+                    <Link href={`/stock/${s.code}`}>{s.name}</Link>
+                    <span className="mk-mkt">{s.market}</span>
+                    <p>{s.reason}</p>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
         </section>
       )}
@@ -135,7 +151,7 @@ export default function BriefingView({ b, latest = false }) {
 
       {b.news?.length > 0 && (
         <section className="panel stock-section">
-          <h2 className="stock-h2">주목할 뉴스</h2>
+          <h2 className="stock-h2">국내 주요 뉴스</h2>
           <div className="pmk-news">
             {b.news.map((n, i) => (
               <article key={i} className="pmk-news-card">
@@ -159,37 +175,23 @@ export default function BriefingView({ b, latest = false }) {
         </section>
       )}
 
-      {(b.themes?.length > 0 || b.stocks?.length > 0) && (
-        <section className="panel stock-section mk-grid pmk-picks">
-          {b.themes?.length > 0 && (
-            <div>
-              <h2 className="stock-h2">오늘 주목할 테마</h2>
-              <div className="pmk-themes">
-                {b.themes.map((t) => (
-                  <Link key={t.theme} href={`/themes?theme=${encodeURIComponent(t.theme)}`} className={`pmk-theme ${t.direction === "up" ? "up" : "down"}`}>
-                    <span className="pmk-theme-top">
-                      <b>{t.theme}</b>
-                      <span className={`pmk-dir ${t.direction === "up" ? "up" : "down"}`}>{t.direction === "up" ? "▲ 강세 기대" : "▼ 약세 우려"}</span>
-                    </span>
-                    <span className="pmk-theme-why">{t.reason}</span>
-                  </Link>
-                ))}
-              </div>
-            </div>
+
+      {idx.length > 0 && (
+        <section className="panel stock-section">
+          <h2 className="stock-h2">밤사이 해외 시장</h2>
+          <p className="mk2-cap">미국 정규장 마감 기준 · 색이 진할수록 많이 움직였어요</p>
+          <Tiles rows={idx} />
+          {stocks.length > 0 && (
+            <>
+              <h3 className="mk-h3 mk2-gap">미국 주요 종목</h3>
+              <Tiles rows={stocks} full={5} />
+            </>
           )}
-          {b.stocks?.length > 0 && (
-            <div>
-              <h2 className="stock-h2">주목 종목</h2>
-              <ul className="pmk-stocks">
-                {b.stocks.map((s) => (
-                  <li key={s.code}>
-                    <Link href={`/stock/${s.code}`}>{s.name}</Link>
-                    <span className="mk-mkt">{s.market}</span>
-                    <p>{s.reason}</p>
-                  </li>
-                ))}
-              </ul>
-            </div>
+          {macro.length > 0 && (
+            <>
+              <h3 className="mk-h3 mk2-gap">환율 · 금리 · 원자재</h3>
+              <Tiles rows={macro} full={2} />
+            </>
           )}
         </section>
       )}
