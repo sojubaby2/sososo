@@ -25,7 +25,8 @@
 //      → 마지막 봉이 30일보다 오래됐으면 "데이터 없음"으로 처리합니다.
 
 const YAHOO_URL = "https://query1.finance.yahoo.com/v8/finance/chart";
-const CACHE_SECONDS = 120; // 2분
+// [2026-10-30] 2분 → 1분(시세 지연 줄이기 — lib/quotes.js와 같은 이유)
+const CACHE_SECONDS = 60; // 1분
 const REQUEST_TIMEOUT_MS = 6000;
 const MAX_STALE_DAYS = 30;
 const RANGE = "9mo"; // 약 180거래일을 받아서, 20일선이 차트 맨 왼쪽부터 그려지게 함

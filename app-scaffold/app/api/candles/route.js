@@ -14,7 +14,8 @@ import { fetchDailyCandles } from "../../../lib/candles";
 
 export const dynamic = "force-dynamic";
 
-const OK_HEADERS = { "Cache-Control": "public, max-age=60, s-maxage=120, stale-while-revalidate=60" };
+// [2026-10-30] 공용 저장 2분 → 1분, 브라우저 저장 1분 → 30초(시세 지연 줄이기)
+const OK_HEADERS = { "Cache-Control": "public, max-age=30, s-maxage=60, stale-while-revalidate=30" };
 const FAIL_HEADERS = { "Cache-Control": "public, max-age=0, s-maxage=30" };
 
 export async function GET(request) {

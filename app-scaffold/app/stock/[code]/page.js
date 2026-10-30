@@ -139,6 +139,10 @@ export default async function StockPage({ params }) {
                 <span className="mono">{Math.round(summary.close).toLocaleString("ko-KR")}원</span>
                 <span className={`mono ${tone(summary.change)}`}>{sign(summary.change)}</span>
                 <span className="stock-asof">{summary.date} 기준 · 15~20분 지연</span>
+                {/* [2026-10-30] 실시간 시세는 네이버 증권으로(링크만) */}
+                <a className="stock-live" href={`https://finance.naver.com/item/main.naver?code=${code}`} target="_blank" rel="noopener noreferrer">
+                  실시간 시세는 네이버 ↗
+                </a>
               </p>
             ) : (
               <p className="stock-asof">시세를 받아오지 못했어요.</p>

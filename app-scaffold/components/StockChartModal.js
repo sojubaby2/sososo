@@ -391,6 +391,16 @@ export default function StockChartModal() {
             <p className="sc-price">
               <span className="mono">{last ? `${won(last.c)}원` : " "}</span>
               {lastChg !== null && <span className={`mono ${toneOf(lastChg)}`}>{pctText(lastChg)}</span>}
+              {/* [2026-10-30] 이 시세는 약 20분 늦은 값 — 실시간은 네이버 증권으로(링크만 걸어 줌, 시세를 가져오지 않음) */}
+              <a
+                className="sc-live"
+                href={`https://finance.naver.com/item/main.naver?code=${stock.code}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                실시간 시세는 네이버
+                <ExternalLink size={11} />
+              </a>
             </p>
           </div>
           <button ref={closeRef} type="button" className="sc-close" onClick={close} aria-label="차트 닫기">

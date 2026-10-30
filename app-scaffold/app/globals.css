@@ -3197,3 +3197,7 @@ img { -webkit-user-drag: none; }
 
 /* [2026-10-30] 대표 종목 — 장 시작 전후 "오늘 시세 대기 중" */
 .flag-px.flag-wait { font-size: 13px; font-weight: 600; color: var(--ink-soft); }
+
+/* [2026-10-30] 차트 창·종목 페이지 — "실시간 시세는 네이버" 링크 */
+.sc-live, .stock-live { display: inline-flex; align-items: center; gap: 2px; font-size: 11.5px; font-weight: 500; color: var(--ink-soft); text-decoration: none; border: 1px solid var(--border); border-radius: 999px; padding: 1px 8px; white-space: nowrap; }
+.sc-live:hover, .stock-live:hover { color: var(--ink); border-color: var(--ink-soft); }
