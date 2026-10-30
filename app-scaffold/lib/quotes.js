@@ -147,6 +147,33 @@ async function fetchMany(symbols) {
   return out;
 }
 
+// [2026-10-30 추가] 장 시작 전후 "어제 등락률"을 잠깐 숨기기
+// 재성님: "8시에 프리장 시작이니까 8시부터… 0%를 굳이 표시하지 말고 아예 시세표를 잠깐
+//          없앴다가 시세 받으면 그때 시세표를 넣던가"
+//   야후는 한국 정규장 시세만, 그것도 15~20분 늦게 줍니다. 8시 프리장이 열려도,
+//   9시 정규장이 열려도 9시 20분쯤까지는 어제 종가·어제 등락률이 그대로 옵니다.
+//   어제 숫자(-4% 등)가 오늘 움직임처럼 보이지 않게, 평일 08:00~09:59(한국 시간)에
+//   받은 값이 "오늘 날짜"가 아니면 등락률을 비웁니다(awaiting: true → 화면에서 숫자를 숨김).
+//   지연 시세가 들어오는 순간(값의 날짜가 오늘이 되면) 자동으로 다시 보입니다.
+//   10시 이후엔 적용하지 않습니다 — 평일 휴장일에 하루 종일 숫자가 비는 걸 막기 위해서입니다.
+const KST_MS = 9 * 3600 * 1000;
+const kstDay = (ms) => new Date(ms + KST_MS).toISOString().slice(0, 10);
+export function isAwaitingTodayQuote(asOf, now = Date.now()) {
+  const k = new Date(now + KST_MS);
+  const wd = k.getUTCDay();
+  if (wd === 0 || wd === 6) return false;
+  const hm = k.getUTCHours() * 100 + k.getUTCMinutes();
+  if (hm < 800 || hm >= 1000) return false;
+  const t = Date.parse(asOf || "");
+  if (!Number.isFinite(t)) return false;
+  return kstDay(t) < kstDay(now);
+}
+// 위 규칙을 시세 하나에 적용(국내 종목에만 씁니다 — 미국 ETF·해외 시세에는 쓰지 않음)
+export function applyOpenWait(q, now = Date.now()) {
+  if (!q || !isAwaitingTodayQuote(q.asOf, now)) return q;
+  return { ...q, changePct: null, awaiting: true };
+}
+
 // 국내 종목 시세.
 //   입력: [{ code, market }, ...]
 //   출력: Map(종목코드 -> { price, changePct, asOf })
@@ -163,7 +190,7 @@ export async function fetchDomesticQuotes(stocks) {
   const out = new Map();
   for (const [sym, code] of bySymbol) {
     const q = fetched.get(sym);
-    if (q) out.set(code, { price: q.price, changePct: q.changePct, asOf: q.asOf });
+    if (q) out.set(code, applyOpenWait({ price: q.price, changePct: q.changePct, asOf: q.asOf }));
   }
   return out;
 }

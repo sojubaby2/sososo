@@ -484,6 +484,9 @@ function FlagshipStrip({ filter, onPick }) {
         {rows.map((r) => {
           const d = r.domestic;
           const a = r.abroad;
+          // [2026-10-30] 한국장이 쉬는 동안엔 해외 원화 환산가(e)를 크게, 장 시작 전후 시세 대기 중엔 숫자를 숨김(wait)
+          const e = r.estimate;
+          const wait = !e && d?.awaiting;
           const loading = !data;
           const pressed = filter?.kind === "stock" && filter.value === r.name;
           return (
@@ -505,14 +508,34 @@ function FlagshipStrip({ filter, onPick }) {
                 {loading ? (
                   <span className="flag-skel flag-skel-px" />
                 ) : (
-                  <span className="flag-px">
-                    <span className="mono">{fmtWon(d?.price)}</span>
-                    <small>원</small>
-                    <span className={`flag-chg mono ${toneOf(d?.changePct)}`}>{fmtPct(d?.changePct)}</span>
-                  </span>
+                  e ? (
+                    <span className="flag-px">
+                      <span className="mono">{fmtWon(e.price)}</span>
+                      <small>원</small>
+                      <span className={`flag-chg mono ${toneOf(e.changePct)}`}>{fmtPct(e.changePct)}</span>
+                    </span>
+                  ) : wait ? (
+                    <span className="flag-px flag-wait">오늘 시세 대기 중</span>
+                  ) : (
+                    <span className="flag-px">
+                      <span className="mono">{fmtWon(d?.price)}</span>
+                      <small>원</small>
+                      <span className={`flag-chg mono ${toneOf(d?.changePct)}`}>{fmtPct(d?.changePct)}</span>
+                    </span>
+                  )
                 )}
               </span>
-              <span className="flag-when">{loading ? "\u00a0" : d ? `국내 ${kstClock(d.asOf)} 기준` : "국내 시세를 못 받아왔어요"}</span>
+              <span className="flag-when">
+                {loading
+                  ? "\u00a0"
+                  : e
+                    ? `${e.basis} 예상가 · ${kstClock(e.asOf)} 기준 (국내 ${kstClock(e.baseAsOf)} ${fmtWon(e.basePrice)}원 대비)`
+                    : wait
+                      ? `한국장 시세는 9시 20분쯤부터(15~20분 지연) · 어제 종가 ${fmtWon(d.prevClose)}원`
+                      : d
+                        ? `국내 ${kstClock(d.asOf)} 기준`
+                        : "국내 시세를 못 받아왔어요"}
+              </span>
 
               <span className="flag-abroad">
                 {loading ? (

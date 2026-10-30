@@ -3194,3 +3194,6 @@ img { -webkit-user-drag: none; }
 
 /* [2026-10-29 전체 점검] HOT 테마 패널 제목 옆 "10/28 기준" */
 .trending-panel-day { margin-left: 4px; font-size: 10.5px; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--ink-soft); }
+
+/* [2026-10-30] 대표 종목 — 장 시작 전후 "오늘 시세 대기 중" */
+.flag-px.flag-wait { font-size: 13px; font-weight: 600; color: var(--ink-soft); }

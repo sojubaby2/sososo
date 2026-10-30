@@ -38,6 +38,9 @@ export async function GET(request) {
       const map = await fetchDomesticQuotes(stocks);
       for (const [code, q] of map) {
         if (typeof q.changePct === "number") quotes[code] = { price: q.price, changePct: q.changePct };
+        // [2026-10-30] 장 시작 전후 오늘 시세 대기 중(lib/quotes.js applyOpenWait) — 화면이 들고 있던
+        //   어제 등락률을 지우도록 "비어 있음"을 분명히 보냄
+        else if (q.awaiting) quotes[code] = { price: null, changePct: null, awaiting: true };
       }
     } catch {
       // 야후가 응답을 안 주면 빈 값 — 화면은 기존 숫자를 그대로 둡니다

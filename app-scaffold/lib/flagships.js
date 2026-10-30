@@ -45,6 +45,7 @@
 // 비용: 야후 무료 시세라 돈이 들지 않습니다. 아래 CACHE_SECONDS 동안은 같은
 // 값을 재사용하므로 방문자가 몇 명이든 바깥 요청은 1분에 한 번입니다.
 
+import { applyOpenWait } from "./quotes";
 const YAHOO_URL = "https://query1.finance.yahoo.com/v8/finance/chart";
 const CACHE_SECONDS = 60;
 const REQUEST_TIMEOUT_MS = 5000;
@@ -63,7 +64,9 @@ export const FLAGSHIPS = [
     // [2026-10-27 수정] 야후는 런던 GDR(국제주문장)을 ".IL"로 적습니다. "SMSN.L"은
     // 야후에 없는 기호라 "해외 시세를 못 받아왔어요"가 떴습니다. 앞에서부터 차례로
     // 시도해서 먼저 값이 오는 기호를 씁니다.
-    abroad: { symbols: ["SMSN.IL", "SMSN.L"], venue: "런던 GDR", ticker: "SMSN", sharesPerUnit: 25 },
+    // [2026-10-30] parity: 원화로 바꾸면 국내 가격과 거의 같게 거래됨(차이 1% 안팎) → 한국장이 쉬는 동안
+    //   "런던 GDR 원화 환산가"를 국내 예상가로 크게 보여 줌. 하이닉스 ADR은 30~50% 비싸게 거래돼서 쓰지 않음.
+    abroad: { symbols: ["SMSN.IL", "SMSN.L"], venue: "런던 GDR", ticker: "SMSN", sharesPerUnit: 25, parity: true },
   },
   {
     code: "000660",
@@ -161,7 +164,10 @@ export async function fetchFlagships() {
     const out = {
       code: f.code,
       name: f.name,
-      domestic: dom ? { price: dom.price, changePct: dom.changePct, asOf: dom.asOf } : null,
+      // [2026-10-30] 평일 08:00~09:59에 아직 어제 시세면 국내 시세를 숨김(awaiting — lib/quotes.js applyOpenWait).
+      //   prevClose(어제 종가)는 "대기 중" 안내 문구에 씀.
+      domestic: dom ? { ...applyOpenWait({ price: dom.price, changePct: dom.changePct, asOf: dom.asOf }), prevClose: dom.price } : null,
+      estimate: null, // 아래에서 채움(삼성전자처럼 parity인 종목만)
       abroad: abr
         ? { venue: f.abroad.venue, ticker: f.abroad.ticker, price: abr.price, currency: abr.currency, changePct: abr.changePct, asOf: abr.asOf, krwPerShare: null, gapPct: null, gapBase: null }
         : null,
@@ -182,6 +188,22 @@ export async function fetchFlagships() {
           out.abroad.krwPerShare = Math.round(krw);
           out.abroad.gapPct = (krw / dom.price - 1) * 100;
           out.abroad.gapBase = "국내가";
+
+          // [2026-10-30 추가] 재성님: "해외시세 계속 받잖아 원화로 환산해서 금액 표시를 해줘 실시간으로,
+          //   그러다가 한국장 시작하면 한국장 시세 따라가고"
+          //   → 해외 시세가 국내 마지막 시세보다 나중 것이면(= 한국장이 쉬는 동안 해외에서 거래됨)
+          //     원화 환산가를 "국내 예상가"로 크게 보여 줌. 등락률은 국내 마지막 가격(보통 어제 종가) 대비.
+          //     한국장 지연 시세(오늘 날짜)가 들어오면 국내 시세 쪽이 더 최신이라 자동으로 국내 시세로 돌아감.
+          if (f.abroad.parity && Date.parse(abr.asOf) > Date.parse(dom.asOf)) {
+            out.estimate = {
+              price: Math.round(krw),
+              changePct: (krw / dom.price - 1) * 100,
+              basis: `${f.abroad.venue} 원화 환산`,
+              asOf: abr.asOf,
+              basePrice: dom.price,
+              baseAsOf: dom.asOf,
+            };
+          }
         }
       }
     }
