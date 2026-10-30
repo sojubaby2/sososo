@@ -362,8 +362,26 @@ function looksLikeBareUrl(text) {
 // "~발표", "~확대" 등) "-습니다/-입니다" 같은 정중한 문장 종결형으로는
 // 거의 안 끝나는 반면, 사람이 직접 쓴 코멘트("~보입니다", "~같아요",
 // "~네요")는 이런 종결형으로 끝나는 경우가 많음 — 이 차이로 감지함.
+// [2026-10-30 추가] 재성님: "진짜 쌉 민폐 국가. 이나라도 응징 좀 당해야되는데" 같은
+//   채널 운영자의 감정 섞인 한마디가 기사 제목 자리에 그대로 실려 게재됨("이런건 좀 심한데").
+//   → 욕설·비속어·인터넷 말투(ㅋㅋ, ㄷㄷ 등)가 있거나, 말하듯 끝나는 문장이면(…는데, …야, …겠다 등)
+//     "운영자 코멘트"로 보고 원문 기사 제목(og:title)으로 바꿉니다. 원문 제목도 못 가져오면 아예 게재하지 않습니다.
+const PROFANITY_RE = /(씨발|시발|씨바|시바|ㅅㅂ|ㅆㅂ|씹|쌉|존나|졸라|ㅈㄴ|좆|병신|ㅂㅅ|븅신|미친놈|미친년|개새|새끼|ㅅㄲ|닥쳐|꺼져|지랄|ㅈㄹ|염병|엿먹|빡치|좆같)/;
+const NET_SLANG_RE = /(ㅋㅋ|ㅎㅎ|ㅠㅠ|ㅜㅜ|ㄷㄷ|ㄹㅇ|ㅇㅇ|ㅉㅉ|ㄱㄱ|ㅗ)/;
+export function hasProfanity(text) {
+  return PROFANITY_RE.test(String(text || ""));
+}
 function looksLikeOperatorComment(text) {
-  return /(습니다|입니다|같아요|보여요|네요)[.!?~…]*$/.test((text || "").trim());
+  const t = (text || "").trim();
+  if (!t) return false;
+  if (PROFANITY_RE.test(t) || NET_SLANG_RE.test(t)) return true;
+  // 존댓말 설명조로 끝나는 문장(예전부터 있던 규칙)
+  if (/(니다|같아요|보여요|네요|세요)[.!?~…]*$/.test(t)) return true;
+  // 말하듯 끝나는 반말·혼잣말(기사 제목은 거의 이렇게 끝나지 않음)
+  if (/(는데|는데요|되는데|하는데|겠다|겠네|싶다|좋겠다|해야지|해야겠다|야지|구나|군요|잖아|잖아요|거든|더라|네|냐|니\?|나\?|ㅋ|ㅎ)[.!?~…]*$/.test(t)) return true;
+  // 제목 중간에 마침표로 문장이 끊기는 경우(예: "...국가. 이나라도...") — 기사 제목은 보통 한 문장
+  if (/[가-힣]\.\s+[가-힣]/.test(t) && !/\d\.\d/.test(t)) return true;
+  return false;
 }
 
 // [2026-10-26 추가 — "서버 깨워두기" 전용 입구]
@@ -497,9 +515,13 @@ export async function POST(request) {
         await logIngest({ stage: "제외", reason: "제목 못 찾음(링크만)" });
         return Response.json({ published: false, reason: "제목을 찾을 수 없음(링크만 있는 메시지)" });
       }
-      // isOperatorComment인데 원문에서도 제목을 못 가져온 경우엔, 운영자
-      // 코멘트라도 있는 게 제목이 아예 없는 것보다는 나으니 title은
-      // rawTitle(운영자 코멘트) 그대로 두고 게재 자체는 막지 않음.
+      // [2026-10-30 변경] 예전엔 운영자 코멘트라도 제목으로 썼는데, 감정 섞인 말·욕설이 그대로
+      //   실린 일이 있어(재성님 리포트) 이제는 원문 제목을 못 가져오면 게재하지 않습니다.
+      else {
+        await redis.set(key, "1", { ex: SEEN_TTL_SECONDS });
+        await logIngest({ stage: "제외", reason: "제목 못 찾음(운영자 코멘트)", title: String(rawTitle).slice(0, 80) });
+        return Response.json({ published: false, reason: "원문 제목을 찾을 수 없음(운영자 코멘트만 있는 메시지)" });
+      }
     }
     if (!summary) summary = meta.summary || "";
   }
@@ -510,6 +532,13 @@ export async function POST(request) {
   // "[종목이보영] ..." 같은 게 카드에 그대로 노출되지 않게 합니다. 이 자리에
   // 둔 이유는, 뒤따르는 종목 매칭·AI 필터도 깨끗해진 제목을 쓰게 하기 위함입니다.
   title = stripBrandLeadingTags(title);
+
+  // [2026-10-30 추가] 마지막 안전장치 — 원문 제목에서 가져왔는데도 욕설이 남아 있으면 게재하지 않음
+  if (hasProfanity(title)) {
+    await redis.set(key, "1", { ex: SEEN_TTL_SECONDS });
+    await logIngest({ stage: "제외", reason: "제목에 비속어", title: String(title).slice(0, 80) });
+    return Response.json({ published: false, reason: "제목에 비속어가 있어 게재하지 않음" });
+  }
 
   // [2026-09-18 추가 — AI 비용 절감] AI를 부르기 전에, 이 기사에 붙일 만한
   // 종목 후보가 하나라도 있는지 공짜로 먼저 확인합니다. 후보가 아예 없으면
