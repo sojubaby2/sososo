@@ -101,7 +101,7 @@ export function OgFrame({ tag, children }) {
       </div>
       <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, justifyContent: "center" }}>{children}</div>
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 24, color: C.muted }}>
-        <span>실시간 속보 · 관련주 자동 매칭</span>
+        <span>실시간 속보 · 관련주</span>
         <span>newsmeme.co.kr</span>
       </div>
     </div>

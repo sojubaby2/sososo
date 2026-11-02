@@ -50,7 +50,7 @@ export const revalidate = 60;
 export const metadata = {
   openGraph: {
     title: "속보 뜨는 순간, 관련주까지 한 번에 — 뉴스매매",
-    description: "실시간 주식 속보마다 움직일 관련주를 자동으로 찾아 붙여 줍니다. 오늘 강한 테마·종목 차트·공시 일정까지 무료로.",
+    description: "실시간 주식 속보마다 움직일 관련주를 함께 보여 줍니다. 오늘 강한 테마·종목 차트·공시 일정까지 무료로.",
     url: "/",
     siteName: "뉴스매매",
     locale: "ko_KR",
@@ -60,7 +60,7 @@ export const metadata = {
   twitter: {
     card: "summary_large_image",
     title: "속보 뜨는 순간, 관련주까지 한 번에 — 뉴스매매",
-    description: "실시간 주식 속보마다 움직일 관련주를 자동으로 찾아 붙여 줍니다.",
+    description: "실시간 주식 속보마다 움직일 관련주를 함께 보여 줍니다.",
     images: ["/og/home"],
   },
 };

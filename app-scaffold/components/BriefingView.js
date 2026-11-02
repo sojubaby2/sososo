@@ -3,6 +3,7 @@
 // [2026-10-29 신설] 장전 브리핑 한 편을 그리는 조각 — /briefing(최신)과 /briefing/날짜가 같이 씀.
 // 자료는 lib/premarket.js가 매일 아침 만들어 저장한 것(record)을 그대로 받습니다. 서버에서 그려서 추가 비용 없음.
 
+import { sessionWordWithDate, gapWord } from "../lib/sessionWord";
 import Link from "next/link";
 import ShareButton from "./ShareButton";
 import { heat, tone } from "./MarketParts";
@@ -46,6 +47,8 @@ export default function BriefingView({ b, latest = false }) {
   const stocks = us.filter((x) => x.group === "stock");
   const macro = us.filter((x) => x.group === "macro");
   const md = `${Number(b.date.slice(5, 7))}월 ${Number(b.date.slice(8, 10))}일`;
+  // [2026-11-02] 월요일·휴장 다음 날엔 "밤사이"·"어제" 대신 "주말 사이"·"지난 금요일"(lib/sessionWord.js)
+  const gap = b.prevDate ? gapWord(b.prevDate, b.date) : "밤사이";
 
   return (
     <>
@@ -123,7 +126,7 @@ export default function BriefingView({ b, latest = false }) {
       {/* [2026-10-29 추가] 밤사이 미국 주요 뉴스 — 미국 언론 RSS 제목을 AI가 한국어로 요약·분석(lib/usNews.js) */}
       {b.usNews?.length > 0 && (
         <section className="panel stock-section">
-          <h2 className="stock-h2">밤사이 미국 주요 뉴스</h2>
+          <h2 className="stock-h2">{gap} 미국 주요 뉴스</h2>
           <div className="pmk-news">
             {b.usNews.map((n, i) => (
               <article key={i} className="pmk-news-card">
@@ -178,7 +181,7 @@ export default function BriefingView({ b, latest = false }) {
 
       {idx.length > 0 && (
         <section className="panel stock-section">
-          <h2 className="stock-h2">밤사이 해외 시장</h2>
+          <h2 className="stock-h2">{gap} 해외 시장</h2>
           <p className="mk2-cap">미국 정규장 마감 기준 · 색이 진할수록 많이 움직였어요</p>
           <Tiles rows={idx} />
           {stocks.length > 0 && (
@@ -223,13 +226,13 @@ export default function BriefingView({ b, latest = false }) {
 
       {b.prevDate && (
         <Link href={`/market/${b.prevDate}`} className="mkh-cta pmk-prev">
-          어제({Number(b.prevDate.slice(5, 7))}/{Number(b.prevDate.slice(8, 10))}) 장 마감 리포트 보기 →
+          {sessionWordWithDate(b.prevDate, b.date)} 장 마감 리포트 보기 →
           <small>수급 · 테마 지도 · 급등주가 오른 이유</small>
         </Link>
       )}
 
       <p className="stock-disclaimer">
-        이 브리핑은 밤사이 해외 시세(야후), 미국 언론 기사 제목(CNBC·MarketWatch·야후 파이낸스·CNN 등), 이 사이트 속보, 전 거래일 장 마감 자료를 바탕으로 AI가 매일 아침 자동으로 정리한 참고 자료입니다.
+        이 브리핑은 해외 시세(야후), 미국 언론 기사(CNBC·MarketWatch·야후 파이낸스·CNN 등), 이 사이트 속보, 전 거래일 장 마감 자료를 바탕으로 정리한 참고 자료입니다.
         틀린 내용이 있을 수 있고, 투자 권유가 아닙니다. 투자 판단과 책임은 본인에게 있습니다.
         {latest ? " 매 거래일 아침 7시 40분쯤 새로 올라옵니다." : ""}
       </p>

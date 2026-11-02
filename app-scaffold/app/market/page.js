@@ -26,7 +26,7 @@ export const dynamic = "force-dynamic";
 export const metadata = {
   title: "장 마감 정리 — 매일 오후 4시 코스피·코스닥 마감 리포트 | 뉴스매매",
   description:
-    "매 거래일 장 마감 뒤 코스피·코스닥 전 종목을 자동 분석한 마감 리포트. 외국인·기관 수급, 강세·약세 테마 지도, 급등주와 그 이유가 된 속보, 거래대금 상위 종목을 날짜별로 정리합니다.",
+    "매 거래일 장 마감 뒤 코스피·코스닥 전 종목을 정리한 마감 리포트. 외국인·기관 수급, 강세·약세 테마 지도, 급등주와 그 이유가 된 속보, 거래대금 상위 종목을 날짜별로 정리합니다.",
   alternates: { canonical: "/market" },
 };
 
@@ -149,7 +149,7 @@ export default async function MarketIndexPage() {
         <header className="mkh-top">
           <h1 className="mk-title">장 마감 정리</h1>
           <p className="mkh-lead">
-            매 거래일 <b>오후 4시 전후</b>, 코스피·코스닥 전 종목을 자동으로 분석해 한 장의 리포트로 정리합니다.
+            매 거래일 <b>오후 4시 전후</b>, 코스피·코스닥 전 종목을 한 장의 리포트로 정리합니다.
           </p>
           <div className="mkh-badges">
             <span>전 종목 {latest ? latest.stockCount.toLocaleString("ko-KR") : "2,500+"}개 분석</span>

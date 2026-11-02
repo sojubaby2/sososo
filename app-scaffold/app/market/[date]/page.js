@@ -249,8 +249,8 @@ export default async function MarketDayPage({ params }) {
           </div>
           <h1 className="mk2-headline">{headline}</h1>
           <p className="mk2-sub">
-            코스피·코스닥 {d.stockCount.toLocaleString("ko-KR")}종목 자동 분석 ·{" "}
-            {d.provisional ? "장 마감 직후 시세(15~20분 지연), 다음 날 아침 한국거래소 확정치로 자동으로 바뀝니다" : "한국거래소 일별 시세 기준"} · 전 거래일(
+            코스피·코스닥 {d.stockCount.toLocaleString("ko-KR")}종목 ·{" "}
+            {d.provisional ? "장 마감 직후 시세(15~20분 지연), 다음 날 아침 한국거래소 확정치로 바뀝니다" : "한국거래소 일별 시세 기준"} · 전 거래일(
             {d.prevDate}) 종가 대비
           </p>
           <div className="mk2-idx-grid">
@@ -445,8 +445,8 @@ export default async function MarketDayPage({ params }) {
 
         <p className="stock-disclaimer">
           동전주(1,000원 미만)와 그날 거래가 없었던 종목은 순위에서 뺐습니다. 하루 등락이 ±30%를 넘는 종목(액면병합·거래재개 등으로 기준가가 바뀐
-          종목)은 계산에서 뺐습니다. 테마 평균은 이 사이트 테마 자료에 3종목 이상 있는 테마만 계산했습니다. 제목과 포인트 문장은 숫자를 보고
-          자동으로 만든 것입니다. 투자 권유가 아닌 참고 자료입니다.
+          종목)은 계산에서 뺐습니다. 테마 평균은 이 사이트 테마 자료에 3종목 이상 있는 테마만 계산했습니다.
+          투자 권유가 아닌 참고 자료입니다.
         </p>
       </main>
     </div>

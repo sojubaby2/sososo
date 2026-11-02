@@ -531,7 +531,7 @@ function FlagshipStrip({ filter, onPick }) {
                   : e
                     ? `${e.basis} 예상가 · ${kstClock(e.asOf)} 기준 (국내 ${kstClock(e.baseAsOf)} ${fmtWon(e.basePrice)}원 대비)`
                     : wait
-                      ? `한국장 시세는 9시 20분쯤부터(15~20분 지연) · 어제 종가 ${fmtWon(d.prevClose)}원`
+                      ? `한국장 시세는 9시 20분쯤부터(15~20분 지연) · 전 거래일 종가 ${fmtWon(d.prevClose)}원`
                       : d
                         ? `국내 ${kstClock(d.asOf)} 기준`
                         : "국내 시세를 못 받아왔어요"}
@@ -1244,7 +1244,7 @@ export default function HomeClient({ initialItems = [], worldIndices: worldIndic
 
               {loadState === "ready" && items.length === 0 && (
                 <p style={{ fontSize: 14, color: "var(--ink-muted)", padding: "24px 0" }}>
-                  아직 자동 수집된 뉴스가 없어요. 스케줄러가 연결되면 여기 자동으로 쌓이기 시작해요.
+                  아직 들어온 속보가 없어요. 새 속보가 들어오면 여기에 바로 쌓여요.
                 </p>
               )}
 

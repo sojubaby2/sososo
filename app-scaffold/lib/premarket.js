@@ -26,6 +26,7 @@ import { getRecentFeed } from "./recentFeed";
 import { getMarketDates, getMarketDay } from "./marketDay";
 import { getMarketFlow } from "./investorFlow";
 import { askJson } from "./claude";
+import { sessionWord, sessionWordWithDate, gapWord } from "./sessionWord";
 // [2026-10-29 추가] 밤사이 미국 주요 뉴스(미국 언론 RSS 제목·소개) — lib/usNews.js
 import { fetchUsNews } from "./usNews"; // [2026-10-29] AI 부르기(Haiku 5.5 + 4.5 대체 + 비용 계량기)
 
@@ -129,7 +130,11 @@ function fmt(v, d = 2) {
 }
 const sgn = (v) => (typeof v === "number" ? `${v > 0 ? "+" : ""}${v.toFixed(2)}%` : "—");
 
-function buildPrompt({ us, news, usNews = [], prevDay, prevFlow, themes, todayIso }) {
+function buildPrompt({ us, news, usNews = [], prevDay, prevFlow, themes, todayIso, prevIso = null }) {
+  // [2026-11-02] 월요일·휴장 다음 날엔 직전 거래일이 "어제"가 아님 → "지난 금요일"처럼(lib/sessionWord.js)
+  const prevWord = prevIso ? sessionWord(prevIso, todayIso) : "전 거래일";
+  const prevLabel = prevIso ? sessionWordWithDate(prevIso, todayIso) : "전 거래일";
+  const gap = prevIso ? gapWord(prevIso, todayIso) : "밤사이";
   const usLines = us.filter((x) => x.ok).map((x) => `${x.name}: ${fmt(x.price)} (${sgn(x.chg)})`).join("\n") || "(못 받음)";
   let kr = "(자료 없음)";
   if (prevDay) {
@@ -160,6 +165,7 @@ function buildPrompt({ us, news, usNews = [], prevDay, prevFlow, themes, todayIs
     usNews.map((n, i) => `${i + 1}. [${n.source}${n.t ? ` ${kstHM(n.t)}` : ""}] ${n.title}${n.desc ? ` — ${n.desc.slice(0, 160)}` : ""}`).join("\n") || "(못 받음)";
 
   const system = `너는 한국 주식 투자자를 위한 "장전 브리핑"을 쓰는 애널리스트다. 오늘은 ${todayIso}(한국 시간), 한국장 개장(09:00) 전이다.
+직전 한국 거래일은 ${prevLabel}이다. 직전 거래일을 가리킬 때는 "${prevWord}"라고 써라.${prevWord !== "어제" ? ` 오늘은 주말·휴장 뒤 첫 거래일이므로 "어제"라는 말은 쓰지 마라. 미국장도 "밤사이" 대신 "${gap}"·"지난 금요일 미국장"처럼 실제 날짜에 맞게 써라.` : ""}
 아래 [자료]에 있는 사실만 근거로 써라. 숫자는 자료에 있는 것만 쓰고 절대 지어내지 마라. 자료에 없는 일정·실적·발언을 만들어내지 마라.
 "사라/팔라/매수 추천" 같은 투자 권유 표현은 쓰지 말고, "주목", "부담", "기대" 같은 관찰 표현만 써라. 쉬운 한국어로, 문장은 짧게.
 반드시 아래 JSON 하나만 출력하라(설명 문장 없이):
@@ -182,16 +188,16 @@ usNews에서 고른 뉴스는 "us"(미국장 핵심)·"summary"·"themes"·"risk
 themes의 theme은 반드시 다음 정식 테마명 목록 중에서만 그대로 골라라: ${themes.join(" | ")}`;
 
   const user = `[자료]
-[1. 밤사이 미국·해외 시장(야후, 미국 정규장 마감 기준)]
+[1. ${gap} 미국·해외 시장(야후, 미국 정규장 마감 기준)]
 ${usLines}
 
-[2. 어제 한국장 마감]
+[2. ${prevLabel} 한국장 마감]
 ${kr}
 
-[3. 어제 장 마감 이후~지금까지(없으면 최근) 속보 — 시각은 한국 시간]
+[3. ${prevWord} 장 마감 이후~지금까지(없으면 최근) 속보 — 시각은 한국 시간]
 ${newsLines}
 
-[4. 밤사이 미국 주요 뉴스 — 미국 언론 RSS 제목과 짧은 소개(영어), 번호. 시각은 한국 시간]
+[4. ${gap} 미국 주요 뉴스 — 미국 언론 RSS 제목과 짧은 소개(영어), 번호. 시각은 한국 시간]
 ${usNewsLines}`;
   return { system, user };
 }
@@ -283,7 +289,8 @@ export async function refreshPremarket(redis, { force = false, now = new Date() 
     usSnapshot(),
     getRecentFeed(),
     getMarketDates().catch(() => []),
-    fetchUsNews({ sinceMs: now.getTime() - 20 * 3600 * 1000 }).catch(() => ({ items: [], sources: [] })),
+    // [2026-11-02] 월요일엔 지난 금요일 미국장 뉴스부터(주말 포함 약 68시간), 평소엔 20시간
+    fetchUsNews({ sinceMs: now.getTime() - (new Date(now.getTime() + 9 * 3600 * 1000).getUTCDay() === 1 ? 68 : 20) * 3600 * 1000 }).catch(() => ({ items: [], sources: [] })),
   ]);
   const usNews = usNewsRes.items || [];
   const prevIso = dates.filter((d) => d < iso).pop() || null;
@@ -295,7 +302,7 @@ export async function refreshPremarket(redis, { force = false, now = new Date() 
   const news = pickNews(feed, sinceMs);
 
   const themes = getAllThemeNames();
-  const { system, user } = buildPrompt({ us, news, usNews, prevDay, prevFlow, themes, todayIso: iso });
+  const { system, user } = buildPrompt({ us, news, usNews, prevDay, prevFlow, themes, todayIso: iso, prevIso });
   const { text, usage } = await askClaude(system, user);
   let parsed;
   try {

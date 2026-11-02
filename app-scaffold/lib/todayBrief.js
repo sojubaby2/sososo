@@ -36,6 +36,7 @@
 //   · 플러스  → "시장을 움직인 건 ○○이었습니다"
 //   · 마이너스 → "시장을 끌어내린 건 ○○이었습니다"
 
+import { sessionWord, kstTodayIso } from "./sessionWord";
 import { US_THEMES } from "./usThemes";
 import { KR_THEMES } from "./krThemes";
 
@@ -74,6 +75,20 @@ const MIN_FRESH_KR_THEMES = 5; // 국내 테마 평균 기준
 // 한국시간 기준 "오늘 몇 시인지"와 "오늘 0시가 언제인지"를 구합니다.
 // 서버는 UTC로 돌아가므로 9시간을 더한 뒤 getUTC* 로 읽습니다
 // (app/HomeClient.js의 formatKoreanDateTime과 같은 방식).
+// [2026-11-02] 코스피 시세의 날짜(asOf)로 직전 거래일을 알아내 "어제"/"지난 금요일"/"전 거래일" 중 맞는 말을 고름
+function lastSessionWord(kospi, now = new Date()) {
+  const todayIso = kstTodayIso(now);
+  const t = kospi?.asOf ? Date.parse(kospi.asOf) : NaN;
+  if (Number.isFinite(t)) {
+    const iso = kstTodayIso(new Date(t));
+    if (iso < todayIso) return sessionWord(iso, todayIso);
+  }
+  // 날짜를 모르면 요일로 짐작(월요일 → 지난 금요일, 일요일 → 지난 금요일, 그 외 어제)
+  const wd = kstNow(now).weekday;
+  if (wd === 0 || wd === 1) return "지난 금요일";
+  return "어제";
+}
+
 export function kstNow(now = new Date()) {
   const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
   const startOfDayUtcMs =
@@ -347,8 +362,12 @@ function pickMover(best, worst) {
 function buildUsPanel(etfQuotes, k) {
   // 미국 정규장은 한국시간으로 대략 23:30 ~ 06:00입니다(서머타임에 따라
   // 한 시간 움직입니다). 그 사이면 "지금", 아니면 "밤사이"로 씁니다.
-  const live = k.hour >= 23 || k.hour < 6;
-  const when = live ? "지금 미국" : "밤사이 미국";
+  // [2026-11-02 수정] 주말에도 "지금 미국 (장중)"이 뜨던 문제 — 미국장은 월~금(현지)만 열립니다.
+  //   한국 시간으로 월~금 23시 이후 또는 화~토 6시 전일 때만 "장중", 토요일 낮~월요일 밤 사이는 "지난 금요일 미국".
+  const wd = k.weekday; // 0=일
+  const live = (k.hour >= 23 && wd >= 1 && wd <= 5) || (k.hour < 6 && wd >= 2 && wd <= 6);
+  const afterWeekend = wd === 0 || (wd === 1 && k.hour < 23) || (wd === 6 && k.hour >= 12);
+  const when = live ? "지금 미국" : afterWeekend ? "지난 금요일 미국" : "밤사이 미국";
 
   const r = rankUs(etfQuotes);
   if (!r) {
@@ -375,7 +394,7 @@ function buildUsPanel(etfQuotes, k) {
   }
 
   return {
-    label: live ? "지금 미국 (장중)" : "밤사이 미국",
+    label: live ? "지금 미국 (장중)" : when,
     lead: {
       before: up ? `${when}을 움직${live ? "이는" : "인"} 건 ` : `${when}을 끌어내${live ? "리는" : "린"} 건 `,
       highlight: leader.label,
@@ -403,9 +422,12 @@ function buildDomesticPanel(items, today, todayRows, quotes, k, now, krEtfQuotes
     // "장중"이라고 쓰면 안 됩니다. 어제 값이라고 밝힙니다.
     const stale = etf.fresh === false;
     const live = marketOpen && !stale;
-    const label = stale ? "어제 한국 (마감)" : marketOpen ? "지금 한국 (장중)" : "오늘 한국";
-    const dayWord = stale ? "어제" : "오늘";
-    const staleNote = stale ? " · 오늘 시세는 9시 20분쯤부터 반영됩니다" : "";
+    // [2026-11-02 수정] 월요일·휴장 다음 날엔 "어제"가 아니라 "지난 금요일"처럼(lib/sessionWord.js)
+    const prevWord = lastSessionWord(kospi, now);
+    const label = stale ? `${prevWord} 한국 (마감)` : marketOpen ? "지금 한국 (장중)" : "오늘 한국";
+    const dayWord = stale ? prevWord : "오늘";
+    // "오늘 시세는 9시 20분쯤부터" 안내는 평일 장 시작 전후(7~10시)에만 — 주말엔 맞지 않음
+    const staleNote = stale && k.weekday >= 1 && k.weekday <= 5 && k.hour >= 7 && k.hour < 10 ? " · 오늘 시세는 9시 20분쯤부터 반영됩니다" : "";
     const contribNote = contribText ? ` · ${contribText}` : "";
 
     // 코스피 등락률. 못 받아왔으면(null) 예전처럼 테마끼리 비교합니다.
@@ -486,7 +508,7 @@ function buildDomesticPanel(items, today, todayRows, quotes, k, now, krEtfQuotes
     if (prevRanked) {
       rows = prevRows;
       ranked = prevRanked;
-      when = "어제";
+      when = lastSessionWord(kospi, now);
       count = prev.length;
     }
   }
@@ -505,7 +527,7 @@ function buildDomesticPanel(items, today, todayRows, quotes, k, now, krEtfQuotes
   }
 
   const live = when === "오늘" && marketOpen;
-  const label = when === "오늘" ? (marketOpen ? "지금 한국 (장중)" : "오늘 한국") : "어제 한국";
+  const label = when === "오늘" ? (marketOpen ? "지금 한국 (장중)" : "오늘 한국") : `${when} 한국`;
 
   const up = ranked.best.avgChangePct >= 0;
   const leader = up ? ranked.best : ranked.worst;

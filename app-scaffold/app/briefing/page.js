@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 export const metadata = {
   title: "장전 브리핑 — 매일 아침 미국장·밤사이 뉴스·오늘 주목 테마 | 뉴스매매",
   description:
-    "매 거래일 아침 7시 40분, 밤사이 나스닥·미국 주요 종목·환율과 어제 장 마감 이후 속보를 종합해 오늘 한국장 분위기, 주목 테마와 종목, 조심할 점을 정리합니다.",
+    "매 거래일 아침 7시 40분, 밤사이 나스닥·미국 주요 종목·환율과 전 거래일 장 마감 이후 속보를 종합해 오늘 한국장 분위기, 주목 테마와 종목, 조심할 점을 정리합니다.",
   alternates: { canonical: "/briefing" },
 };
 
@@ -42,7 +42,7 @@ export default async function BriefingIndexPage() {
               <span>장전 브리핑</span>
             </div>
             <h1 className="mk2-headline">매일 아침 7시 40분, 오늘 장을 미리 봅니다</h1>
-            <p className="mk2-sub">첫 브리핑이 곧 올라옵니다. 밤사이 미국장, 어제 장 마감 이후 속보, 오늘 주목할 테마·종목을 한 장으로 정리해 드려요.</p>
+            <p className="mk2-sub">첫 브리핑이 곧 올라옵니다. 밤사이 미국장, 전 거래일 장 마감 이후 속보, 오늘 주목할 테마·종목을 한 장으로 정리해 드려요.</p>
           </section>
         )}
 

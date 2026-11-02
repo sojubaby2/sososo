@@ -273,7 +273,7 @@ export default async function StockPage({ params }) {
         )}
 
         <p className="stock-disclaimer">
-          이 페이지는 공개된 시세와 이 사이트가 자동으로 모은 속보를 정리한 참고 자료이며, 특정 종목의 매수·매도를 권하지 않습니다.
+          이 페이지는 공개된 시세와 이 사이트에 들어온 속보를 정리한 참고 자료이며, 특정 종목의 매수·매도를 권하지 않습니다.
           시세는 15~20분 지연된 값입니다.{" "}
           <a href={`https://finance.naver.com/item/main.naver?code=${code}`} target="_blank" rel="noopener noreferrer">
             네이버 증권에서 보기
