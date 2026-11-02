@@ -48,9 +48,9 @@ export function kstTodayIso(now = new Date()) {
   return new Date(now.getTime() + 9 * 3600 * 1000).toISOString().slice(0, 10);
 }
 
-async function dartGet(path, params) {
+async function dartGet(path, params, timeoutMs = TIMEOUT_MS) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const qs = new URLSearchParams({ crtfc_key: process.env.DART_API_KEY || "", ...params });
     const res = await fetch(`${DART}/${path}?${qs}`, {
@@ -186,6 +186,7 @@ async function fetchIpoScheduleRaw(now = new Date()) {
   // 1단계: 목록 (최대 3쪽 = 300건)
   const filings = [];
   for (let page = 1; page <= 3; page++) {
+    // [2026-11-02] 목록 조회(최근 89일)는 DART 쪽 응답이 느릴 때가 있어 기다리는 시간을 25초로 늘림
     const j = await dartGet("list.json", {
       bgn_de: begin,
       end_de: end,
@@ -195,7 +196,7 @@ async function fetchIpoScheduleRaw(now = new Date()) {
       last_reprt_at: "Y",
       page_no: String(page),
       page_count: "100",
-    });
+    }, 25000);
     if (j?.status === "013") break; // 자료 없음
     if (j?.status !== "000") {
       return { items: [], fetchedAt: now.toISOString(), error: `DART 응답 코드 ${j?.status}: ${j?.message || ""}` };
@@ -249,6 +250,21 @@ export async function fetchIpoSchedule(now = new Date()) {
     fresh = { items: [], fetchedAt: now.toISOString(), error: String(err?.message || err) };
   }
   const redis = getRedis();
+  // [2026-11-02 추가] Cloudflare에서 DART 목록 조회가 시간 초과로 실패할 때가 있어(같은 코드가 Vercel에선 정상),
+  //   예전 Vercel 주소(sososo-xi.vercel.app)의 /api/ipo에서 한 번 더 받아 봄. Vercel 안에서 돌 때는 건너뜀(자기 자신 호출 방지).
+  if (!fresh?.items?.length && !process.env.VERCEL) {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), 15000);
+    try {
+      const res = await fetch("https://sososo-xi.vercel.app/api/ipo", { signal: ctl.signal, cache: "no-store" });
+      const j = res.ok ? await res.json() : null;
+      if (j?.items?.length) fresh = { ...j, via: "vercel" };
+    } catch {
+      // 대체 경로도 실패 — 아래 정상본으로
+    } finally {
+      clearTimeout(t);
+    }
+  }
   if (fresh?.items?.length) {
     if (redis) await redis.set(LAST_GOOD_KEY, fresh, { ex: 7 * 86400 }).catch(() => {});
     return fresh;
