@@ -15,6 +15,9 @@ export const size = OG_SIZE;
 export const contentType = "image/png";
 export const alt = "뉴스매매 공모주 청약 일정";
 export const revalidate = 3600;
+// [2026-11-02 추가] 안쪽 DART 호출이 "저장 안 함(no-store)"이라 이 화면이 매번 새로 만들어지며 10초 넘게 걸렸음.
+//   아래 한 줄로 다시 "만들어 둔 화면을 3시간 동안 바로 보여 주는" 방식으로 되돌림.
+export const dynamic = "force-static";
 
 const DAY = ["일", "월", "화", "수", "목", "금", "토"];
 const md = (iso) => `${Number(iso.slice(5, 7))}/${Number(iso.slice(8, 10))}`;

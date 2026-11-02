@@ -26,6 +26,9 @@ import IpoCalendar from "../../components/IpoCalendar";
 import { fetchIpoSchedule, statusOf, kstTodayIso } from "../../lib/ipo";
 
 export const revalidate = 10800; // 3시간마다 새로 만듦
+// [2026-11-02 추가] 안쪽 DART 호출이 "저장 안 함(no-store)"이라 이 화면이 매번 새로 만들어지며 10초 넘게 걸렸음.
+//   아래 한 줄로 다시 "만들어 둔 화면을 3시간 동안 바로 보여 주는" 방식으로 되돌림.
+export const dynamic = "force-static";
 
 // [2026-10-27 변경] 카카오톡 공유 때 누르고 싶게 — 제목·설명에 "지금 청약 중인 곳"을 숫자와 이름으로 넣습니다.
 // (미리보기 그림은 app/ipo/opengraph-image.js)

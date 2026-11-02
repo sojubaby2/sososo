@@ -242,7 +242,21 @@ async function fetchIpoScheduleRaw(now = new Date()) {
 //   해결: 제대로 받은 결과는 Redis에 "마지막 정상본"으로 보관해 두고, 이번에 못 받으면 그 정상본을 대신 보여 줍니다.
 //         (정상본은 7일 보관 — 7일 넘게 계속 실패할 때만 안내 문구가 나옴)
 const LAST_GOOD_KEY = "ipo:last-good";
+// [2026-11-02 추가] 3시간 안에 받아 둔 정상본이 있으면 DART에 다시 묻지 않고 바로 씀 — 공모주 화면이
+//   열릴 때마다 DART·Vercel을 기다리느라 10초 넘게 걸리던 문제 수정(재성님 리포트).
+const FRESH_MS = 3 * 3600 * 1000;
 export async function fetchIpoSchedule(now = new Date()) {
+  const redisFirst = getRedis();
+  if (redisFirst) {
+    try {
+      const raw = await redisFirst.get(LAST_GOOD_KEY);
+      const last = typeof raw === "string" ? JSON.parse(raw) : raw;
+      const savedMs = last?.savedAt ? Date.parse(last.savedAt) : NaN;
+      if (last?.items?.length && now.getTime() - savedMs < FRESH_MS) return last;
+    } catch {
+      // 못 읽으면 아래에서 새로 받음
+    }
+  }
   let fresh = null;
   try {
     fresh = await fetchIpoScheduleRaw(now);
@@ -266,6 +280,7 @@ export async function fetchIpoSchedule(now = new Date()) {
     }
   }
   if (fresh?.items?.length) {
+    fresh = { ...fresh, savedAt: now.toISOString() };
     if (redis) await redis.set(LAST_GOOD_KEY, fresh, { ex: 7 * 86400 }).catch(() => {});
     return fresh;
   }
