@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 // components/Header.js
 //
@@ -50,14 +50,45 @@ import { Zap, CandlestickChart, Layers, Ticket, CalendarDays, BarChart3, LineCha
 const ICONS = { zap: Zap, candle: CandlestickChart, layers: Layers, ticket: Ticket, calendar: CalendarDays, bars: BarChart3, line: LineChart, book: BookOpen, sunrise: Sunrise };
 
 // 메뉴 한 칸의 안쪽(그림 + 이름 + 실시간 점/꼬리표)
-function NavInner({ m }) {
+// [2026-11-02 추가] 메뉴 옆 "오늘의 살아 있는 표시" — /api/nav-badges(lib/navBadges.js)에서 받아 옴.
+//   hot(색 있는 표시): 오늘 새로 생긴 것(오늘 브리핑·오늘 장 마감 정리·청약 중·새 글)
+//   그 밖(회색 작은 글씨): 숫자·이름(돌파 12, 공시 건수, 오늘 많이 나온 테마)
+//   페이지를 옮겨 다녀도 5분 동안은 다시 받지 않음(아래 badgeCache).
+let badgeCache = { at: 0, data: null };
+function useNavBadges() {
+  const [data, setData] = useState(badgeCache.data);
+  useEffect(() => {
+    if (badgeCache.data && Date.now() - badgeCache.at < 5 * 60 * 1000) return;
+    let alive = true;
+    fetch("/api/nav-badges")
+      .then((r) => r.json())
+      .then((d) => {
+        const b = d?.badges || {};
+        badgeCache = { at: Date.now(), data: b };
+        if (alive) setData(b);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return data || {};
+}
+
+function NavInner({ m, badge }) {
   const Icon = ICONS[m.icon] || LayoutGrid;
   return (
     <>
       <Icon className="nav-ico" size={16} strokeWidth={2} aria-hidden="true" />
       <span>{m.pc || m.label}</span>
       {m.live && <span className="nav-live" aria-label="실시간" />}
-      {m.badge && <span className="nav-badge">{m.badge}</span>}
+      {badge ? (
+        <span className={`nav-badge ${badge.hot ? "" : "soft"}`} title={badge.title || undefined}>
+          {badge.text}
+        </span>
+      ) : (
+        m.badge && <span className="nav-badge">{m.badge}</span>
+      )}
     </>
   );
 }
@@ -70,6 +101,7 @@ const BRAND_ACCENT = "#ff5b4e";
 
 export default function Header() {
   const pathname = usePathname();
+  const badges = useNavBadges();
   // [2026-10-27 추가] 휴대폰에서 메뉴 줄은 옆으로 밀어야 다 보이는데, 지금 보고 있는 메뉴(예: 공시 일정)가
   // 화면 밖에 숨어 있었습니다. 페이지에 들어오면 그 메뉴를 보이는 곳으로 살짝 밀어 줍니다(PC에서는 변화 없음).
   const navRef = useRef(null);
@@ -98,7 +130,7 @@ export default function Header() {
             if (m.external) {
               return (
                 <a key={m.href} href={m.href} target="_blank" rel="noopener noreferrer" className="nav-btn">
-                  <NavInner m={m} />
+                  <NavInner m={m} badge={badges[m.href]} />
                 </a>
               );
             }
@@ -108,13 +140,13 @@ export default function Header() {
             if (m.vignette) {
               return (
                 <a key={m.href} href={m.href} className={`nav-btn ${active ? "active" : ""}`} data-vignette-allow="">
-                  <NavInner m={m} />
+                  <NavInner m={m} badge={badges[m.href]} />
                 </a>
               );
             }
             return (
               <Link key={m.href} href={m.href} className={`nav-btn ${active ? "active" : ""}`}>
-                <NavInner m={m} />
+                <NavInner m={m} badge={badges[m.href]} />
               </Link>
             );
           })}

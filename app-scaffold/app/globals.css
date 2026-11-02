@@ -3201,3 +3201,11 @@ img { -webkit-user-drag: none; }
 /* [2026-10-30] 차트 창·종목 페이지 — "실시간 시세는 네이버" 링크 */
 .sc-live, .stock-live { display: inline-flex; align-items: center; gap: 2px; font-size: 11.5px; font-weight: 500; color: var(--ink-soft); text-decoration: none; border: 1px solid var(--border); border-radius: 999px; padding: 1px 8px; white-space: nowrap; }
 .sc-live:hover, .stock-live:hover { color: var(--ink); border-color: var(--ink-soft); }
+
+/* [2026-11-02] 메뉴 옆 회색 작은 표시(돌파 12, 공시 건수, 오늘 많이 나온 테마) — 색 있는 표시는 기존 .nav-badge */
+.nav-badge.soft { color: var(--ink-soft); background: transparent; border: 1px solid var(--border); font-weight: 600; letter-spacing: 0; }
+.nav-btn.active .nav-badge.soft { color: inherit; border-color: currentColor; opacity: 0.8; }
+/* 메뉴가 꽉 차는 너비에선 회색 표시(1800px 이하)부터 숨기고, 1366px 이하에선 표시를 모두 숨김 — 검색·어둡게 단추가 밀려나지 않게 */
+@media (max-width: 1800px) { .site-header .nav-badge.soft { display: none; } }
+@media (max-width: 1366px) { .site-header .nav-badge { display: none; } }
+@media (min-width: 1367px) and (max-width: 1440px) { .site-header .nav-badge { font-size: 9.5px; padding: 1px 4px; } .site-header .nav-btn { gap: 5px; } }

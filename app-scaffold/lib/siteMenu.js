@@ -25,8 +25,9 @@ export const MENU = [
   // [2026-10-29 순서 변경] 재성님: "홈, 장전브리핑, 장마감 정리, 테마별 종목정리, 패턴검색, 공시일정, 공모주정보, 차트가이드, 칼럼"
   { href: "/", label: "홈 · 뉴스", short: "홈 · 속보", icon: "zap", match: (p) => p === "/", live: true },
   // [2026-10-29 추가] 매일 아침 장전 브리핑(app/briefing, lib/premarket.js)
-  { href: "/briefing", label: "장전 브리핑", short: "장전 브리핑", icon: "sunrise", badge: "NEW" },
-  { href: "/market", label: "장 마감 정리", short: "장 마감 정리", icon: "bars", badge: "NEW" },
+  // [2026-11-02] 고정 "NEW" 표시는 뺐습니다 — 대신 메뉴마다 그날 바뀐 내용을 작게 보여 줌(lib/navBadges.js, components/Header.js)
+  { href: "/briefing", label: "장전 브리핑", short: "장전 브리핑", icon: "sunrise" },
+  { href: "/market", label: "장 마감 정리", short: "장 마감 정리", icon: "bars" },
   { href: "/themes", label: "테마별 종목정리", pc: "테마별 종목", short: "테마별 종목", icon: "layers", vignette: true },
   { href: "/patterns", label: "패턴검색", short: "패턴검색", icon: "candle" },
   // [2026-10-27 추가] DART 공시 일정·주요 공시(app/disclosure)
