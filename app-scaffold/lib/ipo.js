@@ -30,6 +30,8 @@
 //   error 칸에 이유가 적힙니다(예: "DART_API_KEY 없음", "DART 응답 코드 020" 등).
 //   DART 응답 코드: 000 정상 / 013 자료 없음 / 010·011 키 문제 / 020 하루 한도 초과
 
+import { getRedis } from "./redis";
+
 const DART = "https://opendart.fss.or.kr/api";
 const REVALIDATE_SECONDS = 3 * 3600; // 3시간
 const LOOKBACK_DAYS = 89; // DART 목록 검색은 회사 지정 없이 최대 3개월
@@ -53,7 +55,9 @@ async function dartGet(path, params) {
     const qs = new URLSearchParams({ crtfc_key: process.env.DART_API_KEY || "", ...params });
     const res = await fetch(`${DART}/${path}?${qs}`, {
       signal: controller.signal,
-      next: { revalidate: REVALIDATE_SECONDS },
+      // [2026-11-02] 호출마다 저장소(R2)를 따로 읽고 쓰지 않게 함 — 페이지 자체가 3시간 저장되므로 충분하고,
+      //   Cloudflare 한 번 실행에 허용되는 바깥 요청 수를 덜 씀(실패 원인 줄이기)
+      cache: "no-store",
     });
     if (!res.ok) throw new Error(`DART HTTP ${res.status}`);
     return await res.json();
@@ -172,7 +176,7 @@ async function mapLimited(arr, limit, fn) {
   return out;
 }
 
-export async function fetchIpoSchedule(now = new Date()) {
+async function fetchIpoScheduleRaw(now = new Date()) {
   if (!process.env.DART_API_KEY) {
     return { items: [], fetchedAt: now.toISOString(), error: "DART_API_KEY 없음 (Vercel 환경변수 확인)" };
   }
@@ -229,4 +233,34 @@ export async function fetchIpoSchedule(now = new Date()) {
 
   const items = detailed.filter(Boolean);
   return { items, fetchedAt: now.toISOString(), checked: bases.length };
+}
+
+// [2026-11-02 추가] 재성님: "PC로 보면 공모주가 보이는데 모바일로 보면 '공모주 일정을 불러오지 못했습니다'가 뜬다"
+//   원인: 3시간마다 새로 받을 때 DART 호출(회사마다 1번, 최대 40여 번)이 한 번이라도 통째로 실패하면,
+//         그 "실패한 화면"이 다음 3시간 동안 저장돼 그대로 보였습니다(먼저 저장된 곳에 따라 PC·휴대폰이 다르게 보임).
+//   해결: 제대로 받은 결과는 Redis에 "마지막 정상본"으로 보관해 두고, 이번에 못 받으면 그 정상본을 대신 보여 줍니다.
+//         (정상본은 7일 보관 — 7일 넘게 계속 실패할 때만 안내 문구가 나옴)
+const LAST_GOOD_KEY = "ipo:last-good";
+export async function fetchIpoSchedule(now = new Date()) {
+  let fresh = null;
+  try {
+    fresh = await fetchIpoScheduleRaw(now);
+  } catch (err) {
+    fresh = { items: [], fetchedAt: now.toISOString(), error: String(err?.message || err) };
+  }
+  const redis = getRedis();
+  if (fresh?.items?.length) {
+    if (redis) await redis.set(LAST_GOOD_KEY, fresh, { ex: 7 * 86400 }).catch(() => {});
+    return fresh;
+  }
+  if (redis) {
+    try {
+      const raw = await redis.get(LAST_GOOD_KEY);
+      const last = typeof raw === "string" ? JSON.parse(raw) : raw;
+      if (last?.items?.length) return { ...last, stale: true, staleReason: fresh?.error || "빈 응답" };
+    } catch {
+      // 정상본도 못 읽으면 아래로
+    }
+  }
+  return fresh;
 }
