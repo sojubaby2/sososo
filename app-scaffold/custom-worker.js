@@ -19,9 +19,20 @@ import { default as handler } from "./.open-next/worker.js";
 // [2026-10-30 수정] 요일 표기를 바꿔도 안 어긋나게 "40 22"로 시작하는지만 봅니다.
 const isPremarketCron = (cron) => String(cron || "").startsWith("40 22 ");
 
+// [2026-11-03 추가] 패턴검색 결과를 매시간 새로 계산시키는 예약 실행("15 * * * *" = 매시 15분).
+//   이 계산은 너무 무거워 Cloudflare 안에서는 못 돌리고, 예전 Vercel 주소에서 계산해 같은 저장소(Redis)에 넣습니다.
+//   원래 cron-job.org가 매시간 부르던 일인데 몇 시간씩 실패해 패턴검색이 "0종목"으로 비는 일이 반복돼서,
+//   Cloudflare가 직접 부르게 했습니다(추가 요금 없음 — 하루 24번 호출).
+const isPatternsCron = (cron) => String(cron || "").startsWith("15 * ");
+const PATTERNS_REFRESH_URL = "https://sososo-xi.vercel.app/api/patterns?refresh=1";
+
 export default {
   fetch: handler.fetch,
   async scheduled(event, env, ctx) {
+    if (isPatternsCron(event.cron)) {
+      ctx.waitUntil(fetch(PATTERNS_REFRESH_URL).then((r) => r.text()).catch(() => null));
+      return;
+    }
     const secret = encodeURIComponent(env.CRON_SECRET || "");
     const path = isPremarketCron(event.cron) ? "/api/premarket/refresh" : "/api/market-close";
     const req = new Request(`https://newsmeme.co.kr${path}?secret=${secret}`);

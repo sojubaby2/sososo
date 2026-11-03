@@ -38,6 +38,9 @@ import { decodeEntities } from "../../../lib/decodeEntities";
 import { disclosuresForStock, categoryLabel, dartViewerUrl, kstTodayIso } from "../../../lib/disclosures";
 
 export const revalidate = 600; // 10분
+// [2026-11-03 추가] 공시 자료를 Redis(마지막 정상본)에서 읽는데, 그 읽기가 "저장 안 함" 방식이라 이 줄이 없으면
+//   화면을 미리 만들어 둘 때 오류가 나서 Redis를 못 씁니다. 아래 한 줄로 "만들어 둔 화면을 정해진 시간 동안 보여 주기"를 유지합니다.
+export const dynamic = "force-static";
 export const dynamicParams = true;
 
 // 빌드할 때 미리 만들지 않고, 처음 누가 들어올 때 만들어 저장합니다(빌드 시간·비용 절약).

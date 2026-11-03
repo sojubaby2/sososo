@@ -17,6 +17,9 @@ export const size = OG_SIZE;
 export const contentType = "image/png";
 export const alt = "뉴스매매 공시 일정";
 export const revalidate = 1800;
+// [2026-11-03 추가] 공시 자료를 Redis(마지막 정상본)에서 읽는데, 그 읽기가 "저장 안 함" 방식이라 이 줄이 없으면
+//   화면을 미리 만들어 둘 때 오류가 나서 Redis를 못 씁니다. 아래 한 줄로 "만들어 둔 화면을 정해진 시간 동안 보여 주기"를 유지합니다.
+export const dynamic = "force-static";
 
 const DAY = ["일", "월", "화", "수", "목", "금", "토"];
 const md = (iso) => `${Number(iso.slice(5, 7))}/${Number(iso.slice(8, 10))}(${DAY[new Date(`${iso}T00:00:00Z`).getUTCDay()]})`;

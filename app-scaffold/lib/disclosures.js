@@ -21,6 +21,7 @@
 
 import { unstable_cache } from "next/cache";
 import { parseDates } from "./ipo";
+import { getRedis } from "./redis";
 
 const DART = "https://opendart.fss.or.kr/api";
 const TIMEOUT_MS = 8000;
@@ -284,17 +285,75 @@ async function collect() {
 }
 
 // 30분 저장본 — 공시 일정 페이지와 종목 페이지 1,000여 개가 같이 씁니다.
-export const getDisclosureData = unstable_cache(
-  async () => {
+//
+// [2026-11-03 변경 — "공시 일정이 안 나와요" 재성님 리포트] 공모주와 같은 원인이었습니다.
+//   새 사이트(Cloudflare)에서 DART 목록을 수십 번 물어보면 시간 초과로 자주 실패하는데(같은 코드가 Vercel에선 정상),
+//   실패한 "빈 결과"가 30분 동안 그대로 저장돼 "받아오지 못했습니다"가 보였습니다. 이제 아래 순서로 가져옵니다.
+//     1) Redis에 30분 안에 받아 둔 정상본이 있으면 그대로 씀(DART에 안 물어봄)
+//     2) 없으면 예전 Vercel 주소(sososo-xi.vercel.app)의 /api/disclosures에서 받아 옴 — Cloudflare에서 돌 때만
+//     3) 그것도 안 되면 직접 DART에 물어봄
+//     4) 다 실패하면 마지막 정상본(최대 7일 보관)을 보여 줌
+//   실패했을 때는 저장하지 않으므로(오류를 던짐) 다음 방문 때 바로 다시 시도합니다.
+const LAST_GOOD_KEY = "disclosures:last-good";
+const FRESH_MS = LIST_REVALIDATE * 1000;
+const hasData = (d) => !!(d && (d.recent?.length || d.events?.length));
+
+async function fromVercel() {
+  if (process.env.VERCEL) return null; // Vercel 안에서는 자기 자신을 부르지 않음
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), 25000);
+  try {
+    const res = await fetch("https://sososo-xi.vercel.app/api/disclosures", { signal: ctl.signal, cache: "no-store" });
+    if (!res.ok) return null;
+    const j = await res.json();
+    return hasData(j) ? { ...j, via: "vercel" } : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+async function loadDisclosures() {
+  const redis = getRedis();
+  let last = null;
+  if (redis) {
     try {
-      return await collect();
+      const raw = await redis.get(LAST_GOOD_KEY);
+      last = typeof raw === "string" ? JSON.parse(raw) : raw;
     } catch {
-      return null;
+      last = null;
     }
-  },
-  ["disclosures-v1"],
-  { revalidate: LIST_REVALIDATE }
-);
+  }
+  const savedMs = last?.savedAt ? Date.parse(last.savedAt) : NaN;
+  if (hasData(last) && Date.now() - savedMs < FRESH_MS) return last;
+
+  let fresh = await fromVercel();
+  if (!fresh) {
+    try {
+      fresh = await collect();
+    } catch {
+      fresh = null;
+    }
+  }
+  if (hasData(fresh)) {
+    fresh = { ...fresh, savedAt: new Date().toISOString() };
+    if (redis) await redis.set(LAST_GOOD_KEY, fresh, { ex: 7 * 86400 }).catch(() => {});
+    return fresh;
+  }
+  if (hasData(last)) return { ...last, stale: true };
+  throw new Error("공시를 받아오지 못함"); // 던지면 아래 저장본에 안 남음 → 다음 방문 때 다시 시도
+}
+
+const cachedDisclosures = unstable_cache(loadDisclosures, ["disclosures-v2"], { revalidate: LIST_REVALIDATE });
+
+export async function getDisclosureData() {
+  try {
+    return await cachedDisclosures();
+  } catch {
+    return null;
+  }
+}
 
 // 종목 하나의 최근 공시(최근 7일 주요 공시 + 75일 안의 결정 공시 일정)
 export async function disclosuresForStock(code, max = 8) {

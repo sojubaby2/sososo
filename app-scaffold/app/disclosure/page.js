@@ -22,6 +22,9 @@ import DisclosureList from "../../components/DisclosureList";
 import { getDisclosureData, CATEGORIES, kstTodayIso } from "../../lib/disclosures";
 
 export const revalidate = 1800;
+// [2026-11-03 추가] 공시 자료를 Redis(마지막 정상본)에서 읽는데, 그 읽기가 "저장 안 함" 방식이라 이 줄이 없으면
+//   화면을 미리 만들어 둘 때 오류가 나서 Redis를 못 씁니다. 아래 한 줄로 "만들어 둔 화면을 정해진 시간 동안 보여 주기"를 유지합니다.
+export const dynamic = "force-static";
 
 // [2026-10-27 변경] 카카오톡 공유 때 누르고 싶게 — 이번 주 일정 수와 오늘 공시 수를 제목·설명에 넣습니다.
 // (미리보기 그림은 app/disclosure/opengraph-image.js)
