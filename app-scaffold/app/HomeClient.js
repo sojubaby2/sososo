@@ -10,6 +10,8 @@
 //   ② 그래서 예전처럼 "처음에 전체를 한 번 더 불러오는" 호출을 생략합니다.
 // 나머지 동작은 예전과 완전히 동일합니다.
 
+// [2026-11-04 추가] HOT 테마 막대그래프(Bklit UI)
+import HotThemeChart from "../components/HotThemeChart";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Newspaper, Loader2, Flame, Bell, BellOff, Volume2, VolumeX, Smartphone, X, ArrowUp, Star, Search } from "lucide-react";
@@ -261,7 +263,10 @@ function HotThemePanel() {
       {state === "loading" ? (
         <p className="trending-empty">불러오는 중...</p>
       ) : (
-        themes.map((t) => {
+        <>
+        {/* [2026-11-04 추가] 한눈에 비교되는 막대그래프(Bklit UI) — 아래 줄은 그대로 */}
+        <HotThemeChart themes={themes} field={field} />
+        {themes.map((t) => {
           const val = t[field];
           return (
             // [2026-09-08 추가] 재성님 요청 — HOT 테마를 누르면 "테마별
@@ -275,7 +280,8 @@ function HotThemePanel() {
               </span>
             </Link>
           );
-        })
+        })}
+        </>
       )}
     </aside>
   );

@@ -1,6 +1,10 @@
 import "./globals.css";
 // [2026-11-04 추가] Bklit UI 그래프용 꾸미기 설정(app/bklit.css)
 import "./bklit.css";
+// [2026-11-04 추가] 움직임·색감 강화(app/fx.css) — 이 줄을 지우면 예전 꾸밈으로 돌아감
+import "./fx.css";
+// [2026-11-04 추가] 사이트 전체 움직임 효과(Motion·Anime.js) — components/MotionFX.js
+import MotionFX from "../components/MotionFX";
 import SiteFooterNav from "../components/SiteFooterNav";
 // [2026-10-26 추가] 종목을 누르면 뜨는 일봉 차트 창 — 모든 페이지에서 쓰도록 여기 한 번만 달아 둠
 import StockChartModal from "../components/StockChartModal";
@@ -120,6 +124,7 @@ export default function RootLayout({ children }) {
         <StockSearch />
         {/* [2026-10-27] 드래그 방지 (components/NoDrag.js) */}
         <NoDrag />
+        <MotionFX />
         {/* [2026-10-27] 휴대폰 전용 맨 아래 탭 줄 (components/MobileTabBar.js) */}
         <MobileTabBar />
         {/* [2026-10-28] 앵커 광고와 겹치지 않게 (components/AnchorAdSpacer.js) */}
