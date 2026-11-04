@@ -31,6 +31,9 @@ export default {
   async scheduled(event, env, ctx) {
     if (isPatternsCron(event.cron)) {
       ctx.waitUntil(fetch(PATTERNS_REFRESH_URL).then((r) => r.text()).catch(() => null));
+      // [2026-11-03 추가] 같은 시각에 역사적 신고가 바탕표·후보도 갱신(lib/athBreakout.js)
+      const athReq = new Request(`https://newsmeme.co.kr/api/ath/refresh?secret=${encodeURIComponent(env.CRON_SECRET || "")}`);
+      ctx.waitUntil(handler.fetch(athReq, env, ctx));
       return;
     }
     const secret = encodeURIComponent(env.CRON_SECRET || "");

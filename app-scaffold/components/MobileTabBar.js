@@ -115,20 +115,16 @@ export default function MobileTabBar() {
     }
   }
 
-  const onSchedule = pathname.startsWith("/disclosure") || pathname.startsWith("/ipo");
-  const activeKey = menuOpen
-    ? "all"
-    : isHome
-    ? homeTab
-    : onSchedule
-    ? "schedule"
-    : "all";
+  // [2026-11-03 개편] 재성님: "모바일 화면은 메뉴들도 눈에 잘 안 들어오고 불편한 느낌"
+  //   → 맨 아래 탭: 속보 · 시장 · 브리핑 · 관심 · 전체 (일정은 위쪽 메뉴 줄에 "공시 일정"·"공모주"로 늘 보이게 옮김)
+  //   → 위쪽 머리띠 아래에 모든 메뉴가 가로로 늘 보이는 줄을 새로 둠(components/Header.js + globals.css)
+  //   → "테마" 탭은 다시 "시장"으로: 신고가 돌파·대표 종목·HOT 테마·테마 레이더가 모인 곳(주소는 예전처럼 #market)
+  const onBriefing = pathname.startsWith("/briefing");
+  const activeKey = menuOpen ? "all" : isHome ? homeTab : onBriefing ? "briefing" : "";
 
   const homeTabs = [
     { key: "feed", label: "속보", Icon: Zap },
-    // [2026-10-28] "시장" → "테마": 이 탭 맨 위가 테마 레이더로 바뀜(주소는 예전처럼 #market)
-    { key: "market", label: "테마", Icon: Radar },
-    { key: "watch", label: "관심", Icon: Star },
+    { key: "market", label: "시장", Icon: Radar },
   ];
 
   return (
@@ -206,15 +202,27 @@ export default function MobileTabBar() {
           </Link>
         ))}
         <Link
-          href="/disclosure"
-          className={`m-tab ${activeKey === "schedule" ? "on" : ""}`}
-          aria-current={activeKey === "schedule" ? "page" : undefined}
+          href="/briefing"
+          className={`m-tab ${activeKey === "briefing" ? "on" : ""}`}
+          aria-current={activeKey === "briefing" ? "page" : undefined}
           onClick={() => setMenuOpen(false)}
         >
           <span className="m-tab-ico">
-            <CalendarDays size={21} strokeWidth={activeKey === "schedule" ? 2.4 : 1.9} />
+            <Sunrise size={21} strokeWidth={activeKey === "briefing" ? 2.4 : 1.9} />
           </span>
-          일정
+          브리핑
+        </Link>
+        <Link
+          href={hrefForTab("watch")}
+          className={`m-tab ${activeKey === "watch" ? "on" : ""}`}
+          aria-current={activeKey === "watch" ? "page" : undefined}
+          onClick={(e) => goHomeTab(e, "watch")}
+        >
+          <span className="m-tab-ico">
+            <Star size={21} strokeWidth={activeKey === "watch" ? 2.4 : 1.9} fill={activeKey === "watch" ? "currentColor" : "none"} />
+            {watch.list.length > 0 && <span className="m-count">{watch.list.length}</span>}
+          </span>
+          관심
         </Link>
         <button
           type="button"

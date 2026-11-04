@@ -106,6 +106,15 @@ export async function storeDaySnapshot(redis, basDt, krxItems) {
   return { stored: true, basDt, count: records.length };
 }
 
+// [2026-11-03 추가] 가장 최근에 저장된 하루치 전 종목 시세(종목 목록으로도 씀) — lib/athBreakout.js가 씁니다.
+export async function getLatestDayRecords(redis) {
+  const last = (await redis.zrange(DATES_INDEX_KEY, -1, -1)).map(toBasDtString)[0];
+  if (!last) return { basDt: null, records: [] };
+  const raw = await redis.get(dayKey(last));
+  const records = typeof raw === "string" ? JSON.parse(raw) : raw;
+  return { basDt: last, records: Array.isArray(records) ? records : [] };
+}
+
 export async function hasSnapshot(redis, basDt) {
   const score = await redis.zscore(DATES_INDEX_KEY, basDt);
   return score !== null && score !== undefined;

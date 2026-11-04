@@ -21,6 +21,8 @@ import NewsBoard from "../components/NewsBoard";
 import { HourTimeline } from "../components/MobileFeed";
 import MobileShorts from "../components/MobileShorts";
 import MobileChat from "../components/MobileChat";
+import MobileHome from "../components/MobileHome"; // [2026-11-03] 새 휴대폰 홈
+import MobileInsight from "../components/MobileInsight"; // [2026-11-03] 새 휴대폰 시장 탭(롱앤숏 참고)
 import { MOBILE_FEED } from "../lib/mobileLayout";
 import ThemeRadar from "../components/ThemeRadar";
 // [2026-10-27 추가] 애드센스 광고 칸(번호는 lib/ads.js)
@@ -30,6 +32,7 @@ import { openStockSearch } from "../lib/openStockSearch"; // [2026-10-29] 홈 �
 import { useWatchlist } from "../lib/watchlist";
 import Header from "../components/Header";
 import DailyOutlookBanner from "../components/DailyOutlookBanner";
+import AthBreakoutPanel from "../components/AthBreakoutPanel"; // [2026-11-03] 역사적 신고가 돌파 칸
 import BriefingBand from "../components/BriefingBand";
 import { extractThemes } from "../lib/todayBrief";
 import { isPoliticalTheme } from "../lib/themeData";
@@ -1096,7 +1099,7 @@ export default function HomeClient({ initialItems = [], worldIndices: worldIndic
   // 재성님 요청으로 그 자리에 대표 종목(삼성전자·SK하이닉스) 칸이 들어갔습니다.
 
   return (
-    <div className={`home-app m-${mTab}`}>
+    <div className={`home-app m-${mTab} mlay-${MOBILE_FEED}`}>
       <Header />
 
       {/* [2026-10-19 신설] 남색 브리핑 밴드 — 오늘을 한 문장으로 요약하고,
@@ -1121,7 +1124,16 @@ export default function HomeClient({ initialItems = [], worldIndices: worldIndic
               "chat"   = C. 속보 채널(채팅방처럼 아래로 쌓임, components/MobileChat.js)
               "shorts" = A. 숏폼 속보(속보 한 건이 화면 하나, components/MobileShorts.js)
             재성님: "c형으로 한번적용 해봐도돼? 맘에안들면 다시 a+b로 올게". PC에서는 둘 다 그려지지 않습니다. */}
-        {MOBILE_FEED === "chat" ? (
+        {MOBILE_FEED === "list" ? (
+          <MobileHome
+            items={items}
+            newIds={newIds}
+            filter={shortsFilter}
+            onFilter={setShortsFilter}
+            onOpenMarket={() => switchTab("market")}
+            ad={<AdSlot kind="inFeed" className="ad-in-feed" />}
+          />
+        ) : MOBILE_FEED === "chat" ? (
           <MobileChat
             items={items}
             newIds={newIds}
@@ -1142,9 +1154,21 @@ export default function HomeClient({ initialItems = [], worldIndices: worldIndic
             onFocused={() => setShortsFocus(null)}
           />
         )}
+        {/* [2026-11-03 신설] 휴대폰 "시장" 탭 — 카드 대시보드(components/MobileInsight.js).
+            재성님이 보내 준 롱앤숏 화면 참고: 위쪽 글자 탭 줄 + 지수·예측·히트맵·수급·신고가·급등락·대표주 카드.
+            시장 탭을 열었을 때만 그려서(PC·다른 탭에서는 자료를 받지 않음) 쓸데없는 요청을 막습니다. */}
+        {MOBILE_FEED === "list" && mTab === "market" && (
+          <MobileInsight
+            worldIndices={worldIndices}
+            strip={strip}
+            outlook={<DailyOutlookBanner />}
+            flagship={<FlagshipStrip filter={filter} onPick={(name) => filterAndShow("stock", name)} />}
+            ad={<AdSlot kind="inFeed" className="ad-in-feed" />}
+          />
+        )}
         {/* [2026-10-28] 휴대폰 테마 탭 맨 위: 테마 레이더 (components/ThemeRadar.js) */}
         <div className="m-radar-wrap">
-          <ThemeRadar items={items} onOpen={openThemeShorts} goText={MOBILE_FEED === "chat" ? "모아보기" : "넘겨보기"} />
+          <ThemeRadar items={items} onOpen={openThemeShorts} goText={MOBILE_FEED === "shorts" ? "넘겨보기" : "모아보기"} />
         </div>
 
         <div className="home-grid">
@@ -1292,6 +1316,8 @@ export default function HomeClient({ initialItems = [], worldIndices: worldIndic
               onToggleFilter={() => toggleFilter("watch", "관심종목")}
               onRemove={(s) => watch.toggle(s)}
             />
+            {/* [2026-11-03 추가] 오늘 역사적 신고가 돌파 — 관심종목 바로 아래(재성님 요청). 휴대폰은 "시장" 탭에 보임 */}
+            <AthBreakoutPanel />
             {/* 대표 종목(삼성전자·SK하이닉스) — 2026-10-26 추가, FlagshipStrip 설명 참고 */}
             <FlagshipStrip filter={filter} onPick={(name) => filterAndShow("stock", name)} />
             {/* [2026-10-27] 광고 — 휴대폰 시장 탭에서만(PC 오른쪽 칸에는 광고를 넣지 않음) */}

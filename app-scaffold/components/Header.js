@@ -55,7 +55,8 @@ const ICONS = { zap: Zap, candle: CandlestickChart, layers: Layers, ticket: Tick
 //   그 밖(회색 작은 글씨): 숫자·이름(돌파 12, 공시 건수, 오늘 많이 나온 테마)
 //   페이지를 옮겨 다녀도 5분 동안은 다시 받지 않음(아래 badgeCache).
 let badgeCache = { at: 0, data: null };
-function useNavBadges() {
+// [2026-11-03] 휴대폰 홈 바로가기 칸(components/MobileHome.js)도 같이 씀
+export function useNavBadges() {
   const [data, setData] = useState(badgeCache.data);
   useEffect(() => {
     if (badgeCache.data && Date.now() - badgeCache.at < 5 * 60 * 1000) return;
