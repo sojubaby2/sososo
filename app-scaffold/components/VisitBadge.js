@@ -8,6 +8,10 @@
 //
 //   · 이 브라우저가 오늘 처음 들어왔으면 1을 더하고(POST), 이미 셌으면 숫자만 받아 옴(GET)
 //   · 숫자를 못 받아 오면 칸 자체를 안 보여 줌
+//
+// [2026-11-05 변경] 재성님: "눈 모양을 깜빡깜빡 떴다 감았다 움직이게, 마우스 올렸을 때 설명은 안 나오게"
+//   · 눈 아이콘이 몇 초에 한 번씩 깜빡임(모양은 app/fx.css의 .visit-badge svg — vbBlink)
+//   · 마우스를 올리면 뜨던 설명(title)을 없앰. 화면 읽기 프로그램용 글자(sr-only)는 그대로 둠
 
 import { useEffect, useState } from "react";
 import { Eye } from "lucide-react";
@@ -58,7 +62,7 @@ export default function VisitBadge() {
 
   if (total === null) return null;
   return (
-    <span className="visit-badge" title={`누적 방문 ${total.toLocaleString("ko-KR")} (10월 5일부터, 한 사람 하루 한 번씩 셈)`}>
+    <span className="visit-badge">
       <Eye size={14} strokeWidth={2.2} aria-hidden="true" />
       <span className="mono">{shortCount(total)}</span>
       <span className="sr-only">누적 방문</span>

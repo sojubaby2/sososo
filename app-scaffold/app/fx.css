@@ -280,3 +280,17 @@
 .visit-badge .mono { color: var(--on-deep, var(--ink)); }
 .visit-badge svg { color: var(--amber); }
 .visit-badge .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* [2026-11-05 추가] 👁 누적 방문 눈 아이콘 깜빡임 — 재성님: "깜빡깜빡 눈 떴다 감았다 움직이게"
+   [2026-11-05 변경] 재성님: "2초마다 해줘" → 2초에 한 번씩 깜빡임
+   평소엔 뜬 눈, 2초마다 위아래로 납작해졌다(감음) 다시 펴짐(뜸). 감는 시간은 약 0.2초 */
+.visit-badge svg {
+  transform-origin: 50% 50%;
+  transform-box: fill-box;
+  animation: vbBlink 2s ease-in-out infinite;
+}
+@keyframes vbBlink {
+  0%, 88% { transform: scaleY(1); }
+  93% { transform: scaleY(0.1); }
+  98%, 100% { transform: scaleY(1); }
+}
