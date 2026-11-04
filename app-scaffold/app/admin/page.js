@@ -15,9 +15,41 @@
 // 헤더 메뉴 등 사이트 어디에도 이 페이지로 가는 링크는 안 걸어뒀음 —
 // 주소를 아는 사람(재성님)만 들어올 수 있게 하기 위함.
 
+// [2026-11-04 추가] 재성님: "삭제 가능한 주소를 암호화처럼 만들어서 줘, 저장해 놓고 종종 쓰게"
+//   → 로그인한 뒤 화면 위쪽 "바로가기 주소 만들기"를 누르면, 비밀번호가 뒤섞인 글자로 들어간
+//     주소(https://newsmeme.co.kr/admin#k=nm1.xxxx)가 만들어지고 복사됩니다.
+//     이 주소를 즐겨찾기·메모에 저장해 두면, 어느 기기에서든 열자마자 비밀번호 없이 바로 카드 목록이 나옵니다.
+//   · 비밀번호는 주소의 "#" 뒤에만 들어가서 사이트 서버나 기록(로그)으로는 전송되지 않습니다.
+//   · 뒤섞기는 "눈으로 봐서는 알 수 없게" 하는 정도라, 이 주소 자체를 남에게 보내면 안 됩니다.
+//   · 비밀번호(CRON_SECRET)를 바꾸면 예전 바로가기 주소는 더 이상 안 통합니다 — 새로 만들면 됩니다.
+//   · 목록 위에 "찾기" 칸도 추가 — 제목 몇 글자로 지울 카드를 바로 찾음.
+
 import { useEffect, useState, useCallback } from "react";
 
 const SECRET_STORAGE_KEY = "nm_admin_secret";
+const LINK_PREFIX = "nm1.";
+const MIX = "newsmeme-admin-link";
+
+// 비밀번호 ↔ 주소에 넣을 뒤섞인 글자
+function encodeKey(secret) {
+  const bytes = new TextEncoder().encode(secret);
+  const out = bytes.map((b, i) => b ^ MIX.charCodeAt(i % MIX.length));
+  let bin = "";
+  out.forEach((b) => (bin += String.fromCharCode(b)));
+  return LINK_PREFIX + btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+function decodeKey(code) {
+  try {
+    if (!code || !code.startsWith(LINK_PREFIX)) return "";
+    let b64 = code.slice(LINK_PREFIX.length).replace(/-/g, "+").replace(/_/g, "/");
+    while (b64.length % 4) b64 += "=";
+    const bin = atob(b64);
+    const bytes = Uint8Array.from(bin, (c, i) => c.charCodeAt(0) ^ MIX.charCodeAt(i % MIX.length));
+    return new TextDecoder().decode(bytes);
+  } catch {
+    return "";
+  }
+}
 
 export default function AdminPage() {
   const [secret, setSecret] = useState("");
@@ -28,11 +60,22 @@ export default function AdminPage() {
   const [loadError, setLoadError] = useState("");
   const [message, setMessage] = useState("");
   const [deletingId, setDeletingId] = useState(null);
+  const [query, setQuery] = useState("");
+  const [linkText, setLinkText] = useState("");
 
   useEffect(() => {
     let saved = "";
+    // [2026-11-04] 바로가기 주소(#k=...)로 들어오면 그 안의 비밀번호로 바로 로그인
+    const m = /[#&]k=([^&]+)/.exec(window.location.hash || "");
+    const fromLink = m ? decodeKey(decodeURIComponent(m[1])) : "";
+    if (fromLink) {
+      saved = fromLink;
+      try {
+        localStorage.setItem(SECRET_STORAGE_KEY, fromLink);
+      } catch {}
+    }
     try {
-      saved = localStorage.getItem(SECRET_STORAGE_KEY) || "";
+      if (!saved) saved = localStorage.getItem(SECRET_STORAGE_KEY) || "";
     } catch {
       // 브라우저 저장소를 못 쓰는 환경이면 그냥 매번 입력받음
     }
@@ -77,6 +120,17 @@ export default function AdminPage() {
     }
     setSecret(trimmed);
     setUnlocked(true);
+  }
+
+  async function makeLink() {
+    const url = `${window.location.origin}/admin#k=${encodeKey(secret)}`;
+    setLinkText(url);
+    try {
+      await navigator.clipboard.writeText(url);
+      setMessage("바로가기 주소를 복사했어요. 메모장이나 즐겨찾기에 저장해 두세요(남에게는 보내지 마세요).");
+    } catch {
+      setMessage("아래 주소를 길게 눌러(또는 드래그해서) 복사한 뒤 저장해 두세요.");
+    }
   }
 
   function handleLogout() {
@@ -140,7 +194,7 @@ export default function AdminPage() {
         <div style={styles.loginBox}>
           <h1 style={styles.loginTitle}>관리자 로그인</h1>
           <p style={styles.loginHint}>
-            Vercel 프로젝트 환경변수에 있는 CRON_SECRET 값을 입력해주세요.
+            Cloudflare(또는 Vercel) 환경변수에 있는 CRON_SECRET 값을 입력해주세요. 한 번 들어온 뒤 "바로가기 주소 만들기"를 누르면 다음부터는 그 주소로 바로 들어올 수 있어요.
           </p>
           <input
             type="password"
@@ -166,6 +220,9 @@ export default function AdminPage() {
       <div style={styles.headerRow}>
         <h1 style={styles.pageTitle}>뉴스 카드 관리</h1>
         <div>
+          <button onClick={makeLink} style={styles.smallBtn}>
+            바로가기 주소 만들기
+          </button>
           <button onClick={() => loadFeed(secret)} style={styles.smallBtn}>
             새로고침
           </button>
@@ -176,6 +233,16 @@ export default function AdminPage() {
       </div>
 
       {message && <div style={styles.message}>{message}</div>}
+      {linkText && (
+        <textarea readOnly value={linkText} onFocus={(e) => e.target.select()} style={styles.linkBox} rows={3} />
+      )}
+      <input
+        type="search"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="찾기 — 제목·종목 몇 글자 (예: 얘네는)"
+        style={{ ...styles.input, marginBottom: 8 }}
+      />
       {loadError && <div style={styles.error}>{loadError}</div>}
       {loading && <p style={styles.hint}>불러오는 중...</p>}
       {!loading && !loadError && items.length === 0 && (
@@ -183,7 +250,14 @@ export default function AdminPage() {
       )}
 
       <ul style={styles.list}>
-        {items.map((item) => (
+        {items
+          .filter((item) => {
+            const q = query.trim();
+            if (!q) return true;
+            const hay = `${item.title || ""} ${(item.matches || []).map((m) => m.name || m).join(" ")} ${item.channel || ""}`;
+            return hay.toLowerCase().includes(q.toLowerCase());
+          })
+          .map((item) => (
           <li key={item.id} style={styles.listItem}>
             <div style={styles.itemInfo}>
               <div style={styles.itemTitle}>{item.title}</div>
@@ -254,6 +328,8 @@ const styles = {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
+    flexWrap: "wrap",
+    gap: 8,
     marginBottom: 16,
   },
   pageTitle: { fontSize: 20, fontWeight: 700 },
@@ -293,6 +369,18 @@ const styles = {
     color: "#a33",
   },
   hint: { fontSize: 13, color: "#888" },
+  linkBox: {
+    width: "100%",
+    padding: "10px 12px",
+    fontSize: 12,
+    fontFamily: "monospace",
+    borderRadius: 8,
+    border: "1px solid #ccc",
+    boxSizing: "border-box",
+    marginBottom: 12,
+    wordBreak: "break-all",
+    resize: "none",
+  },
   list: { listStyle: "none", padding: 0, margin: 0 },
   listItem: {
     display: "flex",
