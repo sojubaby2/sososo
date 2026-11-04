@@ -1,5 +1,7 @@
 "use client";
 
+// [2026-11-04 추가] 👁 누적 방문 숫자
+import VisitBadge from "./VisitBadge";
 import { useEffect, useRef, useState } from "react";
 
 // components/Header.js
@@ -153,6 +155,8 @@ export default function Header() {
           })}
         </nav>
 
+        {/* [2026-11-04 추가] 👁 누적 방문 숫자(실제로 센 값) — components/VisitBadge.js */}
+        <VisitBadge />
         {/* [2026-10-29] 종목 검색 — PC·휴대폰 모두 */}
         <button type="button" className="hdr-search" onClick={() => openStockSearch()} aria-label="종목 검색" title="종목 검색 (/)">
           <Search size={16} />

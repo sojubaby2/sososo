@@ -261,3 +261,22 @@
     display: none;
   }
 }
+
+/* ── 👁 누적 방문 숫자(머리띠 오른쪽 위) — components/VisitBadge.js ── */
+.visit-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--on-deep-soft, var(--ink-muted));
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.visit-badge .mono { color: var(--on-deep, var(--ink)); }
+.visit-badge svg { color: var(--amber); }
+.visit-badge .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
