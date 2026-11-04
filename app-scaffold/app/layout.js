@@ -1,4 +1,6 @@
 import "./globals.css";
+// [2026-11-04 추가] Bklit UI 그래프용 꾸미기 설정(app/bklit.css)
+import "./bklit.css";
 import SiteFooterNav from "../components/SiteFooterNav";
 // [2026-10-26 추가] 종목을 누르면 뜨는 일봉 차트 창 — 모든 페이지에서 쓰도록 여기 한 번만 달아 둠
 import StockChartModal from "../components/StockChartModal";
