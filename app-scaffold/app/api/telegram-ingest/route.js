@@ -371,10 +371,21 @@ const NET_SLANG_RE = /(ㅋㅋ|ㅎㅎ|ㅠㅠ|ㅜㅜ|ㄷㄷ|ㄹㅇ|ㅇㅇ|ㅉㅉ|�
 export function hasProfanity(text) {
   return PROFANITY_RE.test(String(text || ""));
 }
+// [2026-11-04 추가] 재성님 리포트(스크린샷) — 제목 자리에 "얘네는 또 왜"가 그대로 실림.
+//   그 채널 메시지 모양: 1줄 = 운영자 한마디, 2줄 = 진짜 기사 제목(합참 "북한, 동해상으로 미상 발사체 발사"), 3줄 = 링크.
+//   "왜"로 끝나는 말, "얘네·쟤네·이거"처럼 수다 말투로 시작하는 말, "…나요/…까요/…죠"로 끝나는 말은
+//   예전 규칙에 안 걸렸습니다. 아래 규칙을 더하고, 아주 짧은 한 줄(띄어쓰기 빼고 8자 이하, 숫자·영문 없음)도
+//   운영자 한마디로 봅니다. 혹시 진짜 짧은 기사 제목이 걸려도, 원문 기사 제목(og:title)으로 바꿔 쓰거나
+//   메시지 둘째 줄의 진짜 제목을 쓰므로 기사가 사라지지는 않습니다(아래 POST 참고).
+const CHAT_START_RE = /^(얘네|얘들|얘는|얘가|쟤네|쟤들|쟤는|쟤가|걔네|걔들|걔는|걔가|이거|저거|요거|이놈|저놈|요놈|이 ?양반|형님들|여러분|헐|와\s|와!|아니\s|역시\s|또\s|드디어\s|ㄷ)/;
+const CHAT_END_RE = /(왜|뭐|뭐야|뭔데|뭐임|어째|나요|까요|가요|죠|지요|대박|헐|실화냐|실화|미쳤네|미쳤다|어휴|아이고|가즈아|가자|간다잉|ㄷ|ㅠ|ㅜ)[.!?~…]*$/;
 function looksLikeOperatorComment(text) {
   const t = (text || "").trim();
   if (!t) return false;
   if (PROFANITY_RE.test(t) || NET_SLANG_RE.test(t)) return true;
+  if (CHAT_START_RE.test(t) || CHAT_END_RE.test(t)) return true;
+  // 아주 짧은 한 줄 — 기사 제목은 보통 이보다 깁니다(숫자·영문·따옴표가 있으면 제목일 수 있어 제외)
+  if (t.replace(/\s/g, "").length <= 8 && !/[0-9A-Za-z%"'“”‘’\[\]]/.test(t)) return true;
   // 존댓말 설명조로 끝나는 문장(예전부터 있던 규칙)
   if (/(니다|같아요|보여요|네요|세요)[.!?~…]*$/.test(t)) return true;
   // 말하듯 끝나는 반말·혼잣말(기사 제목은 거의 이렇게 끝나지 않음)
@@ -382,6 +393,16 @@ function looksLikeOperatorComment(text) {
   // 제목 중간에 마침표로 문장이 끊기는 경우(예: "...국가. 이나라도...") — 기사 제목은 보통 한 문장
   if (/[가-힣]\.\s+[가-힣]/.test(t) && !/\d\.\d/.test(t)) return true;
   return false;
+}
+
+// [2026-11-04 추가] 메시지 본문 첫 줄이 기사 제목처럼 생겼으면 { title, rest }, 아니면 null
+function headlineFromBody(body) {
+  const lines = String(body || "").split("\n").map((x) => x.trim()).filter(Boolean);
+  const first = lines[0] || "";
+  if (first.length < 8 || first.length > 150) return null;
+  if (/^https?:\/\//i.test(first) || looksLikeOperatorComment(first)) return null;
+  if (/(니다|어요|아요|해요)[.!?~…]*$/.test(first)) return null; // 설명 문장이면 제목이 아님
+  return { title: first, rest: lines.slice(1).join("\n") };
 }
 
 // [2026-10-26 추가 — "서버 깨워두기" 전용 입구]
@@ -514,6 +535,13 @@ export async function POST(request) {
         await redis.set(key, "1", { ex: SEEN_TTL_SECONDS });
         await logIngest({ stage: "제외", reason: "제목 못 찾음(링크만)" });
         return Response.json({ published: false, reason: "제목을 찾을 수 없음(링크만 있는 메시지)" });
+      }
+      // [2026-11-04 추가] 원문 제목을 못 가져왔어도, 메시지 둘째 줄이 기사 제목처럼 생겼으면 그걸 제목으로
+      //   (예: "얘네는 또 왜" ↵ 합참 "북한, 동해상으로 미상 발사체 발사" ↵ 링크)
+      else if (headlineFromBody(telegramSummary)) {
+        const alt = headlineFromBody(telegramSummary);
+        title = alt.title;
+        summary = alt.rest;
       }
       // [2026-10-30 변경] 예전엔 운영자 코멘트라도 제목으로 썼는데, 감정 섞인 말·욕설이 그대로
       //   실린 일이 있어(재성님 리포트) 이제는 원문 제목을 못 가져오면 게재하지 않습니다.
