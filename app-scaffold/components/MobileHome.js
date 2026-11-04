@@ -18,6 +18,7 @@ import { Sunrise, BarChart3, Crown, Ticket, ChevronRight, Star, Share2, External
 import { openStockChart } from "../lib/openStockChart";
 import { useWatchlist } from "../lib/watchlist";
 import { useNavBadges } from "./Header";
+import LivePct from "./LivePct"; // [2026-11-04] 등락률 칸을 부드럽게
 import { useAthBreakouts } from "./AthBreakoutPanel";
 import { FRESH_MINUTES, HOT_TAGS, agoText, isNum, minutesAgo, pct, splitTags, themeStats, todaysOf, tone, useNow, kstParts, hhmm } from "./MobileFeed";
 
@@ -203,7 +204,7 @@ function FeedCard({ n, now, isNew, watched, onWatch }) {
             >
               {s.catalyst && <AlertTriangle size={12} aria-label="악재" />}
               <b>{s.name}</b>
-              <span className="mono">{pct(s.change)}</span>
+              <LivePct value={s.change} pending={s.pending} empty="—" />
             </button>
           ))}
         </div>

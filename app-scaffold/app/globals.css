@@ -3520,3 +3520,34 @@ img { -webkit-user-drag: none; }
   .mi-link span { flex: 1; white-space: nowrap; }
   .mi-link .go { color: var(--ink-soft); }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   [2026-11-04 신설] 종목 옆 등락률 칸 (components/LivePct.js)
+   재성님: "등락률이 딱딱하고 안 뜰 때가 많다 — 부드럽고 자연스럽게"
+   · 받는 중: 빈칸 대신 은은하게 흐르는 회색 자리(.lp-wait)
+   · 처음 들어올 때: 살짝 떠오르며 나타남(.lp-in)
+   · 값이 바뀌면: 빨강(오름)/파랑(내림) 바탕이 잠깐 켜졌다가 1초에 걸쳐 스르륵 사라짐(.lp-flash-*)
+   ═══════════════════════════════════════════════════════════════════ */
+.lp {
+  display: inline-flex; align-items: center; gap: 2px; font-weight: 600; font-variant-numeric: tabular-nums;
+  border-radius: 4px; padding: 0 2px; margin: 0 -2px;
+  transition: background-color 0.9s ease, color 0.3s ease;
+}
+.lp.up { color: var(--up); }
+.lp.down { color: var(--down); }
+.lp.flat { color: var(--ink-soft); }
+.lp-in { animation: lpIn 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+@keyframes lpIn { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+.lp.lp-flash-up { background-color: color-mix(in oklab, var(--up) 24%, transparent); transition: none; }
+.lp.lp-flash-down { background-color: color-mix(in oklab, var(--down) 24%, transparent); transition: none; }
+.lp-wait {
+  display: inline-block; width: 3.2em; height: 0.9em; padding: 0; margin: 0; vertical-align: middle; border-radius: 4px;
+  background: linear-gradient(90deg, var(--surface-2) 0%, color-mix(in oklab, var(--ink-soft) 26%, var(--surface-2)) 50%, var(--surface-2) 100%);
+  background-size: 200% 100%; animation: lpShimmer 1.3s linear infinite;
+}
+@keyframes lpShimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+.watch-chg.lp { justify-content: flex-end; }
+.nb-stk-pct.lp { margin: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .lp-in, .lp-wait { animation: none; }
+}

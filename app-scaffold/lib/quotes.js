@@ -124,13 +124,83 @@ async function fetchOne(symbol) {
   }
 }
 
+// [2026-11-04 추가] 여러 종목을 "한 번에" 받기 — 야후 spark(종목 20개까지 한 요청)
+//   재성님: "메인화면 종목 옆 등락률이 딱딱하고 안 뜰 때가 많고 F5를 눌러야 뜬다"
+//   원인: 속보에 붙은 종목이 100개가 넘는데(실측 119개) 종목마다 야후에 따로 물어봐서,
+//         화면이 50개씩 물어보면 한 번에 8초씩 걸렸습니다(실측 7.6~8.4초). 그동안 칸이 비어 있었음.
+//   → 20개를 한 요청으로 받습니다(실측: 같은 숫자·같은 시각이 그대로 옴). 요청 수가 1/20로 줄어 훨씬 빠릅니다.
+//     여기서 못 받은 종목만 예전 방식(하나씩)으로 다시 받습니다. 비용 0원.
+const SPARK_URL = "https://query1.finance.yahoo.com/v7/finance/spark";
+const SPARK_MAX = 20; // 야후가 한 번에 받아 주는 최대 개수
+
+function sparkRow(r) {
+  const meta = r?.response?.[0]?.meta;
+  if (!meta) return null;
+  const price = toNum(meta.regularMarketPrice);
+  const ts = toNum(meta.regularMarketTime);
+  if (price === null || !ts) return null;
+  // 위 ② 함정 방어 — 오래된 값은 버리되 "야후가 답은 했다"는 표시는 남김(하나씩 다시 묻지 않게)
+  if ((Date.now() - ts * 1000) / 86400000 > MAX_STALE_DAYS) return { symbol: String(r.symbol || meta.symbol || ""), stale: true };
+  let changePct = toNum(meta.regularMarketChangePercent);
+  if (changePct === null) {
+    // 하루 범위(range=1d)에서는 chartPreviousClose가 "어제 종가"라서 써도 됩니다(① 함정은 5일 범위에서만)
+    const prev = toNum(meta.chartPreviousClose);
+    if (prev) changePct = ((price - prev) / prev) * 100;
+  }
+  return {
+    symbol: String(r.symbol || meta.symbol || ""),
+    price,
+    changePct,
+    asOf: new Date(ts * 1000).toISOString(),
+    name: meta.longName || meta.shortName || null,
+  };
+}
+
+async function fetchSpark(symbols) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const q = symbols.map((s) => encodeURIComponent(s)).join(",");
+    const res = await fetch(`${SPARK_URL}?symbols=${q}&range=1d&interval=1d`, {
+      headers: { "User-Agent": BROWSER_UA, Accept: "application/json,text/plain,*/*" },
+      signal: controller.signal,
+      next: { revalidate: CACHE_SECONDS },
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    const list = data?.spark?.result;
+    return Array.isArray(list) ? list.map(sparkRow).filter(Boolean) : [];
+  } catch {
+    return [];
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // 여러 기호를 나눠서 받아옵니다. 하나가 실패해도 나머지는 삽니다.
 async function fetchMany(symbols) {
   const out = new Map();
   const unique = [...new Set(symbols.filter(Boolean))];
 
-  for (let i = 0; i < unique.length; i += BATCH_SIZE) {
-    const slice = unique.slice(i, i + BATCH_SIZE);
+  // ⓪ 먼저 20개씩 한 번에(spark) — 묶음들은 동시에 보냄
+  const groups = [];
+  for (let i = 0; i < unique.length; i += SPARK_MAX) groups.push(unique.slice(i, i + SPARK_MAX));
+  const byUpper = new Map(unique.map((s) => [s.toUpperCase(), s]));
+  const sparkResults = await Promise.all(groups.map((g) => fetchSpark(g)));
+  const answered = new Set();
+  for (const rows of sparkResults) {
+    for (const r of rows) {
+      const sym = byUpper.get(r.symbol.toUpperCase());
+      if (!sym) continue;
+      answered.add(sym);
+      if (!r.stale) out.set(sym, { ...r, symbol: sym });
+    }
+  }
+
+  // ① 야후가 답하지 않은 것만 예전처럼 하나씩(오래된 값이라 버린 종목은 다시 묻지 않음)
+  const rest = unique.filter((s) => !answered.has(s));
+  for (let i = 0; i < rest.length; i += BATCH_SIZE) {
+    const slice = rest.slice(i, i + BATCH_SIZE);
     const results = await Promise.all(slice.map((s) => fetchOne(s)));
     results.forEach((r, idx) => {
       if (r) out.set(slice[idx], r);
@@ -139,8 +209,8 @@ async function fetchMany(symbols) {
 
   // 실패한 것만 한 번 더 — 한꺼번에 많이 보내면 야후가 일부를 튕겨내는데,
   // 간격을 두고 다시 부르면 대개 들어옵니다.
-  const missing = unique.filter((s) => !out.has(s));
-  for (const s of missing) {
+  const missing = rest.filter((s) => !out.has(s));
+  for (const s of missing.slice(0, 10)) { // 너무 많이 다시 부르면 그만큼 늦어지므로 10개까지만
     await new Promise((r) => setTimeout(r, 150));
     const r = await fetchOne(s);
     if (r) out.set(s, r);

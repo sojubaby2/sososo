@@ -42,6 +42,7 @@
 import { Fragment, useEffect, useState } from "react";
 import { ChevronRight, AlertTriangle, ShieldAlert, ExternalLink } from "lucide-react";
 import StockChip from "./StockChip";
+import LivePct from "./LivePct"; // [2026-11-04] 등락률 칸을 부드럽게
 import { openStockChart } from "../lib/openStockChart";
 
 const FRESH_MINUTES = 15; // 이 시간 안에 들어온 속보에 빨간 "속보" 딱지 + 시각 빨강
@@ -133,14 +134,7 @@ function clockText(time, m) {
   const [, mm, dd] = d.split("/");
   return `${Number(mm)}/${Number(dd)} ${hm}`;
 }
-function pct(v) {
-  if (typeof v !== "number" || !Number.isFinite(v)) return "—";
-  return `${v > 0 ? "+" : ""}${v.toFixed(1)}%`;
-}
-function tone(v) {
-  if (typeof v !== "number" || !Number.isFinite(v)) return "flat";
-  return v > 0 ? "up" : v < 0 ? "down" : "flat";
-}
+// [2026-11-04] 등락률 글자(pct)·색(tone) 만들던 함수는 components/LivePct.js로 옮김
 
 // 악재 / 시장 추정 표시. "관련주 확정"은 대부분이라 표시하지 않습니다(소음).
 function Flags({ n }) {
@@ -167,7 +161,7 @@ function Chips({ n }) {
   return (
     <div className="chip-row nb-chips">
       {n.stocks.map((s) => (
-        <StockChip key={s.code} name={s.name} code={s.code} market={s.market} change={s.change} catalyst={s.catalyst} />
+        <StockChip key={s.code} name={s.name} code={s.code} market={s.market} change={s.change} pending={s.pending} catalyst={s.catalyst} />
       ))}
     </div>
   );
@@ -278,7 +272,7 @@ export default function NewsBoard({ items, newIds, ad = null }) {
                   {s.name}
                   <span className="mono nb-stk-code">{s.code}</span>
                 </span>
-                <span className={`mono nb-stk-pct ${tone(s.change)}`}>{pct(s.change)}</span>
+                <LivePct value={s.change} pending={s.pending} empty="—" className="nb-stk-pct" />
                 {lead.reasons?.[i] && <span className="nb-stk-why">{lead.reasons[i]}</span>}
               </button>
             ))}
@@ -345,7 +339,7 @@ export default function NewsBoard({ items, newIds, ad = null }) {
                   {lead0 ? (
                     <span className="nb-leadstk">
                       <span className="nm">{lead0.name}</span>
-                      <span className={`mono ${tone(lead0.change)}`}>{pct(lead0.change)}</span>
+                      <LivePct value={lead0.change} pending={lead0.pending} empty="—" />
                       {n.stocks.length > 1 && <span className="more mono">+{n.stocks.length - 1}</span>}
                     </span>
                   ) : (

@@ -33,6 +33,7 @@ import { useWatchlist } from "../lib/watchlist";
 import Header from "../components/Header";
 import DailyOutlookBanner from "../components/DailyOutlookBanner";
 import AthBreakoutPanel from "../components/AthBreakoutPanel"; // [2026-11-03] 역사적 신고가 돌파 칸
+import LivePct from "../components/LivePct"; // [2026-11-04] 등락률 칸을 부드럽게
 import BriefingBand from "../components/BriefingBand";
 import { extractThemes } from "../lib/todayBrief";
 import { isPoliticalTheme } from "../lib/themeData";
@@ -66,6 +67,8 @@ const FEED_POLL_HIDDEN_MS = 60000;
 // (60초 쉬었다 돌아와도 1분에 15건 넘게 게재되는 일은 없습니다.)
 // 최초 로딩 때는 이 값을 안 쓰고 기본값(250개)을 그대로 받음.
 const FEED_POLL_LIMIT = 15;
+// [2026-11-04] 마지막으로 받은 종목 등락률을 이 기기에 잠깐 기억해 두는 이름(다시 들어오면 빈칸 없이 바로 보이게)
+const QUOTE_STORE_KEY = "nm-quotes-v1";
 const FEED_DISPLAY_CAP = 250; // 화면에 유지하는 최대 개수 — 기존 동작과 동일
 const ALERT_KEYWORDS = ["공급계약", "특허", "FDA", "무상증자", "단독", "세계 최초", "국내 최초", "인수", "합병", "수주", "유상증자"];
 
@@ -141,7 +144,7 @@ function toneOf(value) {
 // false로 바꾸면 맨 아래에 붙어 있을 때만 따라갑니다.
 
 
-function toCardShape(item, liveQuotes) {
+function toCardShape(item, liveQuotes, pendingCodes) {
   const hasLegitimate = item.matches.some((m) => m.confidence === "confirmed" || m.confidence === "theme");
   const reasons = item.matches
     .map((m) => m.reason)
@@ -185,6 +188,8 @@ function toCardShape(item, liveQuotes) {
         // [2026-10-29 전체 점검] 오늘 시세를 못 받은 종목은 등락률을 비워 둠 — 예전엔 기사 들어올 때 찍힌
         //   "전 거래일" 등락률(m.change)이 오늘 숫자처럼 보였음(속보 40건 밖의 오래된 기사 등).
         change: typeof live?.changePct === "number" ? live.changePct : null,
+        // [2026-11-04] 아직 받는 중이면 빈칸 대신 반짝이는 자리(components/LivePct.js)
+        pending: Boolean(pendingCodes?.has(m.code)) && typeof live?.changePct !== "number" && !live?.awaiting,
       };
     }),
   };
@@ -364,7 +369,7 @@ function DailyMoversPanel() {
 // [2026-10-27 신설] 관심종목 칸 — 오른쪽 칸 맨 위.
 // 별표(☆)로 담은 종목의 오늘 등락률(quotes: 1분마다 받아오는 값)과 종목 페이지 링크.
 // 이름을 누르면 차트 창, "관심종목만 보기"를 누르면 아래 속보가 담은 종목 것만 남습니다.
-function WatchPanel({ list, quotes, active, onToggleFilter, onRemove }) {
+function WatchPanel({ list, quotes, pendingCodes, active, onToggleFilter, onRemove }) {
   return (
     <section className="panel watch-panel" aria-label="관심종목">
       <div className="watch-panel-head">
@@ -395,9 +400,7 @@ function WatchPanel({ list, quotes, active, onToggleFilter, onRemove }) {
                   {s.name}
                   <span className="trending-row-code">{s.code}</span>
                 </button>
-                <span className={`mono watch-chg ${chg === null ? "flat" : chg > 0 ? "up" : chg < 0 ? "down" : "flat"}`}>
-                  {chg === null ? "—" : `${chg > 0 ? "+" : ""}${chg.toFixed(1)}%`}
-                </span>
+                <LivePct value={chg} pending={!q && Boolean(pendingCodes?.has(s.code))} empty="—" className="watch-chg" />
                 <Link href={`/stock/${s.code}`} className="watch-page" aria-label={`${s.name} 종목 페이지`}>
                   보기
                 </Link>
@@ -907,7 +910,13 @@ export default function HomeClient({ initialItems = [], worldIndices: worldIndic
   //   기사 들어올 때 찍힌 어제 등락률이 그대로 남아 있었습니다.
   //   → 최신 기사에 붙은 종목부터 순서대로, 50개씩 나눠서 빠짐없이 물어봅니다.
   //     (주소가 같으면 1분 동안 공용으로 저장되고, 야후 값은 서버에서 5분 저장 — 비용 0원)
-  const QUOTE_CHUNK = 50;
+  // [2026-11-04 변경] 재성님: "종목 옆 등락률이 안 뜰 때가 많고 F5를 눌러야 뜬다"
+  //   ① 50개 → 20개씩 물어봄. 서버가 20개를 야후에 "한 번에" 묻도록 바뀌어서(lib/quotes.js spark) 묶음 하나가 금방 옴
+  //      (예전: 50개 묶음 하나에 8초 — 그동안 칸이 비어 있었음). 묶음들은 동시에 보내고, 최신 속보 종목이 맨 앞 묶음.
+  //   ② 실패한 묶음은 8초 뒤 한 번 더(예전엔 1분을 기다려야 했음)
+  //   ③ 다른 탭에 갔다가 돌아오면 바로 새로 받음
+  //   ④ 마지막으로 받은 숫자를 이 기기에 30분 동안 기억 → 다시 들어오면 빈칸 없이 바로 보이고, 새 숫자가 오면 바뀜
+  const QUOTE_CHUNK = 20;
   // [2026-10-27] 관심종목(별표로 담은 종목)도 오늘 등락률을 받아옵니다 — 맨 앞에 넣어 항상 포함.
   const watch = useWatchlist();
   const watchKey = watch.list.map((s) => `${s.code}.${String(s.market || "").includes("닥") ? "KQ" : "KS"}`).join(",");
@@ -933,29 +942,98 @@ export default function HomeClient({ initialItems = [], worldIndices: worldIndic
     return chunks;
   }, [rawItems, watchKey]);
   const quoteKey = quoteKeys.join("|"); // 목록이 바뀌었는지 알아보는 용도
+
+  // 아직 숫자를 받는 중인 종목코드(이 동안은 빈칸 대신 반짝이는 자리)
+  const [quotePending, setQuotePending] = useState(() => new Set());
+
+  // ④ 이 기기에 기억해 둔 숫자 불러오기(오늘 것, 30분 이내만) — 서버가 넣어 준 값이 있으면 그게 먼저
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(QUOTE_STORE_KEY) || "null");
+      const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+      if (saved?.d === today && Date.now() - saved.at < 30 * 60 * 1000 && saved.q) {
+        setQuotesNow((cur) => ({ ...saved.q, ...cur }));
+      }
+    } catch {
+      // 저장소를 못 쓰는 환경 — 그냥 서버에서 받음
+    }
+  }, []);
+  // 받은 숫자 기억해 두기(10초에 한 번까지만 저장)
+  const lastSaveRef = useRef(0);
+  useEffect(() => {
+    if (Date.now() - lastSaveRef.current < 10000) return;
+    lastSaveRef.current = Date.now();
+    try {
+      const q = {};
+      for (const [code, v] of Object.entries(quotesNow || {})) if (typeof v?.changePct === "number") q[code] = { price: v.price, changePct: v.changePct };
+      const d = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+      localStorage.setItem(QUOTE_STORE_KEY, JSON.stringify({ d, at: Date.now(), q }));
+    } catch {
+      // 저장 공간이 꽉 찼거나 막힌 환경 — 무시
+    }
+  }, [quotesNow]);
+
   useEffect(() => {
     if (!quoteKey) return;
     let alive = true;
+    let lastLoad = 0;
+    let retryTimer = null;
+    const codesOf = (key) => key.split(",").map((s) => s.split(".")[0]);
+    const done = (key) =>
+      setQuotePending((cur) => {
+        const next = new Set(cur);
+        for (const c of codesOf(key)) next.delete(c);
+        return next;
+      });
+    // 묶음 하나 받기 — 성공하면 true
+    const loadChunk = (key, last) =>
+      fetch(`/api/live-quotes?s=${encodeURIComponent(key)}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          if (!alive) return false;
+          const q = d?.quotes || {};
+          const ok = Object.keys(q).length > 0;
+          if (ok) setQuotesNow((cur) => ({ ...cur, ...q }));
+          if (ok || last) done(key);
+          return ok;
+        })
+        .catch(() => {
+          if (alive && last) done(key);
+          return false;
+        });
     const load = () => {
       if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
-      for (const key of quoteKeys) {
-        fetch(`/api/live-quotes?s=${encodeURIComponent(key)}`)
-          .then((r) => r.json())
-          .then((d) => {
-            if (alive && d?.quotes && Object.keys(d.quotes).length) setQuotesNow((cur) => ({ ...cur, ...d.quotes }));
-          })
-          .catch(() => {});
-      }
+      lastLoad = Date.now();
+      Promise.all(quoteKeys.map((k) => loadChunk(k, false))).then((oks) => {
+        if (!alive) return;
+        const failed = quoteKeys.filter((_, i) => !oks[i]);
+        if (!failed.length) return;
+        clearTimeout(retryTimer);
+        retryTimer = setTimeout(() => failed.forEach((k) => loadChunk(k, true)), 8000); // ② 한 번 더
+      });
     };
+    // 이번에 물어볼 종목은 답이 올 때까지 "받는 중"
+    setQuotePending((cur) => {
+      const next = new Set(cur);
+      for (const k of quoteKeys) for (const c of codesOf(k)) next.add(c);
+      return next;
+    });
     load(); // 종목 목록이 바뀌면(새 속보) 바로 한 번
     const t = setInterval(load, 60000);
+    // ③ 다른 탭·앱에 갔다가 돌아오면 20초 넘었을 때 바로 새로 받기
+    const onVisible = () => {
+      if (document.visibilityState === "visible" && Date.now() - lastLoad > 20000) load();
+    };
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       alive = false;
       clearInterval(t);
+      clearTimeout(retryTimer);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [quoteKey]);
 
-  const items = useMemo(() => rawItems.map((it) => toCardShape(it, quotesNow)), [rawItems, quotesNow]);
+  const items = useMemo(() => rawItems.map((it) => toCardShape(it, quotesNow, quotePending)), [rawItems, quotesNow, quotePending]);
 
   // [2026-10-19 추가] 테마나 종목을 누르면 아래 속보를 그것만 남깁니다.
   // filter: null | { kind: "theme" | "stock" | "watch", value: "해운" }
@@ -1312,6 +1390,7 @@ export default function HomeClient({ initialItems = [], worldIndices: worldIndic
             <WatchPanel
               list={watch.list}
               quotes={quotesNow}
+              pendingCodes={quotePending}
               active={filter?.kind === "watch"}
               onToggleFilter={() => toggleFilter("watch", "관심종목")}
               onRemove={(s) => watch.toggle(s)}
