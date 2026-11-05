@@ -101,11 +101,7 @@ export function CandleChart({ all, onHover }) {
   const H_VOL = 52;
   const H_AXIS = 20;
   const PAD_L = 4;
-  const PAD_R = 58; // 오른쪽 가격 글씨 자리
   const H = H_PRICE + H_GAP + H_VOL + H_AXIS;
-  const plotW = Math.max(10, width - PAD_L - PAD_R);
-  const step = plotW / Math.max(bars.length, 1);
-  const bodyW = Math.max(1, Math.min(9, step * 0.68));
 
   let lo = Infinity;
   let hi = -Infinity;
@@ -116,13 +112,23 @@ export function CandleChart({ all, onHover }) {
   const padP = (hi - lo) * 0.06 || hi * 0.02 || 1;
   lo -= padP;
   hi += padP;
+  const ticks = niceTicks(lo, hi, 4);
+
+  // [2026-11-05 변경] 재성님 리포트 — 휴대폰에서 SK하이닉스처럼 주가가 큰 종목은 오른쪽 가격 글씨가
+  //   "3,000,00"처럼 잘렸음(가격 글씨 자리가 58px로 고정이라 9글자 넘는 숫자가 안 들어감).
+  //   → 오른쪽 자리를 "가장 긴 가격 글씨" 길이에 맞춰 넓힘(글씨 한 자 약 6.5px + 여백). 짧은 가격은 예전과 같은 58px.
+  const lastLabel = won(bars[bars.length - 1]?.c);
+  const longest = Math.max(lastLabel.length, ...ticks.map((t) => won(t).length));
+  const PAD_R = Math.max(58, Math.ceil(longest * 6.5) + 14); // 오른쪽 가격 글씨 자리
+  const plotW = Math.max(10, width - PAD_L - PAD_R);
+  const step = plotW / Math.max(bars.length, 1);
+  const bodyW = Math.max(1, Math.min(9, step * 0.68));
   const y = (p) => 6 + ((hi - p) / (hi - lo)) * (H_PRICE - 12);
   const x = (i) => PAD_L + step * i + step / 2;
   const vMax = Math.max(1, ...bars.map((b) => b.v));
   const volTop = H_PRICE + H_GAP;
   const vy = (v) => volTop + H_VOL - (v / vMax) * H_VOL;
 
-  const ticks = niceTicks(lo, hi, 4);
   const linePath = (arr) => {
     let d = "";
     arr.forEach((v, i) => {

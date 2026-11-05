@@ -15,7 +15,9 @@ import { getRecentFeed, kstDateTimeText } from "../../../lib/recentFeed";
 import { decodeEntities } from "../../../lib/decodeEntities";
 import { OgFrame, OG_SIZE, OG_COLORS as C, ogFonts, clip } from "../../../lib/ogImage";
 
-export const revalidate = 600;
+// [2026-11-05 변경] 예전: revalidate = 600(10분 저장) — 그런데 실제로는 저장본이 몇 시간씩 늦게 바뀌었음(오늘 17시에 14시 44분 속보).
+//   카카오톡 등은 공유할 때 한 번만 받아 가므로, 받을 때마다 그 자리에서 새로 그림(비용은 거의 없음 — 공유 미리보기를 만들 때만 불림).
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   const feed = await getRecentFeed();

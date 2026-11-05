@@ -306,6 +306,31 @@ function pickMetaContent(html, patterns) {
   return "";
 }
 
+// [2026-11-05 추가] 재성님 리포트 — 속보 카드 요약이 "KCC�� �̱�…"처럼 글자가 깨져서 보임.
+//   원인: 일부 언론사 페이지는 한글을 옛날 방식(EUC-KR)으로 보내는데, 예전엔 무조건 UTF-8로 읽었음.
+//   → 페이지가 알려 주는 글자 방식(Content-Type 또는 <meta charset>)을 보고 그 방식으로 읽음.
+//     그래도 깨진 글자(�)가 섞여 나오면 그 제목·요약은 아예 쓰지 않음(깨진 글이 카드에 뜨는 것보다 비워 두는 게 나음).
+const BROKEN_CHAR_RE = /\uFFFD/g;
+function looksBroken(text) {
+  return (String(text || "").match(BROKEN_CHAR_RE) || []).length >= 2;
+}
+async function readHtml(res) {
+  const buf = await res.arrayBuffer();
+  const head = new TextDecoder("utf-8").decode(buf.slice(0, 4096)); // <meta charset> 찾기용(영문 부분만 보면 됨)
+  const ct = res.headers.get("content-type") || "";
+  const m = /charset=["']?([\w-]+)/i.exec(ct) || /<meta[^>]+charset=["']?([\w-]+)/i.exec(head);
+  let cs = (m?.[1] || "utf-8").toLowerCase();
+  if (["ks_c_5601-1987", "euc_kr", "ksc5601", "ks_c_5601", "cp949", "x-windows-949", "windows-949"].includes(cs)) cs = "euc-kr";
+  if (cs !== "utf-8" && cs !== "utf8") {
+    try {
+      return new TextDecoder(cs).decode(buf);
+    } catch {
+      // 이 서버가 그 글자 방식을 못 읽으면 UTF-8로 읽고, 아래에서 깨진 글자 검사로 걸러 냄
+    }
+  }
+  return new TextDecoder("utf-8").decode(buf);
+}
+
 async function fetchArticleMetaFallback(url) {
   try {
     const controller = new AbortController();
@@ -316,7 +341,7 @@ async function fetchArticleMetaFallback(url) {
     });
     clearTimeout(timeout);
     if (!res.ok) return { title: "", summary: "" };
-    const html = await res.text();
+    const html = await readHtml(res); // [2026-11-05] 예전: res.text()(무조건 UTF-8) → 한글 깨짐
 
     // og:xxx을 우선 쓰고, 없으면 일반 메타태그/<title> 태그로 대체. 속성
     // 순서(property/content vs content/property)가 사이트마다 달라서 두
@@ -334,9 +359,11 @@ async function fetchArticleMetaFallback(url) {
       /<meta[^>]+content=["']([^"']*)["'][^>]+name=["']description["']/i,
     ]);
 
+    const title = rawTitle ? decodeHtmlEntities(rawTitle).slice(0, 200) : "";
+    const summary = rawSummary ? trimSummaryBody(decodeHtmlEntities(rawSummary)) : "";
     return {
-      title: rawTitle ? decodeHtmlEntities(rawTitle).slice(0, 200) : "",
-      summary: rawSummary ? trimSummaryBody(decodeHtmlEntities(rawSummary)) : "",
+      title: looksBroken(title) ? "" : title,
+      summary: looksBroken(summary) ? "" : summary,
     };
   } catch {
     // 사이트 차단, 타임아웃, HTML 구조 이상 등 — 실패해도 게재 자체를

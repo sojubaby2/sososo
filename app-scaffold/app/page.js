@@ -47,7 +47,18 @@ export const revalidate = 60;
 
 // [2026-10-27 추가] 메인 홈 링크를 카카오톡 등에 공유할 때 — 재성님: "메인홈페이지 링크공유시도 좀 바꿔줘"
 // 그림: 방금 들어온 속보 3개가 보이는 /og/home(app/og/home/route.js). 다른 페이지는 기존 공용 그림 그대로.
-export const metadata = {
+// [2026-11-05 변경] 재성님: "링크 공유 화면이 10/28 화면으로 고정돼 있다, 실시간으로 안 되나?"
+//   원인: 카카오톡 같은 곳은 그림 주소가 같으면(/og/home) 예전에 받아 둔 그림을 계속 재사용함.
+//   → 그림 주소 끝에 10분마다 바뀌는 표시(?v=202611051710)를 붙여서, 공유할 때마다 새 그림을 받아 가게 함.
+function ogImageUrl() {
+  const k = new Date(Date.now() + 9 * 3600 * 1000);
+  const v = k.toISOString().slice(0, 16).replace(/[-T:]/g, "").slice(0, 11) + "0"; // 10분 단위(예: 202611051710)
+  return `/og/home?v=${v}`;
+}
+
+export async function generateMetadata() {
+  const img = ogImageUrl();
+  return {
   openGraph: {
     title: "속보 뜨는 순간, 관련주까지 한 번에 — 뉴스매매",
     description: "실시간 주식 속보마다 움직일 관련주를 함께 보여 줍니다. 오늘 강한 테마·종목 차트·공시 일정까지 무료로.",
@@ -55,15 +66,16 @@ export const metadata = {
     siteName: "뉴스매매",
     locale: "ko_KR",
     type: "website",
-    images: [{ url: "/og/home", width: 1200, height: 630, alt: "뉴스매매 — 방금 들어온 속보와 관련주" }],
+    images: [{ url: img, width: 1200, height: 630, alt: "뉴스매매 — 방금 들어온 속보와 관련주" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "속보 뜨는 순간, 관련주까지 한 번에 — 뉴스매매",
     description: "실시간 주식 속보마다 움직일 관련주를 함께 보여 줍니다.",
-    images: ["/og/home"],
+    images: [img],
   },
-};
+  };
+}
 
 const SITE_URL = "https://newsmeme.co.kr";
 

@@ -170,7 +170,8 @@ function toCardShape(item, liveQuotes, pendingCodes) {
     // [2026-10-21 수정] 제목·요약에 &#039; 가 그대로 보이던 문제.
     // RSS가 따옴표를 암호처럼 바꿔 보내는데 되돌리는 단계가 없었습니다.
     headline: decodeEntities(item.title),
-    summary: decodeEntities(item.summary),
+    // [2026-11-05] 이미 들어와 있는 카드 중 요약 글자가 깨진 것(�)은 요약을 숨김 — 원인은 app/api/telegram-ingest/route.js에서 고침
+    summary: (String(item.summary || "").match(/\uFFFD/g) || []).length >= 2 ? "" : decodeEntities(item.summary),
     link: item.link,
     confidence: hasLegitimate ? "confirmed" : "rumor",
     reason: reason || "관련 근거 정보 없음",
