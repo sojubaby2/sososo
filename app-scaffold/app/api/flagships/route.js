@@ -12,7 +12,10 @@
 
 import { fetchFlagships } from "../../../lib/flagships";
 
-export const revalidate = 60; // 1분
+// [2026-11-06 변경] 예전: revalidate = 60 — 그런데 Cloudflare에서 저장본이 제때 안 바뀌어
+//   오후 2시에도 전날 저녁 7시 47분 결과(해외 시세 환산가)가 나왔음(재성님 리포트).
+//   → 요청마다 실행하되, 1분 기억은 lib/flagships.js 안(lib/memoCache.js)에서 함. 비용 그대로.
+export const dynamic = "force-dynamic";
 
 const CACHE_HEADERS = {
   "Cache-Control": "public, max-age=0, s-maxage=60, stale-while-revalidate=120",

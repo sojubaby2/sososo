@@ -46,6 +46,7 @@
 // 값을 재사용하므로 방문자가 몇 명이든 바깥 요청은 1분에 한 번입니다.
 
 import { applyOpenWait } from "./quotes";
+import { memo } from "./memoCache";
 const YAHOO_URL = "https://query1.finance.yahoo.com/v8/finance/chart";
 const CACHE_SECONDS = 60;
 const REQUEST_TIMEOUT_MS = 5000;
@@ -99,7 +100,9 @@ async function fetchQuote(symbol) {
     const res = await fetch(`${YAHOO_URL}/${encodeURIComponent(symbol)}?range=5d&interval=1d`, {
       headers: { "User-Agent": BROWSER_UA, Accept: "application/json,text/plain,*/*" },
       signal: controller.signal,
-      next: { revalidate: CACHE_SECONDS },
+      // [2026-11-06 변경] 예전: next: { revalidate } — Cloudflare 저장소가 옛 값을 몇 시간씩 줘서 바꿈.
+      //   이제 야후에 바로 묻고, 1분 기억은 아래 fetchFlagships의 memo가 맡음.
+      cache: "no-store",
     });
     if (!res.ok) return null;
     const data = await res.json();
@@ -142,7 +145,12 @@ function unitScale(currency) {
 }
 
 // 대표 종목 전체를 계산해서 돌려줍니다.
+// [2026-11-06] 1분 동안은 같은 결과를 나눠 씀(lib/memoCache.js). 1분이 지나면 다음 요청 때 바로 새로 계산.
 export async function fetchFlagships() {
+  return memo("flagships", CACHE_SECONDS * 1000, computeFlagships);
+}
+
+async function computeFlagships() {
   // 1단계: 국내·해외 시세를 한꺼번에 (해외는 후보 기호를 차례로 시도)
   const [domQuotes, abrQuotes] = await Promise.all([
     Promise.all(FLAGSHIPS.map((f) => fetchQuote(f.domesticSymbol))),

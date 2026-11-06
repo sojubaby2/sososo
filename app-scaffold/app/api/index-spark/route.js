@@ -5,7 +5,7 @@
 //   자료: 야후 차트(무료) — 종목 10개, 5분 간격 하루치. 시세는 15~20분 늦을 수 있습니다.
 //   비용: 5분에 한 번만 실제로 받습니다(방문자가 몇 명이든 같은 저장본을 나눠 씀). 비밀값 없음.
 
-import { unstable_cache } from "next/cache";
+import { memo } from "../../../lib/memoCache";
 
 export const dynamic = "force-dynamic";
 
@@ -56,8 +56,9 @@ async function one(sym) {
   }
 }
 
-const cached = unstable_cache(
-  async () => {
+// [2026-11-06 변경] 예전: unstable_cache(5분) — Cloudflare에서 4시간 넘게 안 바뀐 일이 있어 lib/memoCache.js로 바꿈
+const cached = () =>
+  memo("index-spark", 5 * 60 * 1000, async () => {
     const rows = await Promise.all(SYMBOLS.map((s) => one(s)));
     const items = {};
     SYMBOLS.forEach((s, i) => {
@@ -65,10 +66,7 @@ const cached = unstable_cache(
     });
     if (!Object.keys(items).length) throw new Error("야후 응답 없음"); // 실패는 저장하지 않음
     return { at: new Date().toISOString(), items };
-  },
-  ["index-spark-v1"],
-  { revalidate: 300 }
-);
+  });
 
 export async function GET() {
   try {
