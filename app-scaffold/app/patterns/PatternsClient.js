@@ -256,7 +256,7 @@ export default function PatternsClient({ initialData = null }) {
                   >
                     <td style={{ fontWeight: 500 }}>
                       {r.name}
-                      <CandlestickChart size={13} className="stock-row-chart" aria-hidden="true" />
+                      {"\u2060"}<CandlestickChart size={13} className="stock-row-chart" aria-hidden="true" />
                     </td>
                     <td className="mono" style={{ color: "var(--ink-muted)" }}>
                       {r.code}
@@ -362,7 +362,7 @@ export default function PatternsClient({ initialData = null }) {
             }}
           >
             <Info size={15} />
-            <span>패턴 결과를 불러오는 중이에요...</span>
+            <span>패턴 결과를 불러오는 중이에요…</span>
           </div>
         )}
 
@@ -373,7 +373,7 @@ export default function PatternsClient({ initialData = null }) {
 
         {loadState === "loading" ? (
           <p style={{ fontSize: 13, color: "var(--ink-muted)", padding: "40px 0", textAlign: "center" }}>
-            불러오는 중...
+            불러오는 중…
           </p>
         ) : (
         <div className="theme-layout">

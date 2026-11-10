@@ -262,7 +262,7 @@ function HotThemePanel() {
         </div>
       </div>
       {state === "loading" ? (
-        <p className="trending-empty">불러오는 중...</p>
+        <p className="trending-empty">불러오는 중…</p>
       ) : (
         <>
         {/* [2026-11-04 추가] 한눈에 비교되는 막대그래프(Bklit UI) — 아래 줄은 그대로 */}
@@ -330,7 +330,7 @@ function DailyMoversPanel() {
         {baseDay ? `${baseDay} 급등주 · 급등테마` : "전일 급등주 · 급등테마"}
       </h2>
       {state === "loading" ? (
-        <p className="trending-empty">불러오는 중...</p>
+        <p className="trending-empty">불러오는 중…</p>
       ) : (
         <>
           <p className="mover-section-label">종목</p>
@@ -1341,13 +1341,13 @@ export default function HomeClient({ initialItems = [], worldIndices: worldIndic
               {loadState === "loading" && (
                 <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--ink-muted)", fontSize: 14, padding: "24px 0" }}>
                   <Loader2 size={16} />
-                  불러오는 중...
+                  불러오는 중…
                 </div>
               )}
 
               {loadState === "error" && (
                 <p style={{ fontSize: 13, color: "var(--amber-tint-ink)", background: "var(--amber-tint)", padding: "8px 12px", borderRadius: 8 }}>
-                  피드를 불러오지 못했습니다. Redis(Upstash) 환경변수 설정을 확인해주세요.
+                  속보를 잠시 불러오지 못했어요. 잠시 뒤 새로고침해 주세요.
                 </p>
               )}
 

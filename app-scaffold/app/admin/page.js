@@ -244,7 +244,7 @@ export default function AdminPage() {
         style={{ ...styles.input, marginBottom: 8 }}
       />
       {loadError && <div style={styles.error}>{loadError}</div>}
-      {loading && <p style={styles.hint}>불러오는 중...</p>}
+      {loading && <p style={styles.hint}>불러오는 중…</p>}
       {!loading && !loadError && items.length === 0 && (
         <p style={styles.hint}>표시할 카드가 없습니다.</p>
       )}
@@ -277,7 +277,7 @@ export default function AdminPage() {
               disabled={deletingId === item.id}
               style={styles.deleteBtn}
             >
-              {deletingId === item.id ? "삭제 중..." : "삭제"}
+              {deletingId === item.id ? "삭제 중…" : "삭제"}
             </button>
           </li>
         ))}

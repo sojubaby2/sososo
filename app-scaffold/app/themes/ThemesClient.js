@@ -216,7 +216,7 @@ export default function ThemesClient() {
               >
                 <td style={{ fontWeight: 500 }}>
                   {s.name}
-                  <CandlestickChart size={13} className="stock-row-chart" aria-hidden="true" />
+                  {"\u2060"}<CandlestickChart size={13} className="stock-row-chart" aria-hidden="true" />
                 </td>
                 <td className="mono" style={{ color: "var(--ink-muted)" }}>{s.code}</td>
                 <td><span className="market-tag">{s.market}</span></td>

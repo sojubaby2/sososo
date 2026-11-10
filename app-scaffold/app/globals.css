@@ -445,7 +445,7 @@ input::placeholder { color: var(--ink-soft); }
 .stock-table td { padding: 12px 16px; border-bottom: 1px solid var(--border); }
 .stock-table tr:last-child td { border-bottom: none; }
 .mono { font-family: var(--font-mono); }
-.market-tag { font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--ink-muted); }
+.market-tag { display: inline-block; white-space: nowrap; font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--ink-muted); }
 
 .site-footer { max-width: 960px; margin: 0 auto; padding: 32px 24px; font-size: 12px; color: var(--ink-muted); display: flex; gap: 8px; align-items: flex-start; }
 
@@ -2890,7 +2890,7 @@ img { -webkit-user-drag: none; }
 .gd-cats button, .gd-levels button {
   font: inherit; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
   font-size: 13.5px; font-weight: 600; color: var(--ink-muted); background: var(--surface); border: 1px solid var(--border);
-  border-radius: 999px; padding: 7px 13px; transition: all 0.15s ease;
+  border-radius: 999px; padding: 7px 13px; transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
 }
 .gd-cats button .mono { font-size: 11.5px; color: var(--ink-soft); }
 .gd-cats button.on { background: var(--ink); color: var(--surface); border-color: var(--ink); }
@@ -3292,7 +3292,7 @@ img { -webkit-user-drag: none; }
   .mh-q-ico.hot { background: var(--breaking-tint); color: var(--breaking-bright); }
   .mh-q-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
   .mh-q-txt b { font-size: 14.5px; font-weight: 700; letter-spacing: -0.02em; white-space: nowrap; }
-  .mh-q-txt small { font-size: 11.5px; color: var(--ink-soft); line-height: 1.3; word-break: keep-all; }
+  .mh-q-txt small { font-size: 11.5px; color: var(--ink-soft); line-height: 1.3; word-break: keep-all; text-wrap: balance; }
   .mh-q-txt small.on { color: var(--up); font-weight: 600; }
   .mh-q-go { flex: 0 0 auto; color: var(--ink-soft); }
 
@@ -3551,3 +3551,15 @@ img { -webkit-user-drag: none; }
 @media (prefers-reduced-motion: reduce) {
   .lp-in, .lp-wait { animation: none; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   [2026-11-10 추가] 디자인 점검(웹 디자인 가이드라인) — 한글 줄바꿈 다듬기
+   휴대폰에서 용어사전·자주 묻는 질문·칼럼 글이 "않 / 는", "수주 / 계약"처럼
+   단어 한가운데서 끊겨 읽기 불편했습니다.
+     · 한글은 띄어쓰기 단위로만 줄을 바꿈(keep-all). 칸보다 긴 낱말만 예외로 끊음.
+     · 제목은 줄 길이를 고르게(balance) — "멈춰 세운 / 날"처럼 한 글자만 남는 줄 방지.
+     · 본문은 마지막 줄에 한 낱말만 덩그러니 남지 않게(pretty).
+   ═══════════════════════════════════════════════════════════════════ */
+body { word-break: keep-all; overflow-wrap: break-word; }
+h1, h2, h3 { text-wrap: balance; }
+p, li { text-wrap: pretty; }
