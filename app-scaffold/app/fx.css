@@ -85,9 +85,7 @@
     transform: translateY(-3px);
     box-shadow: 0 0 0 1px color-mix(in srgb, var(--amber) 35%, var(--border)), 0 18px 40px -18px color-mix(in srgb, var(--amber) 40%, transparent);
   }
-  .fx-hot {
-    background-image: radial-gradient(420px circle at var(--mx, 50%) var(--my, 50%), var(--fx-glow), transparent 45%);
-  }
+  /* (2026-11-10) 마우스를 따라 번지던 빛(.fx-hot) 삭제 */
 }
 
 /* ── 맨 위 헤드라인 속보: 왼쪽 빨간 줄이 숨 쉬듯 빛남 ─────────────── */

@@ -45,9 +45,6 @@ const REVEAL_SELECTORS = [
   "table",
 ].join(",");
 
-// 마우스를 올리면 빛이 따라다니는 카드
-const SPOT_SELECTORS = ".trending-panel, .nb-lead, .nb-second, .home-right > *, .card, .blog-card, .post-card, .mk2-idx";
-
 // 마우스 쪽으로 살짝 끌려오는 단추(자석 효과)
 const MAGNET_SELECTORS = ".site-header .nav a, .site-header .nav button, .range-toggle-btn";
 
@@ -85,22 +82,12 @@ export default function MotionFX() {
       }
     } catch {}
 
-    // 3) 빛 따라다니기 + 4) 자석 단추 — 마우스가 있는 컴퓨터에서만
+    // 3) (2026-11-10 삭제) 마우스를 따라 카드 위에 빛이 번지던 효과 — 재성님: "PC에서 마우스 따라서 번지는 효과 없애줘"
+    // 4) 자석 단추 — 마우스가 있는 컴퓨터에서만
     const finePointer = window.matchMedia?.("(hover: hover) and (pointer: fine)").matches;
     if (finePointer) {
-      let lastSpot = null;
       const onMove = (e) => {
         const t = e.target instanceof Element ? e.target : null;
-        const spot = t?.closest(SPOT_SELECTORS);
-        if (lastSpot && lastSpot !== spot) lastSpot.classList.remove("fx-hot");
-        if (spot) {
-          const r = spot.getBoundingClientRect();
-          spot.style.setProperty("--mx", `${e.clientX - r.left}px`);
-          spot.style.setProperty("--my", `${e.clientY - r.top}px`);
-          spot.classList.add("fx-hot");
-        }
-        lastSpot = spot;
-
         const mag = t?.closest(MAGNET_SELECTORS);
         if (mag) {
           const r = mag.getBoundingClientRect();
