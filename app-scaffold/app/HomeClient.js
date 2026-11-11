@@ -35,6 +35,7 @@ import { useWatchlist } from "../lib/watchlist";
 import Header from "../components/Header";
 import DailyOutlookBanner from "../components/DailyOutlookBanner";
 import AthBreakoutPanel from "../components/AthBreakoutPanel"; // [2026-11-03] 역사적 신고가 돌파 칸
+import { putQuote, getQuote, QUOTE_EVENT } from "../lib/quoteBus"; // [2026-11-11] 목록과 차트 창 숫자 맞추기
 import LivePct from "../components/LivePct"; // [2026-11-04] 등락률 칸을 부드럽게
 import BriefingBand from "../components/BriefingBand";
 import { extractThemes } from "../lib/todayBrief";
@@ -407,7 +408,8 @@ function WatchPanel({ list, quotes, pendingCodes, active, onToggleFilter, onRemo
                   {s.name}
                   <span className="trending-row-code">{s.code}</span>
                 </button>
-                <LivePct value={chg} pending={!q && Boolean(pendingCodes?.has(s.code))} empty="—" className="watch-chg" />
+                {/* [2026-11-11] 차트 창과 똑같이 소수 둘째 자리까지(예: +5.67%) */}
+                <LivePct value={chg} digits={2} pending={!q && Boolean(pendingCodes?.has(s.code))} empty="—" className="watch-chg" />
                 <Link href={`/stock/${s.code}`} className="watch-page" aria-label={`${s.name} 종목 페이지`}>
                   보기
                 </Link>
@@ -958,12 +960,26 @@ export default function HomeClient({ initialItems = [], worldIndices: worldIndic
     try {
       const saved = JSON.parse(localStorage.getItem(QUOTE_STORE_KEY) || "null");
       const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
-      if (saved?.d === today && Date.now() - saved.at < 30 * 60 * 1000 && saved.q) {
+      if (saved?.d === today && Date.now() - saved.at < 10 * 60 * 1000 && saved.q) { // [2026-11-11] 30분 → 10분(옛 숫자가 먼저 보이는 시간 줄임)
         setQuotesNow((cur) => ({ ...saved.q, ...cur }));
       }
     } catch {
       // 저장소를 못 쓰는 환경 — 그냥 서버에서 받음
     }
+  }, []);
+  // [2026-11-11] 차트 창이 더 새 숫자를 받으면 목록도 그 숫자로 — "누르기 전과 후가 같게"(lib/quoteBus.js)
+  useEffect(() => {
+    const onQuote = (e) => {
+      const { code, quote } = e.detail || {};
+      if (!code || typeof quote?.changePct !== "number") return;
+      setQuotesNow((cur) => {
+        const old = cur?.[code];
+        if (old && old.price === quote.price && old.changePct === quote.changePct) return cur;
+        return { ...cur, [code]: quote };
+      });
+    };
+    window.addEventListener(QUOTE_EVENT, onQuote);
+    return () => window.removeEventListener(QUOTE_EVENT, onQuote);
   }, []);
   // 받은 숫자 기억해 두기(10초에 한 번까지만 저장)
   const lastSaveRef = useRef(0);
@@ -1000,6 +1016,14 @@ export default function HomeClient({ initialItems = [], worldIndices: worldIndic
           if (!alive) return false;
           const q = d?.quotes || {};
           const ok = Object.keys(q).length > 0;
+          // [2026-11-11] 받은 값을 알림판에 적고, 차트 창이 이미 더 새 값을 받아 둔 종목은 그 값을 유지
+          for (const [code, v] of Object.entries(q)) {
+            if (typeof v?.changePct !== "number") continue;
+            if (!putQuote(code, v)) {
+              const newer = getQuote(code);
+              if (newer) q[code] = newer;
+            }
+          }
           if (ok) setQuotesNow((cur) => ({ ...cur, ...q }));
           if (ok || last) done(key);
           return ok;

@@ -38,7 +38,7 @@
 
 const YAHOO_URL = "https://query1.finance.yahoo.com/v8/finance/chart";
 
-// 같은 종목을 다시 부르지 않고 저장된 값을 쓰는 시간(초).
+// 같은 종목을 다시 부르지 않고 저장된 값을 쓰는 시간(초). [2026-11-11] 저장 방식은 아래 quoteStore로 바뀜.
 // [2026-10-30] 5분 → 1분. 재성님: "지연 시간을 최대한 줄이는 방법은? 무료로"
 //   야후 자체 지연(20분)은 못 줄이지만, 우리가 덧붙이던 최대 5분은 1분으로 줄임(비용 0원 — 야후 호출만 조금 늘어남)
 const CACHE_SECONDS = 60; // 1분
@@ -77,9 +77,7 @@ async function fetchOne(symbol) {
     const res = await fetch(`${YAHOO_URL}/${encodeURIComponent(symbol)}?range=5d&interval=1d`, {
       headers: { "User-Agent": BROWSER_UA, Accept: "application/json,text/plain,*/*" },
       signal: controller.signal,
-      // Next.js가 이 응답을 5분 동안 저장해 둡니다 — 방문자가 몇 명이든
-      // 바깥으로 나가는 요청은 5분에 한 번입니다.
-      next: { revalidate: CACHE_SECONDS },
+      cache: "no-store", // [2026-11-11] 아래 fetchMany의 [2026-11-11] 설명 참고 — 저장은 quoteStore가 맡음
     });
     if (!res.ok) return null;
 
@@ -164,7 +162,7 @@ async function fetchSpark(symbols) {
     const res = await fetch(`${SPARK_URL}?symbols=${q}&range=1d&interval=1d`, {
       headers: { "User-Agent": BROWSER_UA, Accept: "application/json,text/plain,*/*" },
       signal: controller.signal,
-      next: { revalidate: CACHE_SECONDS },
+      cache: "no-store", // [2026-11-11] 아래 fetchMany의 [2026-11-11] 설명 참고
     });
     if (!res.ok) return [];
     const data = await res.json();
@@ -177,10 +175,43 @@ async function fetchSpark(symbols) {
   }
 }
 
+// [2026-11-11 추가] 종목별 1분 저장소
+//   재성님: "관심종목 +0.8%인데 눌러 보면 +5.67%. 누르기 전하고 누른 후가 똑같아야 할 거 아냐"
+//   원인: 야후 응답을 "주소별로 1분 저장(revalidate)"하게 해 뒀는데, Cloudflare에서는 이 저장본이
+//         제때 새로 만들어지지 않고 옛것(STALE)을 먼저 내줍니다(lib/memoCache.js에 적은 그 현상).
+//         관심종목은 사람마다 종목 조합이 달라 "그 사람만 쓰는 주소"가 되고, 그 사람이 다시 올 때까지
+//         아무도 새로 만들지 않아서 몇 시간 전(심하면 어제) 숫자가 먼저 나왔습니다. 차트 창(lib/candles.js)도 같은 문제.
+//   → 야후에는 항상 새로 묻고(no-store), 받은 값은 "종목별로" 서버 안에 1분만 기억합니다.
+//     어떤 조합으로 물어도 같은 종목은 같은 숫자가 나가고, 1분이 지나면 반드시 새로 받습니다. 비용 0원.
+const quoteStore = new Map(); // 기호 → { t: 받은 시각, v: 시세 또는 null(야후가 오래된 값만 준 종목) }
+const QUOTE_STORE_MAX = 3000;
+function storeGet(sym) {
+  const hit = quoteStore.get(sym);
+  return hit && Date.now() - hit.t < CACHE_SECONDS * 1000 ? hit : null;
+}
+function storePut(sym, v) {
+  quoteStore.delete(sym);
+  quoteStore.set(sym, { t: Date.now(), v });
+  if (quoteStore.size > QUOTE_STORE_MAX) {
+    for (const k of quoteStore.keys()) {
+      quoteStore.delete(k);
+      if (quoteStore.size <= QUOTE_STORE_MAX) break;
+    }
+  }
+}
+
 // 여러 기호를 나눠서 받아옵니다. 하나가 실패해도 나머지는 삽니다.
 async function fetchMany(symbols) {
   const out = new Map();
-  const unique = [...new Set(symbols.filter(Boolean))];
+  const all = [...new Set(symbols.filter(Boolean))];
+  // 1분 안에 받아 둔 종목은 그대로 쓰고, 나머지만 야후에 물어봄
+  const unique = [];
+  for (const s of all) {
+    const hit = storeGet(s);
+    if (!hit) unique.push(s);
+    else if (hit.v) out.set(s, hit.v);
+  }
+  if (unique.length === 0) return out;
 
   // ⓪ 먼저 20개씩 한 번에(spark) — 묶음들은 동시에 보냄
   const groups = [];
@@ -193,7 +224,10 @@ async function fetchMany(symbols) {
       const sym = byUpper.get(r.symbol.toUpperCase());
       if (!sym) continue;
       answered.add(sym);
-      if (!r.stale) out.set(sym, { ...r, symbol: sym });
+      if (!r.stale) {
+        out.set(sym, { ...r, symbol: sym });
+        storePut(sym, { ...r, symbol: sym });
+      } else storePut(sym, null);
     }
   }
 
@@ -203,7 +237,10 @@ async function fetchMany(symbols) {
     const slice = rest.slice(i, i + BATCH_SIZE);
     const results = await Promise.all(slice.map((s) => fetchOne(s)));
     results.forEach((r, idx) => {
-      if (r) out.set(slice[idx], r);
+      if (r) {
+        out.set(slice[idx], r);
+        storePut(slice[idx], r);
+      }
     });
   }
 
@@ -213,7 +250,10 @@ async function fetchMany(symbols) {
   for (const s of missing.slice(0, 10)) { // 너무 많이 다시 부르면 그만큼 늦어지므로 10개까지만
     await new Promise((r) => setTimeout(r, 150));
     const r = await fetchOne(s);
-    if (r) out.set(s, r);
+    if (r) {
+      out.set(s, r);
+      storePut(s, r);
+    }
   }
 
   return out;

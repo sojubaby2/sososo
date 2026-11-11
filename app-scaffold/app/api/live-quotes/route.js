@@ -37,7 +37,8 @@ export async function GET(request) {
     try {
       const map = await fetchDomesticQuotes(stocks);
       for (const [code, q] of map) {
-        if (typeof q.changePct === "number") quotes[code] = { price: q.price, changePct: q.changePct };
+        // [2026-11-11] asOf(야후가 이 값을 찍은 시각)도 같이 보냄 — 화면에서 차트 창 숫자와 "더 새 값"을 가리는 데 씀(lib/quoteBus.js)
+        if (typeof q.changePct === "number") quotes[code] = { price: q.price, changePct: q.changePct, asOf: q.asOf };
         // [2026-10-30] 장 시작 전후 오늘 시세 대기 중(lib/quotes.js applyOpenWait) — 화면이 들고 있던
         //   어제 등락률을 지우도록 "비어 있음"을 분명히 보냄
         else if (q.awaiting) quotes[code] = { price: null, changePct: null, awaiting: true };

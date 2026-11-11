@@ -27,11 +27,40 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { X, Copy, Check, ExternalLink, Filter, FileText } from "lucide-react";
 import { OPEN_CHART_EVENT } from "../lib/openStockChart";
+import { putQuote, getQuote, QUOTE_EVENT } from "../lib/quoteBus"; // [2026-11-11] 목록 숫자와 맞추기
 import WatchStar from "./WatchStar";
 
 const SHOW_BARS = 130; // 화면에 보여줄 거래일 수
-const CLIENT_CACHE_MS = 120000; // 같은 종목을 2분 안에 다시 열면 다시 받지 않음
+const CLIENT_CACHE_MS = 60000; // 같은 종목을 1분 안에 다시 열면 다시 받지 않음([2026-11-11] 2분 → 1분)
 const cache = new Map(); // code → { at, data }
+
+// [2026-11-11 추가] 목록(관심종목·속보 칩)과 이 창의 숫자를 똑같이 맞추기 — 설명은 lib/quoteBus.js
+//   · 이 창이 받은 값이 더 새것이면 → 알림판에 적어 목록이 따라오게 함
+//   · 목록이 이미 더 새 값을 갖고 있으면(같은 날) → 마지막 봉의 종가를 그 값으로 바꿔 보여 줌
+//   마지막에 "이 창에 실제로 보이는 숫자"를 알림판에 다시 적어, 양쪽이 소수점까지 같아지게 합니다.
+const kstDayOf = (asOf) => {
+  const t = Date.parse(asOf || "");
+  return Number.isFinite(t) ? new Date(t + 9 * 3600 * 1000).toISOString().slice(0, 10) : "";
+};
+export function syncCandlesWithQuotes(code, d) {
+  const cs = d?.candles;
+  if (!code || !Array.isArray(cs) || cs.length < 2) return d;
+  let out = d;
+  let last = cs[cs.length - 1];
+  const prev = cs[cs.length - 2];
+  const q = getQuote(code);
+  const qT = Date.parse(q?.asOf || "") || 0;
+  const dT = Date.parse(d.asOf || "") || 0;
+  if (q && typeof q.price === "number" && q.price > 0 && qT > dT && kstDayOf(q.asOf) === last.d && q.price !== last.c) {
+    last = { ...last, c: q.price, h: Math.max(last.h, q.price), l: Math.min(last.l, q.price) };
+    out = { ...d, candles: [...cs.slice(0, -1), last], asOf: q.asOf };
+  }
+  // 오늘(가장 최근 거래일) 봉일 때만 목록에 알림 — 휴일 등으로 날짜가 어긋난 값은 건드리지 않음
+  if (prev.c > 0 && kstDayOf(out.asOf) === last.d) {
+    putQuote(code, { price: last.c, changePct: ((last.c - prev.c) / prev.c) * 100, asOf: out.asOf });
+  }
+  return out;
+}
 
 // ── 숫자 모양 ─────────────────────────────────────────────
 export const won = (n) => (typeof n === "number" ? Math.round(n).toLocaleString("ko-KR") : "—");
@@ -285,7 +314,7 @@ export default function StockChartModal() {
     let alive = true;
     const hit = cache.get(stock.code);
     if (hit && Date.now() - hit.at < CLIENT_CACHE_MS) {
-      setData(hit.data);
+      setData(syncCandlesWithQuotes(stock.code, hit.data));
       setState("ready");
       return;
     }
@@ -298,7 +327,7 @@ export default function StockChartModal() {
         if (!alive) return;
         if (Array.isArray(d?.candles) && d.candles.length >= 2) {
           cache.set(stock.code, { at: Date.now(), data: d });
-          setData(d);
+          setData(syncCandlesWithQuotes(stock.code, d));
           setState("ready");
         } else setState("error");
       })
@@ -306,6 +335,22 @@ export default function StockChartModal() {
     return () => {
       alive = false;
     };
+  }, [stock]);
+
+  const dataRef = useRef(null);
+  dataRef.current = data;
+  // [2026-11-11] 창이 열려 있는 동안 목록이 새 숫자를 받으면(1분마다) 이 창 숫자도 같이 바뀜
+  useEffect(() => {
+    if (!stock) return;
+    const onQuote = (e) => {
+      if (e.detail?.code !== String(stock.code)) return;
+      const cur = dataRef.current;
+      if (!cur) return;
+      const next = syncCandlesWithQuotes(stock.code, cur);
+      if (next !== cur) setData(next);
+    };
+    window.addEventListener(QUOTE_EVENT, onQuote);
+    return () => window.removeEventListener(QUOTE_EVENT, onQuote);
   }, [stock]);
 
   const close = useCallback(() => {

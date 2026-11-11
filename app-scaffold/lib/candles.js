@@ -24,6 +24,8 @@
 //   ③ 거래정지 등으로 몇 년 전 값이 오는 종목이 있습니다(lib/quotes.js 참고)
 //      → 마지막 봉이 30일보다 오래됐으면 "데이터 없음"으로 처리합니다.
 
+import { memo } from "./memoCache";
+
 const YAHOO_URL = "https://query1.finance.yahoo.com/v8/finance/chart";
 // [2026-10-30] 2분 → 1분(시세 지연 줄이기 — lib/quotes.js와 같은 이유)
 const CACHE_SECONDS = 60; // 1분
@@ -51,7 +53,7 @@ async function fetchYahooDaily(symbol) {
     const res = await fetch(`${YAHOO_URL}/${encodeURIComponent(symbol)}?range=${RANGE}&interval=1d`, {
       headers: { "User-Agent": BROWSER_UA, Accept: "application/json,text/plain,*/*" },
       signal: controller.signal,
-      next: { revalidate: CACHE_SECONDS },
+      cache: "no-store", // [2026-11-11] 저장은 아래 memo가 맡음(이유는 lib/quotes.js의 [2026-11-11] 설명)
     });
     if (!res.ok) return null;
     const data = await res.json();
@@ -106,7 +108,8 @@ export async function fetchDailyCandles(code, market = "") {
   if (!/^[0-9A-Z]{6}$/.test(code)) return null;
   const order = /코스닥|KOSDAQ|KQ/i.test(market) ? [".KQ", ".KS"] : [".KS", ".KQ"];
   for (const suffix of order) {
-    const r = await fetchYahooDaily(code + suffix);
+    // [2026-11-11] 주소별 저장(revalidate)이 옛 숫자를 내주던 문제 → 서버 안에 1분만 기억(lib/memoCache.js)
+    const r = await memo(`candles:${code}${suffix}`, CACHE_SECONDS * 1000, () => fetchYahooDaily(code + suffix));
     if (r) return { code, market: suffix === ".KQ" ? "코스닥" : "코스피", ...r };
   }
   return null;

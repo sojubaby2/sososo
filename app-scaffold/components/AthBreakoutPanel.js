@@ -14,6 +14,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Crown } from "lucide-react";
 import { openStockChart } from "../lib/openStockChart";
+import { useQuoteBus } from "../lib/quoteBus"; // [2026-11-11] 차트 창·목록과 같은 숫자 쓰기
 
 const POLL_MS = 3 * 60 * 1000;
 
@@ -67,6 +68,7 @@ export function useAthBreakouts() {
 
 export default function AthBreakoutPanel({ className = "" }) {
   const data = useAthBreakouts();
+  const liveOf = useQuoteBus();
 
   const items = data?.items || [];
   const status = data?.status;
@@ -103,7 +105,12 @@ export default function AthBreakoutPanel({ className = "" }) {
         </p>
       ) : (
         <ul className="ath-list">
-          {items.slice(0, 12).map((s) => (
+          {items.slice(0, 12).map((s0) => {
+            // [2026-11-11] 차트 창이나 속보 목록이 이 종목의 더 새 값을 받아 뒀으면 그 값으로 보여 줌
+            //   (이 칸은 3분마다 계산해서, 누르면 차트 창 숫자와 어긋날 수 있었음 — lib/quoteBus.js)
+            const live = liveOf(s0.code);
+            const s = live && typeof live.price === "number" ? { ...s0, price: live.price, changePct: live.changePct } : s0;
+            return (
             <li key={s.code} className="ath-row">
               <button
                 type="button"
@@ -126,7 +133,8 @@ export default function AthBreakoutPanel({ className = "" }) {
                 보기
               </Link>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
     </section>

@@ -28,12 +28,11 @@ import { notFound } from "next/navigation";
 import Header from "../../../components/Header";
 // [2026-10-27 추가] 애드센스 광고 칸(번호는 lib/ads.js)
 import AdSlot from "../../../components/AdSlot";
-import StockInlineChart from "../../../components/StockInlineChart";
+import { StockLiveProvider, StockLivePrice, StockLiveChart, StockLiveSummary } from "../../../components/StockLive";
 import WatchStar from "../../../components/WatchStar";
 import { getStock, peersOf } from "../../../lib/stockDirectory";
 import { fetchDailyCandles } from "../../../lib/candles";
 import { getRecentFeed, newsForStock, kstDateTimeText } from "../../../lib/recentFeed";
-import { summarizeCandles, describeSummary } from "../../../lib/stockSummary";
 import { decodeEntities } from "../../../lib/decodeEntities";
 import { disclosuresForStock, categoryLabel, dartViewerUrl, kstTodayIso } from "../../../lib/disclosures";
 
@@ -98,8 +97,6 @@ export async function generateMetadata({ params }) {
   };
 }
 
-const sign = (v) => (typeof v === "number" ? `${v > 0 ? "+" : ""}${v.toFixed(2)}%` : "—");
-const tone = (v) => (typeof v === "number" ? (v > 0 ? "up" : v < 0 ? "down" : "flat") : "flat");
 
 export default async function StockPage({ params }) {
   const code = normCode(params.code);
@@ -111,22 +108,13 @@ export default async function StockPage({ params }) {
 
   const label = name || code;
   const candles = chart?.candles || [];
-  const summary = summarizeCandles(candles);
-  const lines = describeSummary(label, summary);
   const peers = dir ? peersOf(code, 12) : [];
-
-  const stats = summary
-    ? [
-        ["1주", summary.week],
-        ["1개월", summary.month],
-        ["3개월", summary.quarter],
-      ]
-    : [];
 
   return (
     <div>
       <Header />
       <main className="stock-page">
+        <StockLiveProvider code={code} market={market} label={label} initialCandles={candles}>
         <nav className="stock-crumb" aria-label="위치">
           <Link href="/">홈</Link> › <Link href="/themes">테마별 종목정리</Link> › <span>{label}</span>
         </nav>
@@ -137,56 +125,20 @@ export default async function StockPage({ params }) {
               {label} <span className="stock-code mono">{code}</span>
               {market && <span className="sc-mkt">{market}</span>}
             </h1>
-            {summary ? (
-              <p className="stock-price">
-                <span className="mono">{Math.round(summary.close).toLocaleString("ko-KR")}원</span>
-                <span className={`mono ${tone(summary.change)}`}>{sign(summary.change)}</span>
-                <span className="stock-asof">{summary.date} 기준 · 15~20분 지연</span>
-                {/* [2026-10-30] 실시간 시세는 네이버 증권으로(링크만) */}
-                <a className="stock-live" href={`https://finance.naver.com/item/main.naver?code=${code}`} target="_blank" rel="noopener noreferrer">
-                  실시간 시세는 네이버 ↗
-                </a>
-              </p>
-            ) : (
-              <p className="stock-asof">시세를 받아오지 못했어요.</p>
-            )}
+            {/* [2026-11-11] 가격·차트·한눈에 보기는 들어온 순간 새 숫자로 맞춤(components/StockLive.js) */}
+            <StockLivePrice />
           </div>
           <WatchStar stock={{ code, name: label, market }} variant="big" />
         </header>
 
         <section className="panel stock-section">
-          <StockInlineChart candles={candles.slice(-Math.max(SHOW_BARS + 30, 160))} />
+          <StockLiveChart bars={Math.max(SHOW_BARS + 30, 160)} />
         </section>
 
         {/* [2026-10-27] 광고 — 차트 아래 */}
         <AdSlot />
 
-        {summary && (
-          <section className="panel stock-section">
-            <h2 className="stock-h2">한눈에 보기</h2>
-            <div className="stock-stats">
-              {stats.map(([k, v]) => (
-                <div key={k} className="stock-stat">
-                  <span className="stock-stat-k">{k}</span>
-                  <span className={`stock-stat-v mono ${tone(v)}`}>{sign(v)}</span>
-                </div>
-              ))}
-              <div className="stock-stat">
-                <span className="stock-stat-k">{summary.periodLabel} 고점</span>
-                <span className="stock-stat-v mono">{Math.round(summary.periodHigh.price).toLocaleString("ko-KR")}</span>
-              </div>
-              <div className="stock-stat">
-                <span className="stock-stat-k">{summary.periodLabel} 저점</span>
-                <span className="stock-stat-v mono">{Math.round(summary.periodLow.price).toLocaleString("ko-KR")}</span>
-              </div>
-            </div>
-            {lines.map((t, i) => (
-              <p key={i} className="stock-text">
-                {t}
-              </p>
-            ))}
-          </section>
-        )}
+        <StockLiveSummary />
 
         <section className="panel stock-section">
           <h2 className="stock-h2">이 종목이 걸린 최근 속보</h2>
@@ -282,6 +234,7 @@ export default async function StockPage({ params }) {
             네이버 증권에서 보기
           </a>
         </p>
+        </StockLiveProvider>
       </main>
     </div>
   );

@@ -11,6 +11,7 @@
 //     · 새로 받다가 실패하면, 직전 값이 있으면 그걸 대신 줌(화면이 비지 않게)
 //   비용: 0원(외부 저장소를 쓰지 않음).
 
+const MAX_ENTRIES = 400;
 const store = new Map(); // key → { t: 저장 시각, v: 값 }
 const inflight = new Map(); // key → 진행 중인 요청(같은 순간 여러 요청이 와도 바깥엔 한 번만 물어봄)
 
@@ -22,6 +23,13 @@ export async function memo(key, ttlMs, fn) {
     try {
       const v = await fn();
       store.set(key, { t: Date.now(), v });
+      // [2026-11-11] 종목별 차트처럼 가짓수가 많은 자료도 쓰게 되어, 오래된 것부터 지워 400개까지만 둠
+      if (store.size > MAX_ENTRIES) {
+        for (const k of store.keys()) {
+          store.delete(k);
+          if (store.size <= MAX_ENTRIES) break;
+        }
+      }
       return v;
     } catch (err) {
       if (hit) return hit.v; // 실패하면 직전 값으로 버팀
