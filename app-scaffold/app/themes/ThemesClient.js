@@ -16,6 +16,8 @@ import { Search, ShieldAlert, TrendingUp, TrendingDown, Minus, CandlestickChart 
 import { openStockChart } from "../../lib/openStockChart";
 import Header from "../../components/Header";
 import { getThemesGrouped, isPoliticalTheme } from "../../lib/themeData";
+// [2026-11-17] 테마가 250개로 늘어 "분야별로 보기" 단추를 붙임 (lib/themeGroups.js)
+import { THEME_GROUP_NAMES, groupOfTheme } from "../../lib/themeGroups";
 
 const THEMES = getThemesGrouped(); // [{ theme, stocks: [{theme,name,code,market}] }, ...]
 
@@ -107,6 +109,7 @@ function ThemeDirectory() {
 
 export default function ThemesClient() {
   const [query, setQuery] = useState("");
+  const [group, setGroup] = useState("전체"); // [2026-11-17] 분야 단추 — "전체" 또는 분야 이름
   const [selected, setSelected] = useState(THEMES[0]?.theme ?? "");
   // 모바일 드롭다운이 "펼쳐져 있는지"만 따로 관리 — selected(데스크톱 오른쪽
   // 패널/좌측 강조 표시용)는 항상 마지막으로 누른 테마를 유지하지만,
@@ -132,6 +135,7 @@ export default function ThemesClient() {
     if (themeParam && THEMES.some((t) => t.theme === themeParam)) {
       setSelected(themeParam);
       setExpanded(themeParam);
+      setGroup(groupOfTheme(themeParam)); // [2026-11-17] 그 테마가 속한 분야를 같이 열어 줌
     }
   }, []);
 
@@ -166,10 +170,32 @@ export default function ThemesClient() {
 
   const stockChangeMap = range === "1W" ? stockChanges1W : stockChanges1M;
 
-  const filteredThemes = useMemo(
-    () => THEMES.filter((t) => t.theme.toLowerCase().includes(query.toLowerCase())),
-    [query]
-  );
+  // [2026-11-17 변경] ① 검색어는 테마 이름뿐 아니라 "종목 이름"으로도 찾음(예: "한화엔진" → 조선(엔진) 등)
+  //   ② 검색어가 없을 때는 고른 분야(반도체·조선·2차전지 …)의 테마만 보여 줌
+  const filteredThemes = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (q) {
+      return THEMES.filter(
+        (t) => t.theme.toLowerCase().includes(q) || t.stocks.some((s) => s.name.toLowerCase().includes(q))
+      );
+    }
+    if (group === "전체") return THEMES;
+    return THEMES.filter((t) => groupOfTheme(t.theme) === group);
+  }, [query, group]);
+  // 휴대폰에서 분야 단추가 옆으로 길게 늘어서므로, 고른 분야 단추가 화면 안에 보이게 살짝 밀어 줌
+  useEffect(() => {
+    try {
+      document.querySelector(".theme-group-btn.active")?.scrollIntoView({ inline: "center", block: "nearest" });
+    } catch {}
+  }, [group]);
+  const groupCounts = useMemo(() => {
+    const m = { 전체: THEMES.length };
+    for (const t of THEMES) {
+      const g = groupOfTheme(t.theme);
+      m[g] = (m[g] || 0) + 1;
+    }
+    return m;
+  }, []);
 
   const selectedGroup = THEMES.find((t) => t.theme === selected) ?? THEMES[0];
 
@@ -267,7 +293,7 @@ export default function ThemesClient() {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
           <div className="search-box" style={{ marginBottom: 0 }}>
             <Search size={16} />
-            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="테마 검색 (예: 반도체, 위고비, 호르무즈)" />
+            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="테마·종목 검색 (예: 조선 엔진, 나트륨, 한화엔진)" />
           </div>
           <div className="range-toggle">
             <button
@@ -285,6 +311,26 @@ export default function ThemesClient() {
               1개월
             </button>
           </div>
+        </div>
+
+        {/* [2026-11-17] 분야 단추 — 테마가 250개라 분야별로 골라 보기. 검색어를 넣으면 분야와 상관없이 전체에서 찾음 */}
+        <div className="theme-groups" role="tablist" aria-label="테마 분야">
+          {["전체", ...THEME_GROUP_NAMES].map((g) => (
+            <button
+              key={g}
+              type="button"
+              role="tab"
+              aria-selected={group === g && !query.trim()}
+              className={`theme-group-btn ${group === g && !query.trim() ? "active" : ""}`}
+              onClick={() => {
+                setGroup(g);
+                setQuery("");
+              }}
+            >
+              {g}
+              <span className="theme-group-n">{groupCounts[g] || 0}</span>
+            </button>
+          ))}
         </div>
 
         {loadState === "error" && (

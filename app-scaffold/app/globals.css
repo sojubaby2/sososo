@@ -3859,3 +3859,18 @@ p, li { text-wrap: pretty; }
   .on-card-top .on-name { white-space: normal; overflow: visible; line-height: 1.3; }
   .on-sec { padding: 14px 12px; }
 }
+
+/* [2026-11-17] 테마 화면 "분야 단추" — 테마가 250개로 늘어 분야별로 골라 보기 (app/themes/ThemesClient.js) */
+.theme-groups { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 18px; }
+.theme-group-btn { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border: 1px solid var(--border); border-radius: 999px; background: transparent; color: var(--ink-muted); font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer; transition: background-color .15s ease, border-color .15s ease, color .15s ease; }
+.theme-group-btn:hover { border-color: var(--amber); color: var(--ink); }
+.theme-group-btn.active { background: var(--amber-tint); border-color: var(--amber); color: var(--amber-tint-ink, var(--ink)); }
+.theme-group-btn:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.theme-group-n { font-size: 11px; font-weight: 700; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.theme-group-btn.active .theme-group-n { color: inherit; opacity: .75; }
+@media (max-width: 767px) {
+  /* 휴대폰: 한 줄로 옆으로 밀어 보기 */
+  .theme-groups { flex-wrap: nowrap; overflow-x: auto; margin-left: -16px; margin-right: -16px; padding: 0 16px 4px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .theme-groups::-webkit-scrollbar { display: none; }
+  .theme-group-btn { flex: 0 0 auto; height: 36px; }
+}
