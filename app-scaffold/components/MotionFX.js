@@ -10,7 +10,7 @@
 //
 // 쓰는 도구 두 가지:
 //   · Motion   — 스크롤하면 카드가 아래에서 떠오르며 나타남, 새 속보가 미끄러져 들어옴,
-//                맨 위 읽은 만큼 차오르는 진행 막대, 메뉴 단추가 마우스 쪽으로 살짝 끌려옴(자석 효과)
+//                맨 위 읽은 만큼 차오르는 진행 막대 (자석 효과는 2026-11-17 삭제)
 //   · Anime.js — 로고 "뉴" 글자가 통통 튀며 등장, 브리핑 띠 세계지도의 시장 위치 점이 레이더처럼 퍼져 나감
 //
 // 안전장치:
@@ -45,8 +45,9 @@ const REVEAL_SELECTORS = [
   "table",
 ].join(",");
 
-// 마우스 쪽으로 살짝 끌려오는 단추(자석 효과)
-const MAGNET_SELECTORS = ".site-header .nav a, .site-header .nav button, .range-toggle-btn";
+// [2026-11-17 삭제] 자석 효과(메뉴 단추가 마우스 쪽으로 끌려오던 것) — 재성님: "뭐 클릭하면 버벅버벅 하는 느낌"
+//   마우스를 움직일 때마다(초당 60~120번) 새 움직임을 만들어서 메뉴 위에서 화면이 끊겼고,
+//   누르려는 단추가 움직여서 누르는 느낌도 둔했습니다. 아래 "가벼운 버전으로 바꾼 것"도 같은 날 같이 고침.
 
 const reduced = () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
@@ -83,32 +84,7 @@ export default function MotionFX() {
     } catch {}
 
     // 3) (2026-11-10 삭제) 마우스를 따라 카드 위에 빛이 번지던 효과 — 재성님: "PC에서 마우스 따라서 번지는 효과 없애줘"
-    // 4) 자석 단추 — 마우스가 있는 컴퓨터에서만
-    const finePointer = window.matchMedia?.("(hover: hover) and (pointer: fine)").matches;
-    if (finePointer) {
-      const onMove = (e) => {
-        const t = e.target instanceof Element ? e.target : null;
-        const mag = t?.closest(MAGNET_SELECTORS);
-        if (mag) {
-          const r = mag.getBoundingClientRect();
-          const dx = (e.clientX - (r.left + r.width / 2)) * 0.18;
-          const dy = (e.clientY - (r.top + r.height / 2)) * 0.25;
-          animate(mag, { x: dx, y: dy }, { type: "spring", stiffness: 300, damping: 18 });
-          if (!mag.dataset.fxMag) {
-            mag.dataset.fxMag = "1";
-            mag.addEventListener(
-              "pointerleave",
-              () => {
-                animate(mag, { x: 0, y: 0 }, { type: "spring", stiffness: 260, damping: 14 });
-              },
-              { passive: true }
-            );
-          }
-        }
-      };
-      document.addEventListener("pointermove", onMove, { passive: true });
-      cleanups.push(() => document.removeEventListener("pointermove", onMove));
-    }
+    // 4) (2026-11-17 삭제) 자석 단추 — 위 설명 참고
 
     // 5) 누른 자리 물결 — 단추·종목·속보 줄을 누르면 그 자리에서 동그란 물결이 퍼짐 (Motion)
     const onDown = (e) => {
@@ -141,7 +117,9 @@ export default function MotionFX() {
       const els = groupQueue;
       groupQueue = [];
       els.forEach((el, i) => {
-        animate(el, { opacity: [0, 1], y: [22, 0], filter: ["blur(4px)", "blur(0px)"] }, { duration: 0.6, delay: i * 0.06, ease: [0.22, 1, 0.36, 1] }).then(() => {
+        // [2026-11-17 변경] 흐림(blur) 효과를 빼고 시간을 0.6초 → 0.35초로 — 흐림은 화면을 통째로 다시 그려서
+        //   스크롤할 때 끊기는 주범이었습니다. 투명도와 위치만 바꾸면 그래픽 장치가 처리해서 부드럽습니다.
+        animate(el, { opacity: [0, 1], y: [14, 0] }, { duration: 0.35, delay: Math.min(i, 6) * 0.04, ease: [0.22, 1, 0.36, 1] }).then(() => {
           el.classList.remove("fx-pre");
           el.style.removeProperty("opacity");
           el.style.removeProperty("transform");
@@ -191,11 +169,19 @@ export default function MotionFX() {
 
     // 처음엔 화면이 다 그려진 뒤 한 번 훑고, 이후 바뀌는 부분만 다시 훑음
     const t0 = setTimeout(scan, 60);
+    // [2026-11-17 변경] 화면이 조금만 바뀌어도(시세 숫자가 1초에 여러 번 바뀜) 매번 화면 전체를 훑던 것을
+    //   "바뀐 뒤 0.25초 조용해지면 한 번"으로 줄임. 새로 들어온 조각이 없으면 아예 안 훑음.
     let pending = 0;
     const mo = new MutationObserver((list) => {
-      list.forEach((m) => m.addedNodes.forEach(arrive));
-      cancelAnimationFrame(pending);
-      pending = requestAnimationFrame(scan);
+      let added = false;
+      for (const m of list) {
+        if (!m.addedNodes.length) continue;
+        added = true;
+        m.addedNodes.forEach(arrive);
+      }
+      if (!added) return;
+      clearTimeout(pending);
+      pending = setTimeout(scan, 250);
     });
     mo.observe(document.body, { childList: true, subtree: true });
 
@@ -221,7 +207,7 @@ export default function MotionFX() {
       clearTimeout(t0);
       clearTimeout(t1);
       clearTimeout(groupTimer);
-      cancelAnimationFrame(pending);
+      clearTimeout(pending);
       mo.disconnect();
       stops.forEach((s) => s?.());
       try {

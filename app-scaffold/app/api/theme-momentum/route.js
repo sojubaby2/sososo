@@ -53,6 +53,16 @@ export const maxDuration = 60;
 
 import rawThemeData from "../../../lib/themeData.json";
 import { fetchLatestAvailable } from "../../../lib/krxOpenApi";
+// [2026-11-17 추가] 재성님: "뭐 클릭하면 버벅버벅" — 이 주소는 부를 때마다 거래소(KRX)에 전 종목 시세를 3번
+//   (오늘·1주 전·1달 전) 물어봐서 매번 약 3초가 걸렸고, 방문자마다 되풀이됐습니다(하루 1만 번 한도도 갉아먹음).
+//   자료는 하루 한 번 바뀌는 종가 기준이므로, 계산한 결과를 30분 동안 저장해 두고 그대로 내줍니다.
+//   ① 서버 메모리(10분) → ② Redis(30분, 다른 서버 조각과도 공유) → ③ 둘 다 없을 때만 거래소에 물어봄.
+//   거래소가 대답을 안 하면 저장해 둔 마지막 결과(최대 3일)를 내줍니다.
+import { memo } from "../../../lib/memoCache";
+import { getRedis } from "../../../lib/redis";
+
+const TM_KEY = "tm:result:v1";
+const TM_FRESH_MS = 30 * 60 * 1000;
 
 // [2026-09-11 수정] KRX 정식 API를 호출하는 공통 로직(인증키 처리,
 // 영업일 계산, 필드 정규화 등)을 lib/krxOpenApi.js로 옮기고 여기서는
@@ -155,6 +165,44 @@ function aggregateByTheme(stockChanges) {
 }
 
 export async function GET() {
+  let data = null;
+  try {
+    data = await memo("theme-momentum", 10 * 60 * 1000, loadCached);
+  } catch {
+    data = null;
+  }
+  if (!data) return Response.json({ error: "시세 데이터를 가져오지 못했습니다." }, { status: 502 });
+  return Response.json(data, { headers: { "Cache-Control": "public, max-age=300, s-maxage=1800, stale-while-revalidate=3600" } });
+}
+
+async function loadCached() {
+  const redis = getRedis();
+  let last = null;
+  if (redis) {
+    try {
+      const raw = await redis.get(TM_KEY);
+      last = typeof raw === "string" ? JSON.parse(raw) : raw;
+    } catch {
+      last = null;
+    }
+  }
+  if (last?.themeChanges && Date.now() - Date.parse(last.savedAt || 0) < TM_FRESH_MS) return last;
+  let fresh = null;
+  try {
+    fresh = await compute();
+  } catch {
+    fresh = null;
+  }
+  if (fresh) {
+    fresh.savedAt = new Date().toISOString();
+    if (redis) await redis.set(TM_KEY, fresh, { ex: 3 * 86400 }).catch(() => {});
+    return fresh;
+  }
+  if (last?.themeChanges) return last; // 거래소가 대답을 안 하면 마지막 결과로
+  throw new Error("theme-momentum: 자료 없음"); // memo가 빈 결과를 10분씩 붙잡지 않게
+}
+
+async function compute() {
   const now = new Date();
   const weekAgo = new Date(now);
   weekAgo.setDate(weekAgo.getDate() - 7);
@@ -174,7 +222,7 @@ export async function GET() {
   // 받아온 만큼만(예: 1일치만) 보여주고 나머지는 "데이터 없음"으로 둠.
   if (!recent) {
     console.error("theme-momentum: 최신 시세를 가져오지 못함 (KRX 정식 API 응답 오류)");
-    return Response.json({ error: "시세 데이터를 가져오지 못했습니다." }, { status: 502 });
+    return null;
   }
   if (!week) console.error("theme-momentum: 1주일 전 시세를 가져오지 못함 — 1주일 등락률은 비어서 나감");
   if (!month) console.error("theme-momentum: 1개월 전 시세를 가져오지 못함 — 1개월 등락률은 비어서 나감");
@@ -215,8 +263,7 @@ export async function GET() {
   // [2026-09-08 추가] 마감시황 자동 작성용 — 급락주 랭킹.
   const dailyLosers = topDailyMovers(recent.items, 20, "asc");
 
-  return Response.json(
-    {
+  return {
       recentBasDt: recent.basDt,
       weekBasDt: week ? week.basDt : null,
       monthBasDt: month ? month.basDt : null,
@@ -226,7 +273,5 @@ export async function GET() {
       stockChanges1M,
       dailyMovers,
       dailyLosers,
-    },
-    { headers: { "Cache-Control": "public, max-age=0, s-maxage=1800, stale-while-revalidate=3600" } }
-  );
+  };
 }

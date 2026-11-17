@@ -30,10 +30,11 @@
 }
 
 /* ── 머리띠: 반투명 유리 + 아래 빛나는 선 ───────────────────────── */
+/* [2026-11-17 변경] 재성님: "뭐 클릭하면 버벅버벅" — 머리띠 뒤를 흐리게 비치던 유리 효과(backdrop-filter)를 뺌.
+   머리띠가 화면 위에 붙어 다니는 동안 스크롤할 때마다 뒤 화면을 다시 흐리게 계산해서 끊김의 큰 원인이었습니다.
+   거의 불투명한 바탕색으로 바꿔 겉모습은 비슷하게 둡니다. */
 .site-header {
-  background: color-mix(in srgb, var(--deep) 82%, transparent);
-  -webkit-backdrop-filter: saturate(160%) blur(14px);
-  backdrop-filter: saturate(160%) blur(14px);
+  background: color-mix(in srgb, var(--deep) 97%, transparent);
 }
 .site-header::after {
   content: "";
@@ -43,9 +44,8 @@
   bottom: -1px;
   height: 1px;
   background: linear-gradient(90deg, transparent, var(--breaking-bright), var(--amber), transparent);
-  background-size: 200% 100%;
   opacity: 0.55;
-  animation: fx-line 7s linear infinite;
+  /* [2026-11-17] 선이 흘러가던 움직임을 멈춤 — 쉬지 않고 화면을 다시 그리게 만들던 것(선 색은 그대로) */
   pointer-events: none;
 }
 @keyframes fx-line {
@@ -62,7 +62,6 @@
 /* 메뉴 단추 — 자석 효과가 자연스럽게, 고른 메뉴는 그라데이션 테두리 */
 .site-header .nav a,
 .site-header .nav button {
-  will-change: transform;
   transition: color 0.2s ease, background-color 0.2s ease;
 }
 
@@ -240,14 +239,15 @@
 }
 
 /* ── 휴대폰 아래 탭 줄: 유리 느낌 ─────────────────────────────────── */
+/* [2026-11-17] 유리 흐림 삭제(휴대폰에서 스크롤이 끊기던 원인) — 바탕을 거의 불투명하게 */
 .m-tabbar {
-  -webkit-backdrop-filter: saturate(160%) blur(14px);
-  backdrop-filter: saturate(160%) blur(14px);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: color-mix(in oklab, var(--surface) 98%, transparent);
 }
 
 /* ── 움직임 줄이기를 켠 사람: 전부 끔 ─────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
-  .site-header::after,
   .nb-lead::before,
   .nb-breaking::after,
   .nb-crawl-label::after,

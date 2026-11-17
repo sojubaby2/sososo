@@ -11,7 +11,13 @@
 // 나머지 동작은 예전과 완전히 동일합니다.
 
 // [2026-11-04 추가] HOT 테마 막대그래프(Bklit UI)
-import HotThemeChart from "../components/HotThemeChart";
+// [2026-11-17 변경] HOT 테마 막대그래프는 그래프 도구(약 200KB)를 끌고 와서, 홈을 열 때마다 그걸 먼저 다 읽느라
+//   화면이 늦게 반응했습니다. → 홈이 먼저 뜬 뒤에 그래프 부분만 따로 받아 그립니다(자리는 미리 잡아 둬서 안 밀림).
+import dynamic from "next/dynamic";
+const HotThemeChart = dynamic(() => import("../components/HotThemeChart"), {
+  ssr: false,
+  loading: () => <div className="fx-hotchart" aria-hidden="true" />,
+});
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Newspaper, Loader2, Flame, Bell, BellOff, Volume2, VolumeX, Smartphone, X, ArrowUp, Star, Search } from "lucide-react";
@@ -39,7 +45,8 @@ import { putQuote, getQuote, QUOTE_EVENT } from "../lib/quoteBus"; // [2026-11-1
 import LivePct from "../components/LivePct"; // [2026-11-04] 등락률 칸을 부드럽게
 import BriefingBand from "../components/BriefingBand";
 import { extractThemes } from "../lib/todayBrief";
-import { isPoliticalTheme } from "../lib/themeData";
+import { isPoliticalTheme } from "../lib/politicalThemes"; // [2026-11-17] 큰 테마 표를 홈에 싣지 않게
+import { loadThemeMomentum } from "../lib/themeMomentumClient";
 // [2026-10-27 추가] 휴대폰 전용 홈 탭(속보·시장·관심) — lib/mobileTab.js 설명 참고
 import {
   HOME_TAB_REQUEST,
@@ -212,10 +219,9 @@ function HotThemePanel() {
   const [range, setRange] = useState("1W"); // "1W" | "1M" — 재성님 요청으로 기본값을 1주일로 변경
 
   useEffect(() => {
-    fetch("/api/theme-momentum")
-      .then((r) => r.json())
+    loadThemeMomentum() // [2026-11-17] 홈에서 3번 따로 받던 것을 한 번만 (lib/themeMomentumClient.js)
       .then((data) => {
-        if (!data.themeChanges) {
+        if (!data || !data.themeChanges) {
           setState("error");
           return;
         }
@@ -302,10 +308,9 @@ function DailyMoversPanel() {
   const [baseDay, setBaseDay] = useState("");
 
   useEffect(() => {
-    fetch("/api/theme-momentum")
-      .then((r) => r.json())
+    loadThemeMomentum() // [2026-11-17] 한 번만 받기
       .then((data) => {
-        if (!data.dailyMovers || !data.themeChanges) {
+        if (!data || !data.dailyMovers || !data.themeChanges) {
           setState("error");
           return;
         }

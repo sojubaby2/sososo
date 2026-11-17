@@ -21,7 +21,7 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { ChevronDown, ExternalLink, AlertTriangle } from "lucide-react";
 import { openStockChart } from "../lib/openStockChart";
-import { isPoliticalTheme } from "../lib/themeData";
+import { isPoliticalTheme } from "../lib/politicalThemes"; // [2026-11-17] 큰 테마 표를 싣지 않게
 
 export const FRESH_MINUTES = 15; // 이 시간 안의 속보에 빨간 "속보" 딱지
 const OPEN_GROUPS = 2; // 처음에 펼쳐 둘 시간 묶음 수

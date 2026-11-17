@@ -14,6 +14,7 @@
 //         Cloudflare에서는 DART 접속이 막히는 일이 있어 Vercel 쪽 같은 주소를 먼저 불러 봅니다.
 
 import { getRedis } from "./redis";
+import { memo } from "./memoCache";
 import { dartGet, fetchList, mapLimit, kstTodayIso } from "./disclosures";
 
 const FRESH_MS = 60 * 60 * 1000; // 1시간
@@ -135,7 +136,7 @@ const hasData = (d) => Boolean(d && Array.isArray(d.items) && d.items.length);
 async function fromVercel() {
   if (process.env.VERCEL) return null;
   const ctl = new AbortController();
-  const t = setTimeout(() => ctl.abort(), 30000);
+  const t = setTimeout(() => ctl.abort(), 12000); // [2026-11-17] 30초 → 12초
   try {
     const res = await fetch("https://sososo-xi.vercel.app/api/earnings", { signal: ctl.signal, cache: "no-store" });
     if (!res.ok) return null;
@@ -148,7 +149,13 @@ async function fromVercel() {
   }
 }
 
-export async function getEarningsData() {
+// [2026-11-17 변경] 같은 서버 조각 안에서는 5분 동안 결과를 기억(자료가 비어 있는 결과도) —
+//   실적 자료를 못 받는 날에 부를 때마다 8초씩 다시 시도하던 것을 막음.
+export function getEarningsData() {
+  return memo("earnings-data", 5 * 60 * 1000, getEarningsDataFresh);
+}
+
+async function getEarningsDataFresh() {
   const redis = getRedis();
   let last = null;
   if (redis) {

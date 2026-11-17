@@ -3874,3 +3874,10 @@ p, li { text-wrap: pretty; }
   .theme-groups::-webkit-scrollbar { display: none; }
   .theme-group-btn { flex: 0 0 auto; height: 36px; }
 }
+
+/* [2026-11-17] 링크를 누르는 즉시 맨 위에 뜨는 진행 막대 (components/NavProgress.js) */
+#nav-progress { position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 90; pointer-events: none; background: linear-gradient(90deg, var(--breaking-bright, #ff4d4f), var(--amber, #e8b04a)); transform-origin: 0 50%; transform: scaleX(0); opacity: 0; }
+#nav-progress[data-state="run"] { opacity: 1; transform: scaleX(0.82); transition: transform 2.4s cubic-bezier(0.1, 0.7, 0.2, 1), opacity 0.1s linear; }
+#nav-progress[data-state="done"] { opacity: 0; transform: scaleX(1); transition: transform 0.18s ease-out, opacity 0.22s ease 0.1s; }
+/* 누른 단추·줄이 바로 반응하게(살짝 눌리는 느낌) — 다음 화면을 기다리는 동안 "눌렸다"는 표시 */
+.nav-btn:active, .m-tab:active, .m-menu-item:active, .theme-item:active, .theme-group-btn:active { opacity: 0.6; }

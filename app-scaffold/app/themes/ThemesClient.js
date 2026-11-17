@@ -18,6 +18,7 @@ import Header from "../../components/Header";
 import { getThemesGrouped, isPoliticalTheme } from "../../lib/themeData";
 // [2026-11-17] 테마가 250개로 늘어 "분야별로 보기" 단추를 붙임 (lib/themeGroups.js)
 import { THEME_GROUP_NAMES, groupOfTheme } from "../../lib/themeGroups";
+import { loadThemeMomentum } from "../../lib/themeMomentumClient";
 
 const THEMES = getThemesGrouped(); // [{ theme, stocks: [{theme,name,code,market}] }, ...]
 
@@ -140,10 +141,9 @@ export default function ThemesClient() {
   }, []);
 
   useEffect(() => {
-    fetch("/api/theme-momentum")
-      .then((r) => r.json())
+    loadThemeMomentum() // [2026-11-17] 홈에서 이미 받았으면 그대로 써서 바로 뜸 (lib/themeMomentumClient.js)
       .then((data) => {
-        if (data.error || !data.themeChanges) {
+        if (!data || data.error || !data.themeChanges) {
           setLoadState("error");
           return;
         }

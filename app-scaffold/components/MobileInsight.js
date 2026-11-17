@@ -15,11 +15,12 @@
 //   예전 시장 탭(카드가 아무렇게나 섞여 있던 모양)은 lib/mobileLayout.js를 "shorts"로 바꾸면 돌아옵니다.
 
 import Link from "next/link";
+import { loadThemeMomentum } from "../lib/themeMomentumClient";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronRight, CalendarClock, Layers, Activity, Ticket, FileText, BarChart3 } from "lucide-react";
 import AthBreakoutPanel from "./AthBreakoutPanel";
 import { openStockChart } from "../lib/openStockChart";
-import { isPoliticalTheme } from "../lib/themeData";
+import { isPoliticalTheme } from "../lib/politicalThemes"; // [2026-11-17] 큰 테마 표를 싣지 않게
 
 const SECTIONS = [
   { id: "mi-index", label: "지수" },
@@ -69,19 +70,7 @@ function fmtValue(v, t) {
 }
 
 // 여러 칸이 같은 자료를 쓰므로 한 번만 받기(테마 히트맵·급등락)
-let tmPromise = null;
-function loadThemeMomentum() {
-  if (!tmPromise) {
-    tmPromise = fetch("/api/theme-momentum")
-      .then((r) => (r.ok ? r.json() : null))
-      .catch(() => null)
-      .then((d) => {
-        if (!d) tmPromise = null; // 실패하면 다음에 다시 시도
-        return d;
-      });
-  }
-  return tmPromise;
-}
+// [2026-11-17] PC 홈·테마 화면과도 같이 쓰도록 lib/themeMomentumClient.js로 옮김
 function useThemeMomentum() {
   const [data, setData] = useState(null);
   const [state, setState] = useState("loading");

@@ -17,6 +17,8 @@ import VignetteGuard from "../components/VignetteGuard";
 import SideAds from "../components/SideAds";
 // [2026-10-29 추가] 종목 검색 창 — 위 메뉴줄 돋보기·홈 검색창·"/" 키로 열림(components/StockSearch.js)
 import StockSearch from "../components/StockSearch";
+import NavProgress from "../components/NavProgress";
+import { Suspense } from "react";
 
 const SITE_URL = "https://newsmeme.co.kr";
 const TITLE = "뉴스매매 — 실시간 뉴스 속보와 관련주 매칭";
@@ -125,6 +127,10 @@ export default function RootLayout({ children }) {
         {/* [2026-10-27] 드래그 방지 (components/NoDrag.js) */}
         <NoDrag />
         <MotionFX />
+        {/* [2026-11-17] 링크를 누르는 즉시 맨 위에 뜨는 진행 막대 (components/NavProgress.js) */}
+        <Suspense fallback={null}>
+          <NavProgress />
+        </Suspense>
         {/* [2026-10-27] 휴대폰 전용 맨 아래 탭 줄 (components/MobileTabBar.js) */}
         <MobileTabBar />
         {/* [2026-10-28] 앵커 광고와 겹치지 않게 (components/AnchorAdSpacer.js) */}

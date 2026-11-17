@@ -68,13 +68,8 @@ export function getThemesGrouped() {
 // isPoliticalTheme()로 걸러내는 데 쓰고 있고, 나중에 정치 테마를 다시
 // 넣더라도 그 필터가 그대로 동작해야 하기 때문입니다. 다시 넣으실 때는
 // themeData.json에 종목을 추가하기만 하면 됩니다.
-export const POLITICAL_THEMES = new Set([
-  "이재명", "애국테마주", "김민석", "김경수", "김동연",
-  "최재형", "안철수", "한동훈", "홍준표", "오세훈", "이준석",
-]);
-
-export function isPoliticalTheme(themeName) {
-  return POLITICAL_THEMES.has(themeName);
-}
+// [2026-11-17] 목록과 함수는 lib/politicalThemes.js로 옮김(홈 화면이 이 큰 표를 통째로 내려받지 않게). 여기서는 그대로 다시 내보냄.
+import { POLITICAL_THEMES, isPoliticalTheme } from "./politicalThemes";
+export { POLITICAL_THEMES, isPoliticalTheme };
 
 export default raw;
