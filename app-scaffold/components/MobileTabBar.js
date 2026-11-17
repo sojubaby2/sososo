@@ -33,6 +33,8 @@ import {
   LineChart,
   BookOpen,
   Sunrise,
+  Target,
+  CalendarCheck,
   X,
 } from "lucide-react";
 import { MENU, FOOTER_LINKS, isMenuActive } from "../lib/siteMenu";
@@ -58,6 +60,10 @@ const ICONS = {
   book: BookOpen,
   // [2026-10-29 추가] 장전 브리핑
   sunrise: Sunrise,
+  // [2026-11-14 추가] 내 종목 분석기
+  target: Target,
+  // [2026-11-15 추가] 실적 캘린더
+  calcheck: CalendarCheck,
 };
 
 export default function MobileTabBar() {

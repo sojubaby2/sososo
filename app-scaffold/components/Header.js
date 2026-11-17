@@ -47,9 +47,9 @@ import { openStockSearch } from "../lib/openStockSearch";
 import { MENU, isMenuActive } from "../lib/siteMenu";
 // [2026-10-29] 재성님: "이 메뉴들이 눈에 너무 안띄어" → 메뉴마다 작은 그림 + 알약 모양 + 꼬리표(lib/siteMenu.js의 live·badge)
 //   그림은 휴대폰 "전체" 창(components/MobileTabBar.js)과 같은 것. 좁은 PC 화면(1280px 아래)에서는 그림을 숨겨 한 줄에 들어가게(globals.css)
-import { Zap, CandlestickChart, Layers, Ticket, CalendarDays, BarChart3, LineChart, BookOpen, LayoutGrid, Sunrise, Search } from "lucide-react";
+import { Zap, CandlestickChart, Layers, Ticket, CalendarDays, BarChart3, LineChart, BookOpen, LayoutGrid, Sunrise, Search, Target, CalendarCheck } from "lucide-react";
 
-const ICONS = { zap: Zap, candle: CandlestickChart, layers: Layers, ticket: Ticket, calendar: CalendarDays, bars: BarChart3, line: LineChart, book: BookOpen, sunrise: Sunrise };
+const ICONS = { zap: Zap, candle: CandlestickChart, layers: Layers, ticket: Ticket, calendar: CalendarDays, bars: BarChart3, line: LineChart, book: BookOpen, sunrise: Sunrise, target: Target, calcheck: CalendarCheck };
 
 // 메뉴 한 칸의 안쪽(그림 + 이름 + 실시간 점/꼬리표)
 // [2026-11-02 추가] 메뉴 옆 "오늘의 살아 있는 표시" — /api/nav-badges(lib/navBadges.js)에서 받아 옴.

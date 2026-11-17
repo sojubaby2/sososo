@@ -226,6 +226,12 @@
 .fx-hotchart {
   height: 120px;
   margin: 6px -4px 10px;
+  position: relative;
+}
+/* [2026-11-14] 그래프가 칸(120px) 밖으로 넘쳐 아래 목록을 덮던 문제 — 칸 높이를 꽉 채우고 그 이상 커지지 않게 */
+.fx-hotchart > .fx-hotchart-in {
+  height: 100%;
+  aspect-ratio: auto !important;
 }
 .fx-hotchart-cap {
   font-size: 11px;

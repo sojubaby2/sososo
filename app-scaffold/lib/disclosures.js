@@ -104,7 +104,8 @@ function oneDate(text) {
 }
 
 // ── DART 호출 ──
-async function dartGet(path, params, revalidate) {
+// [2026-11-15] lib/earnings.js(실적 캘린더)도 같이 쓰도록 export
+export async function dartGet(path, params, revalidate) {
   const key = process.env.DART_API_KEY;
   if (!key) return null;
   const controller = new AbortController();
@@ -121,7 +122,8 @@ async function dartGet(path, params, revalidate) {
   }
 }
 
-async function mapLimit(items, limit, fn) {
+// [2026-11-15] lib/earnings.js(실적 캘린더)도 같이 쓰도록 export
+export async function mapLimit(items, limit, fn) {
   const out = new Array(items.length);
   let i = 0;
   const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
@@ -135,7 +137,8 @@ async function mapLimit(items, limit, fn) {
 }
 
 // 공시 목록(한 종류) — 상장사(코스피 Y·코스닥 K)만, 필요한 칸만 남겨서
-async function fetchList(pblntfTy, bgnIso, endIso, extra = {}, maxPages = MAX_PAGES_B) {
+// [2026-11-15] lib/earnings.js(실적 캘린더)도 같이 쓰도록 export
+export async function fetchList(pblntfTy, bgnIso, endIso, extra = {}, maxPages = MAX_PAGES_B) {
   const base = { bgn_de: ymdOf(bgnIso), end_de: ymdOf(endIso), pblntf_ty: pblntfTy, page_count: "100", ...extra };
   const first = await dartGet("list.json", { ...base, page_no: "1" }, LIST_REVALIDATE);
   if (!first || first.status !== "000") return [];

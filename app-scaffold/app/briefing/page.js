@@ -34,6 +34,11 @@ export default async function BriefingIndexPage() {
     <div>
       <Header />
       <main className="stock-page market-page mk2 pmk">
+        {/* [2026-11-15 추가] 내일 장 미리 보기(app/overnight)로 가는 띠 */}
+        <Link className="pm-overnight-link" href="/overnight">
+          <span>밤사이 미국 증시와 삼성전자·SK하이닉스 해외 시세, 지금 어떻게 움직이고 있을까요?</span>
+          <b>내일 장 미리 보기 →</b>
+        </Link>
         {latest ? (
           <BriefingView b={latest} latest />
         ) : (

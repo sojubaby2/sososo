@@ -18,7 +18,7 @@ import { getMarketDates, getMarketDay, koreanDate } from "../../lib/marketDay";
 import { getMarketFlow } from "../../lib/investorFlow";
 import { marketHeadline, marketPoints } from "../../lib/marketReport";
 import { pct1, tone, eok, heat, IndexCard } from "../../components/MarketParts";
-import { unstable_cache } from "next/cache";
+import { memo } from "../../lib/memoCache";
 
 // [2026-10-27] 저장소(Redis) 읽기는 "매번 새로" 방식이라 미리 만들어 두는 페이지와 함께 쓰면 오류가 납니다.
 export const dynamic = "force-dynamic";
@@ -128,7 +128,9 @@ async function buildIndexData() {
     points: top ? marketPoints(top, flowAll).slice(0, 3) : [],
   };
 }
-const getIndexData = unstable_cache(buildIndexData, ["market-index-v1"], { revalidate: 120 });
+// [2026-11-16 변경] Cloudflare 저장소(unstable_cache)가 옛 묶음을 몇 시간씩 내주는 일이 있어, 서버 안에 2분만 기억하는 방식으로 바꿈.
+//   (날짜별 계산 결과는 그대로 저장해 두고 재사용하므로 느려지지 않습니다)
+const getIndexData = () => memo("market-index", 120 * 1000, buildIndexData);
 
 export default async function MarketIndexPage() {
   let data = null;

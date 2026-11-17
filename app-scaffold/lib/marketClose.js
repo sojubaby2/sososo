@@ -14,6 +14,7 @@
 // 언제 도나:
 //   Cloudflare 예약 실행(wrangler.jsonc의 triggers, custom-worker.js)이 평일 15시~17시 사이 3분마다
 //   /api/market-close를 부릅니다. 한 번에 약 700종목씩 받아서 4~5번이면 끝납니다.
+//   [2026-11-16 추가] 그때까지 못 만들었으면 18시~23시 매시 15분에 이어서 다시 시도합니다(custom-worker.js).
 //   ★ 야후 국내 시세는 15~20분 늦게 나옵니다. 그래서 실제로 정리가 올라오는 건 보통 15시 55분~16시 10분쯤입니다.
 //     (15:30 종가가 야후에 반영됐는지 대표 종목 3개로 먼저 확인하고, 아직이면 기다렸다가 다음 차례에 다시 봅니다)
 //
@@ -26,6 +27,8 @@
 // 정식 자료(hist:day:, hist:dates)와 따로 둬서, 패턴검색 등 다른 기능은 확정 자료만 계속 씁니다.
 
 const YAHOO_URL = "https://query1.finance.yahoo.com/v8/finance/chart";
+// [2026-11-16 추가] 첫 주소가 막히거나 응답이 없을 때 쓰는 야후의 두 번째 주소(대표 종목 확인에만 씀)
+const YAHOO_URL_2 = "https://query2.finance.yahoo.com/v8/finance/chart";
 const BROWSER_UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36";
 
@@ -39,7 +42,10 @@ const PER_RUN = 700; // 한 번 실행에 받을 종목 수
 const CONCURRENCY = 10; // 동시에 보내는 요청 수
 const RUN_BUDGET_MS = 25000; // 한 번 실행 최대 시간
 const START_MIN = 15 * 60 + 33; // 15:33부터 시도
-const STOP_MIN = 17 * 60 + 30; // 17:30 이후엔 안 함
+// [2026-11-16 변경] 17:30 → 23:50. 재성님: "장마감 정리 왜 안올라와"
+//   예전엔 17:30까지 못 만들면 그날은 끝이라, 그 시간대에 야후가 잠깐 막히면 다음 날 아침까지 정리가 비었습니다.
+//   이제 밤 11시 50분까지 계속 다시 시도합니다(18시 이후엔 매시 15분 예약 실행이 이어서 부름 — custom-worker.js).
+const STOP_MIN = 23 * 60 + 50;
 const GIVE_UP_MIN = 16 * 60 + 40; // 이때까지 다 못 모으면 모인 만큼으로 마무리(60% 이상일 때)
 // [2026-10-29 전체 점검] 0.95 → 0.9 — 10/29엔 야후에 없는 종목이 7%쯤이라 95%를 못 채워서, 16시 40분 "포기 시각"까지
 //   기다렸다가 마무리됐음(평소 16시 10분쯤 → 30분 늦게 올라옴). 빠진 종목은 다음 날 아침 한국거래소 확정치로 채워짐.
@@ -71,38 +77,55 @@ function symbolOf(r) {
   return `${r.code}.${String(r.market || "").includes("닥") ? "KQ" : "KS"}`;
 }
 
-// 종목 하나 — 오늘 15:30 이후 확정된 시세면 {o,h,l,c,v}, 아니면 null
-async function fetchClose(symbol, basDt) {
+// 종목 하나 — 야후에 물어본 결과를 상태와 함께 돌려줌
+//   { ok:true, q:{o,h,l,c,v} } 오늘 15:30 이후 확정된 시세
+//   { ok:true, q:null }        야후가 대답은 했지만 오늘 종가가 아님(아직 종가 전이거나 오늘 거래 없음)
+//   { ok:false, q:null }       야후가 대답을 안 함(막힘·시간 초과) — [2026-11-16] 이걸 "휴장"으로 착각하지 않게 구분
+async function fetchCloseStatus(symbol, basDt, base = YAHOO_URL) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 6000);
   try {
-    const res = await fetch(`${YAHOO_URL}/${encodeURIComponent(symbol)}?range=1d&interval=1d`, {
+    const res = await fetch(`${base}/${encodeURIComponent(symbol)}?range=1d&interval=1d`, {
       headers: { "User-Agent": BROWSER_UA, Accept: "application/json,text/plain,*/*" },
       signal: controller.signal,
       cache: "no-store",
     });
-    if (!res.ok) return null;
+    if (!res.ok) return { ok: false, q: null };
     const data = await res.json();
     const result = data?.chart?.result?.[0];
     const meta = result?.meta;
+    if (!meta) return { ok: false, q: null };
     const t = num(meta?.regularMarketTime);
-    if (!t || t < closeEpoch(basDt)) return null; // 아직 15:30 종가 전이거나 오늘 거래가 없음(거래정지·휴장)
-    if (t > closeEpoch(basDt) + 12 * 3600) return null; // 다른 날 자료
+    if (!t || t < closeEpoch(basDt)) return { ok: true, q: null }; // 아직 15:30 종가 전이거나 오늘 거래가 없음(거래정지·휴장)
+    if (t > closeEpoch(basDt) + 12 * 3600) return { ok: true, q: null }; // 다른 날 자료
     const q = result?.indicators?.quote?.[0] || {};
     const c = lastNum(q.close) ?? num(meta.regularMarketPrice);
-    if (c === null) return null;
+    if (c === null) return { ok: true, q: null };
     return {
-      o: lastNum(q.open) ?? c,
-      h: lastNum(q.high) ?? num(meta.regularMarketDayHigh) ?? c,
-      l: lastNum(q.low) ?? num(meta.regularMarketDayLow) ?? c,
-      c,
-      v: lastNum(q.volume) ?? num(meta.regularMarketVolume) ?? undefined,
+      ok: true,
+      q: {
+        o: lastNum(q.open) ?? c,
+        h: lastNum(q.high) ?? num(meta.regularMarketDayHigh) ?? c,
+        l: lastNum(q.low) ?? num(meta.regularMarketDayLow) ?? c,
+        c,
+        v: lastNum(q.volume) ?? num(meta.regularMarketVolume) ?? undefined,
+      },
     };
   } catch {
-    return null;
+    return { ok: false, q: null };
   } finally {
     clearTimeout(timer);
   }
+}
+// 오늘 15:30 이후 확정된 시세면 {o,h,l,c,v}, 아니면 null
+async function fetchClose(symbol, basDt, base = YAHOO_URL) {
+  return (await fetchCloseStatus(symbol, basDt, base)).q;
+}
+// 대표 종목 확인용 — 첫 주소가 대답을 안 하면 두 번째 주소로 한 번 더
+async function probeClose(symbol, basDt) {
+  const a = await fetchCloseStatus(symbol, basDt);
+  if (a.ok) return { ...a, base: YAHOO_URL };
+  return { ...(await fetchCloseStatus(symbol, basDt, YAHOO_URL_2)), base: YAHOO_URL_2 };
 }
 
 async function latestOfficialRecords(redis, basDt) {
@@ -136,14 +159,26 @@ export async function runMarketCloseStep(redis, { force = false, now = new Date(
   }
   if (await redis.zscore(DATES_KEY, basDt)) return { skipped: "한국거래소 확정 자료가 이미 있음", basDt };
   const existing = parse(await redis.get(PRELIM_PREFIX + basDt));
-  if (existing?.complete || existing?.holiday) return { skipped: existing.holiday ? "휴장일로 판단함" : "이미 완성", basDt };
+  if (existing?.complete) return { skipped: "이미 완성", basDt };
+  // [2026-11-16 변경] "휴장일" 표시는 야후가 실제로 대답한 걸 보고 붙인 것(checked)만 믿습니다.
+  //   예전 방식으로 붙은 표시는 야후가 잠깐 막혔을 때 잘못 붙었을 수 있어 다시 확인합니다.
+  if (existing?.holiday && existing?.checked) return { skipped: "휴장일로 판단함", basDt };
 
   // 15:30 종가가 야후에 들어왔는지 대표 종목으로 먼저 확인(야후는 15~20분 늦음)
-  const probes = await Promise.all(PROBES.map((s) => fetchClose(s, basDt)));
-  const ready = probes.filter(Boolean).length;
+  const probes = await Promise.all(PROBES.map((s) => probeClose(s, basDt)));
+  const ready = probes.filter((p) => p.q).length;
+  const answered = probes.filter((p) => p.ok).length;
+  // 첫 주소가 막혀 두 번째 주소로만 대답을 받았으면, 전 종목도 두 번째 주소로 받음
+  const base = probes.some((p) => p.ok && p.base === YAHOO_URL) ? YAHOO_URL : YAHOO_URL_2;
   if (ready === 0) {
+    // 야후가 대답을 안 한 경우(막힘·시간 초과) — 휴장으로 단정하지 않고 다음 차례에 다시 시도
+    if (answered < 2) return { waiting: "야후가 응답하지 않음 — 다음 차례에 다시 시도", basDt, answered };
     if (!force && minutes >= GIVE_UP_MIN) {
-      await redis.set(PRELIM_PREFIX + basDt, { basDt, at: new Date().toISOString(), complete: false, holiday: true }, { ex: 3 * 86400 });
+      await redis.set(
+        PRELIM_PREFIX + basDt,
+        { basDt, at: new Date().toISOString(), complete: false, holiday: true, checked: true },
+        { ex: 3 * 86400 }
+      );
       return { skipped: "오늘 종가가 없어 휴장일로 판단", basDt };
     }
     return { waiting: "야후에 아직 종가가 안 들어옴(15~20분 지연)", basDt };
@@ -162,7 +197,7 @@ export async function runMarketCloseStep(redis, { force = false, now = new Date(
   for (let i = 0; i < todo.length; i += CONCURRENCY) {
     if (Date.now() - started > RUN_BUDGET_MS) break;
     const slice = todo.slice(i, i + CONCURRENCY);
-    const got = await Promise.all(slice.map((r) => fetchClose(symbolOf(r), basDt)));
+    const got = await Promise.all(slice.map((r) => fetchClose(symbolOf(r), basDt, base)));
     got.forEach((q, k) => {
       const r = slice[k];
       tried.add(r.code);

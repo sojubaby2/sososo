@@ -30,8 +30,12 @@ export const MENU = [
   { href: "/market", label: "장 마감 정리", short: "장 마감 정리", icon: "bars" },
   { href: "/themes", label: "테마별 종목정리", pc: "테마별 종목", short: "테마별 종목", icon: "layers", vignette: true },
   { href: "/patterns", label: "패턴검색", short: "패턴검색", icon: "candle" },
+  // [2026-11-14 추가] 내 종목 분석기(app/analyzer) — 종목 + 내 평단가 → 손절·익절·물타기 기준
+  { href: "/analyzer", label: "내 종목 분석기", pc: "종목 분석기", short: "종목 분석기", icon: "target" },
   // [2026-10-27 추가] DART 공시 일정·주요 공시(app/disclosure)
   { href: "/disclosure", label: "공시 일정", short: "공시 일정", icon: "calendar" },
+  // [2026-11-15 추가] 실적 캘린더(app/earnings) — 분기 실적 발표일 + 영업이익 비교
+  { href: "/earnings", label: "실적 캘린더", short: "실적 캘린더", icon: "calcheck" },
   // [2026-10-26 변경] 바깥 DART 링크 → 우리 사이트 공모주 페이지(app/ipo, 3시간마다 자동 갱신)
   { href: "/ipo", label: "공모주 정보", pc: "공모주", short: "공모주", icon: "ticket" },
   { href: "/guide", label: "차트 가이드", short: "차트 가이드", icon: "line" },

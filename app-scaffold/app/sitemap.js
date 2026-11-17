@@ -49,6 +49,9 @@ export default async function sitemap() {
   const staticPages = [
     { path: "", changeFrequency: "hourly", priority: 1.0 },
     { path: "/patterns", changeFrequency: "daily", priority: 0.9 },
+    { path: "/analyzer", changeFrequency: "weekly", priority: 0.8 }, // [2026-11-14] 내 종목 분석기
+    { path: "/earnings", changeFrequency: "daily", priority: 0.9 }, // [2026-11-15] 실적 캘린더
+    { path: "/overnight", changeFrequency: "daily", priority: 0.8 }, // [2026-11-15] 내일 장 미리 보기
     { path: "/themes", changeFrequency: "daily", priority: 0.8 },
     { path: "/blog", changeFrequency: "daily", priority: 0.8 },
     { path: "/guide", changeFrequency: "monthly", priority: 0.6 },

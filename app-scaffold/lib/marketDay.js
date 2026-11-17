@@ -18,6 +18,7 @@
 //   · 테마별 평균 등락률 상위·하위 5 (종목 3개 이상인 테마만) + 그 테마에서 많이 오른/내린 종목
 
 import { unstable_cache } from "next/cache";
+import { memo } from "./memoCache";
 import { getRedis } from "./redis";
 import { allThemes, themeMembers, getStock } from "./stockDirectory";
 // [2026-10-28 추가] 장 마감 직후 잠정 시세(야후) — 한국거래소 확정 자료가 다음 날 아침에야 나와서
@@ -57,11 +58,11 @@ async function readDates() {
 
 // 저장된 거래일 목록(오래된 → 최신), "2026-10-27" 모양.
 // [2026-10-28 변경] 1시간 → 5분 저장 — 장 마감 직후 잠정 정리가 늦지 않게 뜨도록
-export const getMarketDates = unstable_cache(
-  async () => (await readDates()).map(toIso),
-  ["market-dates-v2"],
-  { revalidate: 300 }
-);
+// [2026-11-16 변경] 재성님: "장마감 정리 왜 안올라와"
+//   이 목록을 Cloudflare 저장소(unstable_cache)에 두면 제때 새로 안 만들어지고 옛 목록을 몇 시간씩 내주는 일이 있어서
+//   (lib/memoCache.js 맨 위 설명과 같은 문제), 오늘 정리가 다 만들어져도 목록에 오늘 날짜가 안 나타날 수 있었습니다.
+//   → 서버 안에 1분만 기억하는 방식으로 바꿈. 1분이 지나면 반드시 새로 읽습니다(Redis 읽기 몇 번, 비용 변화 거의 없음).
+export const getMarketDates = () => memo("market-dates", 60 * 1000, async () => (await readDates()).map(toIso));
 
 // 그날 전 종목 시세. 확정 자료(hist:day)가 없으면 잠정 자료(hist:prelim)를 씀 → { rows, provisional }
 async function readDay(redis, basDt) {

@@ -127,6 +127,10 @@ export default async function StockPage({ params }) {
             </h1>
             {/* [2026-11-11] 가격·차트·한눈에 보기는 들어온 순간 새 숫자로 맞춤(components/StockLive.js) */}
             <StockLivePrice />
+            {/* [2026-11-14 추가] 내 종목 분석기로 가는 단추 — 이 종목이 골라진 채로 열림(app/analyzer) */}
+            <Link className="stock-an-link" href={`/analyzer?code=${code}`}>
+              내 평단가로 손절·익절 기준 보기 →
+            </Link>
           </div>
           <WatchStar stock={{ code, name: label, market }} variant="big" />
         </header>

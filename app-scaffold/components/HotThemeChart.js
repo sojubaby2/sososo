@@ -22,7 +22,9 @@ export default function HotThemeChart({ themes, field }) {
 
   return (
     <div className="fx-hotchart" aria-hidden="true">
-      <BarChart key={field} data={rows} xDataKey="name" margin={{ top: 8, right: 4, bottom: 4, left: 4 }}>
+      {/* [2026-11-14] 그래프 크기를 칸 높이(120px)에 맞춤 — 기본값(가로:세로 2:1)이면 칸보다 커져서
+          막대가 아래 목록 첫 줄(1위 테마 이름·등락률)을 덮었음 */}
+      <BarChart key={field} data={rows} xDataKey="name" aspectRatio="auto" className="fx-hotchart-in" margin={{ top: 8, right: 4, bottom: 4, left: 4 }}>
         <Grid horizontal />
         <Bar dataKey="value" fill={allUp ? "var(--up)" : "var(--amber)"} lineCap="round" />
         <ChartTooltip />
