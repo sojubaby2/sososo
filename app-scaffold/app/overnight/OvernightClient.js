@@ -12,6 +12,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { MoonStar } from "lucide-react";
 import LivePct from "../../components/LivePct";
+import UsThemeNight from "../../components/UsThemeNight"; // [2026-11-18] 밤사이 미국 테마 칸
 import { openStockChart } from "../../lib/openStockChart";
 
 const won = (v) => (typeof v === "number" ? Math.round(v).toLocaleString("ko-KR") : "—");
@@ -137,6 +138,9 @@ export default function OvernightClient() {
             </ul>
             <p className="on-note">"환산"은 해외 가격을 환율로 바꿔 국내 1주 값으로 맞춘 것이고, 옆의 %는 국내 종가와의 차이예요.</p>
           </section>
+
+          {/* [2026-11-18] 밤사이 미국 테마 → 이어지는 한국 테마 (components/UsThemeNight.js) */}
+          <UsThemeNight />
 
           {data.groups.map((g) => (
             <section key={g.key} className="panel on-sec">

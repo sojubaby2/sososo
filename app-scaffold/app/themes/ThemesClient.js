@@ -19,6 +19,10 @@ import { getThemesGrouped, isPoliticalTheme } from "../../lib/themeData";
 // [2026-11-17] 테마가 250개로 늘어 "분야별로 보기" 단추를 붙임 (lib/themeGroups.js)
 import { THEME_GROUP_NAMES, groupOfTheme } from "../../lib/themeGroups";
 import { loadThemeMomentum } from "../../lib/themeMomentumClient";
+// [2026-11-18] 미국 테마 — 같은 화면에서 [한국 | 미국] 단추로 바꿔 보기. 미국 쪽 코드는 "미국"을 눌렀을 때만 내려받음.
+import dynamic from "next/dynamic";
+import { loadUsThemes, usThemesForKorean } from "../../lib/usThemesClient";
+const UsThemesPanel = dynamic(() => import("./UsThemesPanel"), { ssr: false, loading: () => <p className="ec-empty">미국 테마를 불러오는 중…</p> });
 
 const THEMES = getThemesGrouped(); // [{ theme, stocks: [{theme,name,code,market}] }, ...]
 
@@ -108,9 +112,68 @@ function ThemeDirectory() {
   );
 }
 
+// [2026-11-18] 한국 테마 아래에 붙는 "미국에서는" 한 줄 — 이어지는 미국 종목 4개와 밤사이 등락률
+function UsPeers({ data, theme, onOpen }) {
+  const us = usThemesForKorean(data, theme);
+  if (!us.length) return null;
+  const seen = new Set();
+  const picks = [];
+  for (const t of us) {
+    for (const s of [...t.stocks].sort((a, b) => Math.abs(b.c ?? 0) - Math.abs(a.c ?? 0))) {
+      if (seen.has(s.t) || typeof s.c !== "number") continue;
+      seen.add(s.t);
+      picks.push(s);
+      if (picks.length >= 4) break;
+    }
+    if (picks.length >= 4) break;
+  }
+  if (!picks.length) return null;
+  return (
+    <p className="us-peers">
+      <i>밤사이 미국</i>
+      {picks.map((s) => (
+        <span key={s.t}>
+          {s.n} <b className={s.c > 0 ? "up" : s.c < 0 ? "down" : ""}>{s.c > 0 ? "+" : ""}{s.c.toFixed(1)}%</b>
+        </span>
+      ))}
+      <button type="button" className="us-peers-more" onClick={onOpen}>
+        미국 테마 보기
+      </button>
+    </p>
+  );
+}
+
 export default function ThemesClient() {
   const [query, setQuery] = useState("");
   const [group, setGroup] = useState("전체"); // [2026-11-17] 분야 단추 — "전체" 또는 분야 이름
+  // [2026-11-18] "kr" 한국 테마(기본) | "us" 미국 테마. 주소에 ?m=us 가 있으면 미국으로 시작.
+  const [market, setMarket] = useState("kr");
+  const [usData, setUsData] = useState(null); // 한국 테마 아래 "미국에서는" 한 줄에 쓰는 자료
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("m") === "us") setMarket("us");
+    loadUsThemes().then(setUsData);
+  }, []);
+  const pickMarket = (m) => {
+    setMarket(m);
+    setQuery("");
+    try {
+      const u = new URL(window.location.href);
+      if (m === "us") u.searchParams.set("m", "us");
+      else {
+        u.searchParams.delete("m");
+        u.searchParams.delete("ut");
+      }
+      window.history.replaceState(null, "", u);
+    } catch {}
+  };
+  // 미국 테마에서 "이어지는 한국 테마" 단추를 눌렀을 때 — 한국 쪽으로 돌아와 그 테마를 엶
+  const pickKorean = (name) => {
+    if (!THEMES.some((t) => t.theme === name)) return;
+    pickMarket("kr");
+    setSelected(name);
+    setExpanded(name);
+    setGroup(groupOfTheme(name));
+  };
   const [selected, setSelected] = useState(THEMES[0]?.theme ?? "");
   // 모바일 드롭다운이 "펼쳐져 있는지"만 따로 관리 — selected(데스크톱 오른쪽
   // 패널/좌측 강조 표시용)는 항상 마지막으로 누른 테마를 유지하지만,
@@ -214,6 +277,9 @@ export default function ThemesClient() {
           )}
         </div>
 
+        {/* [2026-11-18] 이 테마와 이어지는 미국 종목 한 줄 — 밤사이 미국에서 어땠는지 바로 보이게. 없으면 아무것도 안 그림 */}
+        <UsPeers data={usData} theme={group.theme} onOpen={() => pickMarket("us")} />
+
         <table className="stock-table">
           <thead>
             <tr>
@@ -293,9 +359,18 @@ export default function ThemesClient() {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
           <div className="search-box" style={{ marginBottom: 0 }}>
             <Search size={16} />
-            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="테마·종목 검색 (예: 조선 엔진, 나트륨, 한화엔진)" />
+            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={market === "us" ? "미국 테마·종목 검색 (예: 원전, 엔비디아, NVDA)" : "테마·종목 검색 (예: 조선 엔진, 나트륨, 한화엔진)"} />
           </div>
-          <div className="range-toggle">
+          {/* [2026-11-18] 한국 | 미국 — 같은 화면에서 바꿔 보기 */}
+          <div className="range-toggle market-toggle" role="tablist" aria-label="시장 선택">
+            <button type="button" role="tab" aria-selected={market === "kr"} className={`range-toggle-btn ${market === "kr" ? "active" : ""}`} onClick={() => pickMarket("kr")}>
+              한국
+            </button>
+            <button type="button" role="tab" aria-selected={market === "us"} className={`range-toggle-btn ${market === "us" ? "active" : ""}`} onClick={() => pickMarket("us")}>
+              미국
+            </button>
+          </div>
+          <div className="range-toggle" style={market === "us" ? { display: "none" } : undefined}>
             <button
               type="button"
               className={`range-toggle-btn ${range === "1W" ? "active" : ""}`}
@@ -313,6 +388,9 @@ export default function ThemesClient() {
           </div>
         </div>
 
+        {market === "us" && <UsThemesPanel query={query} onPickKorean={pickKorean} />}
+
+        {market === "kr" && (<>
         {/* [2026-11-17] 분야 단추 — 테마가 250개라 분야별로 골라 보기. 검색어를 넣으면 분야와 상관없이 전체에서 찾음 */}
         <div className="theme-groups" role="tablist" aria-label="테마 분야">
           {["전체", ...THEME_GROUP_NAMES].map((g) => (
@@ -380,6 +458,7 @@ export default function ThemesClient() {
             {selectedGroup && renderThemeDetail(selectedGroup, sortedStocks)}
           </section>
         </div>
+        </>)}
 
         <AboutThemesSection />
         <ThemeDirectory />
