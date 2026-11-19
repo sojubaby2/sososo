@@ -1,13 +1,23 @@
 {
-  "name": "뉴스매매 — 실시간 뉴스 속보와 관련주 매칭",
+  "name": "뉴스매매 — 회원가입 없이 무료로 보는 실시간 주식 속보·관련주",
   "short_name": "뉴스매매",
-  "description": "실시간 경제 뉴스를 자동으로 수집하고 AI가 관련 종목을 즉시 매칭해서 보여드려요.",
+  "description": "회원가입 없이 완전 무료. 실시간 주식 속보와 관련주, 테마별 종목, 장전 브리핑, 장 마감 정리를 바로 보세요.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f2f4f7",
-  "theme_color": "#c6862b",
+  "background_color": "#121215",
+  "theme_color": "#121215",
   "icons": [
-    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
   ]
 }

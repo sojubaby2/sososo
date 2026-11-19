@@ -21,17 +21,28 @@ import NavProgress from "../components/NavProgress";
 import { Suspense } from "react";
 
 const SITE_URL = "https://newsmeme.co.kr";
-const TITLE = "뉴스매매 — 실시간 뉴스 속보와 관련주 매칭";
-const DESCRIPTION = "실시간 주식 속보와 관련주를 한눈에 보고, 빠르게 시장에 대응하세요.";
+// [2026-11-19 변경] 재성님: 네이버에 "뉴스매매"를 검색했을 때 "회원가입 없고 완전 무료" 같은 멘트가 보였으면.
+//   네이버·구글 검색 결과의 파란 제목과 그 아래 회색 설명은 아래 두 줄에서 나옵니다.
+//   (검색 로봇이 다시 다녀간 뒤에 바뀌므로 며칠~2주쯤 걸릴 수 있음)
+//   이전: "뉴스매매 — 실시간 뉴스 속보와 관련주 매칭" / "실시간 주식 속보와 관련주를 한눈에 보고, 빠르게 시장에 대응하세요."
+const TITLE = "뉴스매매 — 회원가입 없이 무료로 보는 실시간 주식 속보·관련주";
+const DESCRIPTION = "회원가입 없이 완전 무료. 실시간 주식 속보와 관련주, 테마별 종목, 장전 브리핑, 장 마감 정리를 앱 설치 없이 바로 보세요.";
 
 export const metadata = {
   metadataBase: new URL(SITE_URL),
   title: TITLE,
   description: DESCRIPTION,
   manifest: "/manifest.json",
+  // [2026-11-19 변경] 아이콘 새로 만듦(검은 바탕 + 흰 "뉴" + 빨간 실시간 점) — 재성님: "아이콘 같은 거 좀 만들고".
+  //   네이버 검색 결과 왼쪽의 작은 그림은 favicon.ico를 가져다 쓰므로 그 파일도 새로 넣었습니다(public/favicon.ico).
   icons: {
-    icon: "/icon-192.png",
-    apple: "/icon-192.png",
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon-192.png", type: "image/png", sizes: "192x192" },
+      { url: "/icon-512.png", type: "image/png", sizes: "512x512" },
+    ],
+    shortcut: "/favicon.ico",
+    apple: "/apple-touch-icon.png",
   },
   openGraph: {
     title: TITLE,
