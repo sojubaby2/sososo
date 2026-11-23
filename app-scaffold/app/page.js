@@ -60,7 +60,7 @@ export async function generateMetadata() {
   const img = ogImageUrl();
   return {
   openGraph: {
-    title: "속보 뜨는 순간, 관련주까지 한 번에 — 뉴스매매",
+    title: "실시간 주식 속보, 관련주까지 한 번에 — 뉴스매매", // [2026-11-21] "주식 속보"를 넣음
     // [2026-11-19] "회원가입 없이 완전 무료"를 맨 앞에 — 검색 결과·카톡 공유 미리보기에 보이게
     description: "회원가입 없이 완전 무료. 실시간 주식 속보마다 움직일 관련주를 함께 보여 줍니다. 테마·종목 차트·공시 일정까지 한 번에.",
     url: "/",
@@ -71,7 +71,7 @@ export async function generateMetadata() {
   },
   twitter: {
     card: "summary_large_image",
-    title: "속보 뜨는 순간, 관련주까지 한 번에 — 뉴스매매",
+    title: "실시간 주식 속보, 관련주까지 한 번에 — 뉴스매매",
     description: "회원가입 없이 완전 무료. 실시간 주식 속보마다 움직일 관련주를 함께 보여 줍니다.",
     images: [img],
   },
