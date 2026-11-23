@@ -31,7 +31,7 @@ const SITE_URL = "https://newsmeme.co.kr";
 //   ※ 이것만으로 순위가 보장되지는 않습니다 — 검색 로봇이 다시 읽어 가야 하고, 다른 사이트와의 경쟁도 있습니다.
 //   이전(11-19): "뉴스매매 — 회원가입 없이 무료로 보는 실시간 주식 속보·관련주"
 const TITLE = "뉴스매매 — 실시간 주식 속보 사이트 · 회원가입 없이 무료";
-const DESCRIPTION = "실시간 주식 속보 사이트 뉴스매매. 회원가입 없이 완전 무료로 주식 속보와 관련주, 테마별 종목, 장전 브리핑, 장 마감 정리를 앱 설치 없이 바로 보세요.";
+const DESCRIPTION = "실시간 주식 속보 사이트 뉴스매매. 회원가입 없이 완전 무료로 주식 속보와 관련주, 테마별 종목, 장전 브리핑, 장 마감 브리핑를 앱 설치 없이 바로 보세요.";
 // 검색엔진에 "이 사이트가 무엇인지" 알려 주는 표(구조화 자료). 화면에는 안 보입니다.
 const SITE_JSONLD = {
   "@context": "https://schema.org",
@@ -41,7 +41,7 @@ const SITE_JSONLD = {
   url: SITE_URL,
   inLanguage: "ko-KR",
   description: DESCRIPTION,
-  keywords: "주식 속보, 주식속보, 주식 속보 사이트, 실시간 주식 속보, 관련주, 테마주, 장전 브리핑, 장 마감 정리",
+  keywords: "주식 속보, 주식속보, 주식 속보 사이트, 실시간 주식 속보, 관련주, 테마주, 장전 브리핑, 장 마감 브리핑",
   isAccessibleForFree: true,
 };
 
@@ -49,7 +49,7 @@ export const metadata = {
   metadataBase: new URL(SITE_URL),
   title: TITLE,
   description: DESCRIPTION,
-  keywords: ["주식 속보", "주식속보", "주식 속보 사이트", "실시간 주식 속보", "관련주", "테마주", "장전 브리핑", "장 마감 정리", "뉴스매매"],
+  keywords: ["주식 속보", "주식속보", "주식 속보 사이트", "실시간 주식 속보", "관련주", "테마주", "장전 브리핑", "장 마감 브리핑", "뉴스매매"],
   manifest: "/manifest.json",
   // [2026-11-19 변경] 아이콘 새로 만듦(검은 바탕 + 흰 "뉴" + 빨간 실시간 점) — 재성님: "아이콘 같은 거 좀 만들고".
   //   네이버 검색 결과 왼쪽의 작은 그림은 favicon.ico를 가져다 쓰므로 그 파일도 새로 넣었습니다(public/favicon.ico).

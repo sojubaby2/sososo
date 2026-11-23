@@ -2,5 +2,5 @@
 import PageSkeleton from "../../../components/PageSkeleton";
 
 export default function Loading() {
-  return <PageSkeleton title="장 마감 정리" />;
+  return <PageSkeleton title="장 마감 브리핑" />;
 }

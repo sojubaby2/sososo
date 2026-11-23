@@ -369,9 +369,9 @@ function DailyMoversPanel() {
               </span>
             </div>
           ))}
-          {/* [2026-10-27] 날짜별 장 마감 정리 페이지로 */}
+          {/* [2026-10-27] 날짜별 장 마감 브리핑 페이지로 */}
           <Link href="/market" className="panel-more-link">
-            장 마감 정리 전체 보기 →
+            장 마감 브리핑 전체 보기 →
           </Link>
         </>
       )}

@@ -472,7 +472,7 @@ function FlowCard() {
     ["institution", "기관"],
   ];
   return (
-    <Card id="mi-flow" title="투자자 수급" sub={sub} more={{ href: "/market", label: "장 마감 정리에서 자세히" }}>
+    <Card id="mi-flow" title="투자자 수급" sub={sub} more={{ href: "/market", label: "장 마감 브리핑에서 자세히" }}>
       {state === "loading" ? (
         <p className="mi-empty">불러오는 중…</p>
       ) : (
@@ -516,7 +516,7 @@ function MoversCard() {
   const list = (side === "up" ? data?.dailyMovers : data?.dailyLosers) || [];
   const day = mdOf(data?.recentBasDt);
   return (
-    <Card id="mi-movers" title="급등 · 급락 종목" sub={day ? `${day} 종가 기준` : ""} more={{ href: "/market", label: "장 마감 정리 전체 보기" }}>
+    <Card id="mi-movers" title="급등 · 급락 종목" sub={day ? `${day} 종가 기준` : ""} more={{ href: "/market", label: "장 마감 브리핑 전체 보기" }}>
       <Seg value={side} onChange={setSide} options={[["up", "급등"], ["down", "급락"]]} />
       {state === "loading" ? (
         <p className="mi-empty">불러오는 중…</p>
@@ -542,7 +542,7 @@ function MoversCard() {
 
 // ── ⑧ 바로가기 ──────────────────────────────────────────────
 const LINKS = [
-  { href: "/market", label: "장 마감 정리", Icon: BarChart3 },
+  { href: "/market", label: "장 마감 브리핑", Icon: BarChart3 },
   { href: "/themes", label: "테마별 종목", Icon: Layers },
   { href: "/patterns", label: "패턴 검색", Icon: Activity },
   { href: "/ipo", label: "공모주 일정", Icon: Ticket },

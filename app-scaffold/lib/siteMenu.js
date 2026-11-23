@@ -23,15 +23,17 @@
 //   pc: PC 위 메뉴 줄에서만 쓰는 짧은 이름(메뉴가 9개라 한 줄에 들어가게). 없으면 label을 씀.
 export const MENU = [
   // [2026-10-29 순서 변경] 재성님: "홈, 장전브리핑, 장마감 정리, 테마별 종목정리, 패턴검색, 공시일정, 공모주정보, 차트가이드, 칼럼"
-  { href: "/", label: "홈 · 뉴스", short: "홈 · 속보", icon: "zap", match: (p) => p === "/", live: true },
+  // [2026-11-23] 재성님: 네이버 검색 결과 아래에 뜨는 메뉴 이름을 "실시간 뉴스 속보 · 한국·미국 테마별 종목 · 장 마감 브리핑"으로
+  //   → 네이버는 사이트 메뉴 글자를 그대로 가져가므로 메뉴 이름을 바꿨습니다.
+  { href: "/", label: "실시간 뉴스 속보", short: "실시간 속보", icon: "zap", match: (p) => p === "/", live: true },
   // [2026-10-29 추가] 매일 아침 장전 브리핑(app/briefing, lib/premarket.js)
   // [2026-11-02] 고정 "NEW" 표시는 뺐습니다 — 대신 메뉴마다 그날 바뀐 내용을 작게 보여 줌(lib/navBadges.js, components/Header.js)
   { href: "/briefing", label: "장전 브리핑", short: "장전 브리핑", icon: "sunrise" },
-  { href: "/market", label: "장 마감 정리", short: "장 마감 정리", icon: "bars" },
-  { href: "/themes", label: "테마별 종목정리", pc: "테마별 종목", short: "테마별 종목", icon: "layers", vignette: true },
+  { href: "/market", label: "장 마감 브리핑", short: "장 마감 브리핑", icon: "bars" },
+  { href: "/themes", label: "한국·미국 테마별 종목", short: "한·미 테마 종목", icon: "layers", vignette: true },
   { href: "/patterns", label: "패턴검색", short: "패턴검색", icon: "candle" },
   // [2026-11-14 추가] 내 종목 분석기(app/analyzer) — 종목 + 내 평단가 → 손절·익절·물타기 기준
-  { href: "/analyzer", label: "내 종목 분석기", pc: "종목 분석기", short: "종목 분석기", icon: "target" },
+  { href: "/analyzer", label: "종목 분석기", short: "종목 분석기", icon: "target" },
   // [2026-10-27 추가] DART 공시 일정·주요 공시(app/disclosure)
   { href: "/disclosure", label: "공시 일정", short: "공시 일정", icon: "calendar" },
   // [2026-11-15 추가] 실적 캘린더(app/earnings) — 분기 실적 발표일 + 영업이익 비교

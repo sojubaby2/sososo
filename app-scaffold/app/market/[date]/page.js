@@ -1,13 +1,13 @@
 // app/market/[date]/page.js
 //
-// [2026-10-27 신설] 날짜별 "장 마감 정리" — 예) /market/2026-10-26
+// [2026-10-27 신설] 날짜별 "장 마감 브리핑" — 예) /market/2026-10-26
 //
-// 재성님 요청: 방문자를 늘릴 아이디어 중 "오늘 장 마감 정리 페이지 매일 쌓기".
+// 재성님 요청: 방문자를 늘릴 아이디어 중 "오늘 장 마감 브리핑 페이지 매일 쌓기".
 // "10월 26일 급등주"처럼 날짜로 검색하는 사람이 들어오는 입구가 됩니다.
 // 매일 따로 글을 쓰는 게 아니라, 이미 저장되는 전 종목 일별 시세로 자동 계산합니다
 // (lib/marketDay.js — 비용 0, 계산 결과는 날짜별로 저장해 재사용).
 //
-// [2026-10-29 전면 개편] 재성님: "장 마감 정리로 홍보를 좀 해보려고하는데 화면이 좀 단조로운거같어
+// [2026-10-29 전면 개편] 재성님: "장 마감 브리핑로 홍보를 좀 해보려고하는데 화면이 좀 단조로운거같어
 //   혁신적으로 바꿔봐 영양가도 좀 올려주고" → "마감 리포트" 모양으로 다시 짰습니다.
 //   1. 맨 위 큰 제목 한 줄(숫자로 자동 작성) + 코스피·코스닥 지수 카드(오름/내림 막대, 상한가·하한가, 거래대금)
 //   2. 오늘의 포인트 — 수급·시장 온도·주도 테마·거래대금 쏠림·상한가를 문장으로
@@ -44,13 +44,13 @@ export async function generateMetadata({ params }) {
   const md = `${Number(d.date.slice(5, 7))}월 ${Number(d.date.slice(8, 10))}일`;
   const top = d.gainers.slice(0, 3).map((x) => x.name).join(", ");
   const head = marketHeadline(d, flow);
-  const title = `${md} 장 마감 정리 — ${head || "급등주·급락주·테마"} | 뉴스매매`;
+  const title = `${md} 장 마감 브리핑 — ${head || "급등주·급락주·테마"} | 뉴스매매`;
   const description = `${koreanDate(d.date)} 코스피·코스닥 마감 리포트. ${head}. 외국인·기관 수급, 테마 지도, 상승률 상위 ${top} 등 급등주와 관련 속보.`;
   return {
     title,
     description,
     alternates: { canonical: `/market/${d.date}` },
-    openGraph: { title: `${md} 장 마감 정리`, description, type: "article" },
+    openGraph: { title: `${md} 장 마감 브리핑`, description, type: "article" },
   };
 }
 
@@ -237,7 +237,7 @@ export default async function MarketDayPage({ params }) {
       <Header />
       <main className="stock-page market-page mk2">
         <nav className="stock-crumb" aria-label="위치">
-          <Link href="/">홈</Link> › <Link href="/market">장 마감 정리</Link> › <span>{d.date}</span>
+          <Link href="/">홈</Link> › <Link href="/market">장 마감 브리핑</Link> › <span>{d.date}</span>
         </nav>
 
         {/* ── 맨 위: 리포트 제목 ── */}
@@ -259,7 +259,7 @@ export default async function MarketDayPage({ params }) {
             ))}
           </div>
           <div className="mk2-hero-actions">
-            <ShareButton title={`${md} 장 마감 정리 | 뉴스매매`} text={headline} path={`/market/${d.date}`} label="이 리포트 공유하기" />
+            <ShareButton title={`${md} 장 마감 브리핑 | 뉴스매매`} text={headline} path={`/market/${d.date}`} label="이 리포트 공유하기" />
           </div>
         </header>
 
@@ -434,7 +434,7 @@ export default async function MarketDayPage({ params }) {
 
         <div className="mk2-bottom-share">
           <span>이 정리가 도움이 됐다면 주식 하는 친구에게 공유해 주세요</span>
-          <ShareButton title={`${md} 장 마감 정리 | 뉴스매매`} text={headline} path={`/market/${d.date}`} />
+          <ShareButton title={`${md} 장 마감 브리핑 | 뉴스매매`} text={headline} path={`/market/${d.date}`} />
         </div>
 
         <nav className="mk-pager" aria-label="다른 날짜">

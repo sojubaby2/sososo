@@ -1,6 +1,6 @@
 // app/market/page.js
 //
-// [2026-10-27 신설] 장 마감 정리 — 날짜 목록. 최신 날짜 정리를 위에 크게 보여주고,
+// [2026-10-27 신설] 장 마감 브리핑 — 날짜 목록. 최신 날짜 정리를 위에 크게 보여주고,
 // 아래에 최근 거래일 목록을 둡니다(각 날짜 → /market/날짜).
 //
 // [2026-10-29 전면 개편] 재성님: "장마감 정리를 눌렀을때 이 화면이 너무 허접해보여서 뭔가 더 눌러볼거같지가 않은데
@@ -24,7 +24,7 @@ import { memo } from "../../lib/memoCache";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "장 마감 정리 — 매일 오후 4시 코스피·코스닥 마감 리포트 | 뉴스매매",
+  title: "장 마감 브리핑 — 매일 오후 4시 코스피·코스닥 마감 리포트 | 뉴스매매",
   description:
     "매 거래일 장 마감 뒤 코스피·코스닥 전 종목을 정리한 마감 리포트. 외국인·기관 수급, 강세·약세 테마 지도, 급등주와 그 이유가 된 속보, 거래대금 상위 종목을 날짜별로 정리합니다.",
   alternates: { canonical: "/market" },
@@ -149,7 +149,7 @@ export default async function MarketIndexPage() {
       <Header />
       <main className="stock-page market-page mk2 mkh">
         <header className="mkh-top">
-          <h1 className="mk-title">장 마감 정리</h1>
+          <h1 className="mk-title">장 마감 브리핑</h1>
           <p className="mkh-lead">
             매 거래일 <b>오후 4시 전후</b>, 코스피·코스닥 전 종목을 한 장의 리포트로 정리합니다.
           </p>
@@ -229,7 +229,7 @@ export default async function MarketIndexPage() {
                 <small>수급 · 테마 지도 · 급등주가 오른 이유 · 대형주 성적표</small>
               </Link>
               <ShareButton
-                title={`${Number(latest.date.slice(5, 7))}월 ${Number(latest.date.slice(8, 10))}일 장 마감 정리 | 뉴스매매`}
+                title={`${Number(latest.date.slice(5, 7))}월 ${Number(latest.date.slice(8, 10))}일 장 마감 브리핑 | 뉴스매매`}
                 text={headline}
                 path={`/market/${latest.date}`}
               />
