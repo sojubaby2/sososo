@@ -172,14 +172,19 @@ export default function ThemesClient() {
     pickMarket("kr");
     setSelected(name);
     setExpanded(name);
+    setUserPicked(true);
     setGroup(groupOfTheme(name));
   };
-  const [selected, setSelected] = useState(THEMES[0]?.theme ?? "");
+  // [2026-11-25 고침] 처음 들어오면 왼쪽 목록 1위(등락률 가장 높은 테마)가 오른쪽에 보여야 하는데,
+  //   자료 파일의 맨 첫 테마("세종시 이전")가 고정으로 떠 있었습니다(왼쪽 1위는 "로봇"인데 오른쪽은 다른 테마).
+  //   → 사용자가 직접 테마를 고르기 전(userPicked=false)에는 "지금 목록의 1위"를 보여 줍니다.
+  const [userPicked, setUserPicked] = useState(false);
+  const [selectedRaw, setSelected] = useState(THEMES[0]?.theme ?? "");
   // 모바일 드롭다운이 "펼쳐져 있는지"만 따로 관리 — selected(데스크톱 오른쪽
   // 패널/좌측 강조 표시용)는 항상 마지막으로 누른 테마를 유지하지만,
   // 모바일에서는 같은 테마를 한 번 더 누르면 드롭다운만 접히고 selected는
   // 그대로 둠(다시 열면 바로 그 테마가 보이도록).
-  const [expanded, setExpanded] = useState(THEMES[0]?.theme ?? "");
+  const [expandedRaw, setExpanded] = useState(THEMES[0]?.theme ?? "");
   const [rawThemeChanges, setRawThemeChanges] = useState([]); // [{theme, change1W, change1M}, ...]
   const [stockChanges1W, setStockChanges1W] = useState({}); // code -> change1W
   const [stockChanges1M, setStockChanges1M] = useState({}); // code -> change1M
@@ -199,6 +204,7 @@ export default function ThemesClient() {
     if (themeParam && THEMES.some((t) => t.theme === themeParam)) {
       setSelected(themeParam);
       setExpanded(themeParam);
+      setUserPicked(true);
       setGroup(groupOfTheme(themeParam)); // [2026-11-17] 그 테마가 속한 분야를 같이 열어 줌
     }
   }, []);
@@ -260,7 +266,6 @@ export default function ThemesClient() {
     return m;
   }, []);
 
-  const selectedGroup = THEMES.find((t) => t.theme === selected) ?? THEMES[0];
 
   // 종목 테이블 하나를 데스크톱 오른쪽 패널과 모바일 인라인 드롭다운
   // 양쪽에서 그대로 재사용하기 위한 렌더 함수.
@@ -346,6 +351,12 @@ export default function ThemesClient() {
     });
   }, [filteredThemes, themeChangeMap]);
 
+  // [2026-11-25] 직접 고르기 전에는 목록 1위를, 고른 뒤에는 고른 테마를 보여 줌
+  const topTheme = sortedThemes[0]?.theme ?? "";
+  const selected = userPicked ? selectedRaw : topTheme || selectedRaw;
+  const expanded = userPicked ? expandedRaw : topTheme || expandedRaw;
+  const selectedGroup = THEMES.find((t) => t.theme === selected) ?? THEMES[0];
+
   // Within the selected theme, sort stocks by the same range's change — this
   // is what stands in for a "대장주" leaderboard now that we don't show a
   // same-day price/change (which looked live but wasn't). sortStocksFor is
@@ -429,7 +440,8 @@ export default function ThemesClient() {
                     <button
                       onClick={() => {
                         setSelected(t.theme);
-                        setExpanded((prev) => (prev === t.theme ? "" : t.theme));
+                        setExpanded(expanded === t.theme ? "" : t.theme);
+                        setUserPicked(true);
                       }}
                       className={`theme-item ${isActive ? "active" : ""}`}
                     >
