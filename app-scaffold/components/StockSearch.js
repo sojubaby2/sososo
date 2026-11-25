@@ -40,6 +40,13 @@ function chosung(s) {
 }
 const isChoOnly = (q) => /^[ㄱ-ㅎ]+$/.test(q);
 const norm = (s) => String(s || "").replace(/\s+/g, "").toLowerCase();
+// [2026-11-25 추가] 흔히 쓰는 약칭으로도 찾기 — "SKIET"를 쳐도 SK아이이테크놀로지가 나오게
+//   왼쪽: 약칭(띄어쓰기 없이 소문자), 오른쪽: 거래소 등록 이름
+const SEARCH_ALIASES = {
+  skiet: "SK아이이테크놀로지", lg엔솔: "LG에너지솔루션", 삼바: "삼성바이오로직스", 하닉: "SK하이닉스", 하이닉스: "SK하이닉스",
+  현대자동차: "현대차", 네이버: "NAVER", 한전: "한국전력", skt: "SK텔레콤", 한화에어로: "한화에어로스페이스", sk이노: "SK이노베이션",
+  jyp: "JYP Ent.", sm엔터: "에스엠", yg엔터: "와이지엔터테인먼트", 포스코홀딩스: "POSCO홀딩스",
+};
 const pct = (v) => (typeof v === "number" ? `${v > 0 ? "+" : ""}${v.toFixed(2)}%` : "");
 const tone = (v) => (v > 0 ? "up" : v < 0 ? "down" : "");
 const won = (v) => (typeof v === "number" ? `${Math.round(v).toLocaleString("ko-KR")}원` : "");
@@ -158,9 +165,13 @@ export default function StockSearch() {
     const nq = norm(raw);
     const cho = isChoOnly(nq);
     const scored = [];
+    // 약칭으로 친 경우(약칭과 똑같거나, 3글자 이상 치고 약칭의 앞부분과 맞으면) 그 종목 이름
+    const aliasNames = new Set();
+    if (!cho) for (const [al, nm] of Object.entries(SEARCH_ALIASES)) if (al === nq || (nq.length >= 3 && al.startsWith(nq))) aliasNames.add(nm);
     for (const r of rows) {
       let s = 0;
       if (/^\d{2,6}$/.test(nq) && r.code.startsWith(nq)) s = 90;
+      else if (aliasNames.has(r.name)) s = 95;
       else if (r.n === nq) s = 100;
       else if (r.n.startsWith(nq)) s = 80;
       else if (r.n.includes(nq)) s = 60;
